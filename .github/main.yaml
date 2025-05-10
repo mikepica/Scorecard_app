@@ -1,0 +1,46 @@
+
+# Continuous Integration Pipeline for Streamlit App
+name: Azimuth Demo Apps
+
+on:
+  push:
+    branches:
+      - 'main'
+  
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on:
+      - self-hosted
+      - azimuth
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+            persist-credentials: 'false'
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: harbor.csis.astrazeneca.net
+          username: ${{ secrets.AZIMUTH_HARBOR_USERNAME }}
+          password: ${{ secrets.AZIMUTH_HARBOR_PASSWORD }}
+
+
+      #- name: Simple Streamlit Apps
+      #  run: |
+        #  tag=v9
+        #  docker build . -t harbor.csis.astrazeneca.net/azimuth-demo/simple-streamlit:$tag
+        #  docker push harbor.csis.astrazeneca.net/azimuth-demo/simple-streamlit:$tag
+
+      - name: React App Demo
+        run: |
+          echo "React App Demo"
+          tag=latest
+          docker build . -t harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag --file src\Dockerfile
+          docker push harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag
+
+      - name: Docker Size
+        run: docker system df -v
