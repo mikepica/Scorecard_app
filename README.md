@@ -9,6 +9,7 @@ A web application for managing and displaying scorecard data from CSV files.
    ```bash
    npm install
    ```
+3. Place your CSV file in the `data` directory (e.g., `data/DummyData.csv`)
 
 ## Configuration
 
@@ -25,8 +26,20 @@ You can set the CSV file path in one of two ways:
 
 2. Set the environment variable directly when running the application:
    ```bash
-   CSV_FILE_PATH=path/to/your/file.csv npm run dev
+   CSV_FILE_PATH=data/your-file.csv npm run dev
    ```
+
+- ### Data Directory Structure
+- The `data` directory is used to store CSV files and is gitignored by default. This means:
+- - You can keep your data files local to your environment
+- - Different repositories can use different data files
+- - Sensitive data can be kept out of version control
+
+- To use the application:
+- 1. Create a `data` directory if it doesn't exist
+- 2. Place your CSV file in the `data` directory
+- 3. The file will be automatically ignored by git
+
 
 ## Running the Application
 
