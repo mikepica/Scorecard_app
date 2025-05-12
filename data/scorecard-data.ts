@@ -32,10 +32,11 @@ let loadedData: ScoreCardData = defaultData
 // Function to load data from CSV
 export async function loadScorecardData(): Promise<ScoreCardData> {
   try {
-    const csvUrl =
-      "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Dummy%20Data%20o3-pPprgpgfIkVe0GvlejN1XGVqW1hA6z.csv"
-    const csvData = await parseCSV(csvUrl)
-    const transformedData = transformCSVToScoreCardData(csvData)
+    const response = await fetch('/api/scorecard')
+    if (!response.ok) {
+      throw new Error('Failed to fetch scorecard data')
+    }
+    const transformedData = await response.json()
 
     // Update the loaded data
     loadedData = transformedData
