@@ -15,12 +15,12 @@ COPY components /app/components
 RUN npm install
 
 # Install Python 3 and pip
-RUN apt-get update && apt-get install -y python3 python3-pip python3-venv
+# RUN apt-get update && apt-get install -y python3 python3-pip python3-venv
 
 # Copy requirements.txt and install Python dependencies
 # COPY requirements.txt ./
-RUN python3 -m venv venv && \
-    /bin/bash -c "source venv/bin/activate && pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt"
+# RUN python3 -m venv venv && \
+#    /bin/bash -c "source venv/bin/activate && pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt"
 
 # Copy the rest of the application code
 COPY . .
