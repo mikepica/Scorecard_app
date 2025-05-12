@@ -39,7 +39,7 @@ jobs:
         run: |
           echo "React App Demo"
           tag=latest
-          docker build . -t harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag --file src\Dockerfile
+          docker build . -t harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag --file src/Dockerfile
           docker push harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag
 
       - name: Docker Size
