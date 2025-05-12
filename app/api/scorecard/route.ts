@@ -5,7 +5,7 @@ import { parseCSV, transformCSVToScoreCardData } from '@/utils/csv-parser'
 
 export async function GET() {
   try {
-    const csvPath = '/Users/mikepica/AZ_Projects/Scorecard_App/Dummy Data o3 (1).csv'
+    const csvPath = 'DummyData.csv'
     const csvText = await fs.readFile(csvPath, 'utf-8')
     const csvData = csvText.split('\n').map(row => {
       const values: string[] = []
