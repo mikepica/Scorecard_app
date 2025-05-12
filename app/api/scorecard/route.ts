@@ -2,10 +2,11 @@ import { NextResponse } from "next/server"
 import { scorecardData } from "@/data/scorecard-data"
 import { promises as fs } from 'fs'
 import { parseCSV, transformCSVToScoreCardData } from '@/utils/csv-parser'
+import { config } from '@/config'
 
 export async function GET() {
   try {
-    const csvPath = 'DummyData.csv'
+    const csvPath = config.csvFilePath
     const csvText = await fs.readFile(csvPath, 'utf-8')
     const csvData = csvText.split('\n').map(row => {
       const values: string[] = []
