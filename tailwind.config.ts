@@ -8,9 +8,31 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "*.{js,ts,jsx,tsx,mdx}"
   ],
+  safelist: [
+    'bg-pillar-magenta',
+    'bg-pillar-light-blue', 
+    'bg-pillar-lime',
+    'bg-pillar-gold',
+    'text-pillar-magenta',
+    'text-pillar-light-blue',
+    'text-pillar-lime', 
+    'text-pillar-gold',
+    'bg-pillar-magenta/30',
+    'bg-pillar-light-blue/30',
+    'bg-pillar-lime/30',
+    'border-pillar-magenta',
+    'border-pillar-light-blue',
+    'border-pillar-lime',
+    'border-pillar-gold'
+  ],
   theme: {
   	extend: {
   		colors: {
+  			// Custom pillar colors
+  			'pillar-magenta': '#d0006f',
+  			'pillar-light-blue': '#68d2df',
+  			'pillar-lime': '#c4d600',
+  			'pillar-gold': '#f0ab00',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {
