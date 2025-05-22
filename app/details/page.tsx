@@ -356,6 +356,49 @@ export default function DetailsPage() {
     }
   }
 
+  const getPillarHeaderColor = (pillarName: string) => {
+    // If showing all pillars, use a neutral color
+    if (pillarName.toLowerCase().includes("all")) {
+      return "bg-gray-600"
+    }
+    
+    switch (pillarName.toLowerCase()) {
+      case "science & innovation":
+        return "bg-cyan-500"
+      case "growth & ta leadership":
+        return "bg-pink-600"
+      case "people & sustainability":
+        return "bg-pillar-lime"
+      case "precision medicine":
+        return "bg-pillar-light-blue"
+      case "pipeline acceleration":
+        return "bg-pillar-magenta"
+      case "patient engagement":
+        return "bg-pillar-lime"
+      default:
+        return "bg-purple-800"
+    }
+  }
+
+  const getPillarTextColor = (pillarName: string) => {
+    switch (pillarName.toLowerCase()) {
+      case "science & innovation":
+        return "text-cyan-500"
+      case "growth & ta leadership":
+        return "text-pink-600"
+      case "people & sustainability":
+        return "text-pillar-lime"
+      case "precision medicine":
+        return "text-pillar-light-blue"
+      case "pipeline acceleration":
+        return "text-pillar-magenta"
+      case "patient engagement":
+        return "text-pillar-lime"
+      default:
+        return "text-purple-800"
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -448,7 +491,7 @@ export default function DetailsPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="border border-gray-300 bg-purple-800 text-white p-3 text-left w-1/5 text-base">
+              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left w-1/5 text-base`}>
                 2024 proposed strategic programs
               </th>
               <th className="border border-gray-300 bg-green-500 text-white p-3 text-center w-1/5 text-base">Q1</th>
@@ -462,7 +505,7 @@ export default function DetailsPage() {
               filteredPrograms.map((program) => (
                 <tr key={program.id}>
                   <td className="border border-gray-300 p-3">
-                    <div className="text-purple-800 font-medium text-base">{program.text}</div>
+                    <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
                   </td>
                   <td className="border border-gray-300 p-3">
                     <div className="mb-2 text-base">
