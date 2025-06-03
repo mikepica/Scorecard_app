@@ -44,7 +44,7 @@ export function AIChat({ isOpen, onClose, context }: AIChatProps) {
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (typeof window !== 'undefined' && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
     }
   }, [messages])
