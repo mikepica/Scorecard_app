@@ -5,29 +5,44 @@ export interface StrategicProgram {
   q2Objective?: string
   q3Objective?: string
   q4Objective?: string
-  q1Status?: 'on-track' | 'at-risk' | 'off-track'
-  q2Status?: 'on-track' | 'at-risk' | 'off-track'
-  q3Status?: 'on-track' | 'at-risk' | 'off-track'
-  q4Status?: 'on-track' | 'at-risk' | 'off-track'
+  ordLtSponsors?: string
+  sponsorsLeads?: string
+  reportingOwners?: string
+  q1Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q2Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q1Comments?: string
+  q2Comments?: string
+  q3Comments?: string
+  q4Comments?: string
 }
 
 export interface StrategicGoal {
   id: string
-  name: string
   text: string
-  description: string
-  status: 'on-track' | 'at-risk' | 'off-track'
-  q1Status: 'on-track' | 'at-risk' | 'off-track'
-  q2Status: 'on-track' | 'at-risk' | 'off-track'
-  q3Status: 'on-track' | 'at-risk' | 'off-track'
-  q4Status: 'on-track' | 'at-risk' | 'off-track'
+  q1Objective?: string
+  q2Objective?: string
+  q3Objective?: string
+  q4Objective?: string
   ordLtSponsors?: string
+  sponsorsLeads?: string
+  reportingOwners?: string
+  q1Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q2Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
+  q1Comments?: string
+  q2Comments?: string
+  q3Comments?: string
+  q4Comments?: string
   programs?: StrategicProgram[]
 }
 
 export interface Category {
   id: string
   name: string
+  pillar: string
   goals: StrategicGoal[]
 }
 

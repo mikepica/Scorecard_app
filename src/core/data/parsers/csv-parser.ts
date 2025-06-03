@@ -1,4 +1,4 @@
-import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
+import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/features/scorecard/types"
 
 // Function to parse CSV data
 export async function parseCSV(url: string): Promise<string[][]> {
