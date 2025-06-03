@@ -9,13 +9,8 @@ const openai = new OpenAI({
 
 export async function POST(req: Request) {
   try {
-    const { messages, context } = await req.json();
-
-    // Load system prompt from file
-export async function POST(req: Request) {
-  try {
     const body = await req.json();
-    
+
     // Validate request body
     if (!body.messages || !Array.isArray(body.messages)) {
       return NextResponse.json(
@@ -32,7 +27,7 @@ export async function POST(req: Request) {
 
     // Limit context size to prevent token overflow
     const contextString = JSON.stringify(context);
-    const maxContextLength = 4000; // Adjust based on needs
+    const maxContextLength = 20000; // Adjust based on needs
     const truncatedContext = contextString.length > maxContextLength 
       ? contextString.substring(0, maxContextLength) + '...[truncated]'
       : contextString;
@@ -45,9 +40,6 @@ export async function POST(req: Request) {
           role: "system",
           content: `${systemPrompt}\n\nHere is the context of the scorecard data: ${truncatedContext}`
         },
-        ...messages
-      ],
-    });
         ...messages
       ],
     });
