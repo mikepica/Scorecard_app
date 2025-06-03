@@ -83,55 +83,66 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col">
-      <div className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
-        <h1 className="text-2xl font-bold">ORD 2024 Scorecard</h1>
+    <main className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-pillar-lime/20 border-b border-pillar-lime/30">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">ORD 2024 Scorecard</h1>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={captureScreen}
+                className="inline-flex items-center px-4 py-2 bg-pillar-lime text-gray-900 rounded-md hover:bg-pillar-lime/90 transition-colors"
+              >
+                <Camera className="w-5 h-5 mr-2" />
+                Capture Screen
+              </button>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <Camera size={16} />
-            <span>Capture Screen</span>
-          </button>
+              <Link
+                href="/details"
+                className="inline-flex items-center px-4 py-2 bg-pillar-magenta text-white rounded-md hover:bg-pillar-magenta/90 transition-colors"
+              >
+                <BarChart2 className="w-5 h-5 mr-2" />
+                Program View
+              </Link>
 
-          <Link
-            href="/details"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <BarChart2 size={16} />
-            <span>Program View</span>
-          </Link>
-
-          <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <Menu size={16} />
-            <span>AI Chat</span>
-          </button>
+              <button
+                onClick={() => setIsChatOpen(true)}
+                className="inline-flex items-center px-4 py-2 bg-pillar-magenta text-white rounded-md hover:bg-pillar-magenta/90 transition-colors"
+              >
+                <Menu className="w-5 h-5 mr-2" />
+                AI Assistant
+              </button>
+            </div>
+          </div>
         </div>
-
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
       </div>
 
-      <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-8">
         {loading ? (
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pillar-magenta mx-auto mb-4"></div>
               <p className="text-gray-600">Loading scorecard data...</p>
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex flex-col">
-            <Scorecard data={data} />
-          </div>
+          <Scorecard data={data} />
         )}
       </div>
-      {/* Toast notification */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      {/* AI Chat Modal */}
+      {isChatOpen && <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />}
+
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </main>
-  )
+  );
 }

@@ -10,6 +10,7 @@ import { AIChat } from "@/features/ai-chat/components/AIChat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/features/scorecard/types"
 import { Toast } from "@/shared/components/common/Toast"
 import { Dropdown } from "@/shared/components/ui/forms/Dropdown"
+import { StatusIndicator } from "@/features/scorecard/components/StatusIndicator"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -250,34 +251,32 @@ export default function DetailsPage() {
     const programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }> = []
 
     data.pillars.forEach((pillar) => {
-      // Skip if specific pillar selected and doesn't match
+      // Skip if specific pillar selected and this isn't it
       if (selectedPillar !== ALL_VALUE && pillar.id !== selectedPillar) return
 
       pillar.categories.forEach((category) => {
-        // Skip if specific category selected and doesn't match
+        // Skip if specific category selected and this isn't it
         if (selectedCategory !== ALL_VALUE && category.id !== selectedCategory) return
 
         category.goals.forEach((goal) => {
-          // Skip if specific goal selected and doesn't match
+          // Skip if specific goal selected and this isn't it
           if (selectedGoal !== ALL_VALUE && goal.id !== selectedGoal) return
 
-          // Add all programs from matching goals
-          if (goal.programs && goal.programs.length > 0) {
-            goal.programs.forEach((program) => {
-              programs.push({
-                ...program,
-                goalText: goal.text,
-                categoryName: category.name,
-                pillarName: pillar.name,
-              })
+          // Add each program with its context
+          goal.programs?.forEach((program) => {
+            programs.push({
+              ...program,
+              goalText: goal.text,
+              categoryName: category.name,
+              pillarName: pillar.name,
             })
-          }
+          })
         })
       })
     })
 
     return programs
-  }, [selectedPillar, selectedCategory, selectedGoal, data])
+  }, [data, selectedPillar, selectedCategory, selectedGoal])
 
   // Get sponsor information
   const sponsor = useMemo(() => {
@@ -358,45 +357,36 @@ export default function DetailsPage() {
   }
 
   const getPillarHeaderColor = (pillarName: string) => {
-    // If showing all pillars, use a neutral color
-    if (pillarName.toLowerCase().includes("all")) {
-      return "bg-gray-600"
-    }
-    
     switch (pillarName.toLowerCase()) {
       case "science & innovation":
-        return "bg-cyan-500"
+        return "bg-pillar-gold/20 text-pillar-gold"
       case "growth & ta leadership":
-        return "bg-pink-600"
+        return "bg-pillar-magenta/20 text-pillar-magenta"
       case "people & sustainability":
-        return "bg-pillar-lime"
+        return "bg-pillar-lime/20 text-pillar-lime"
       case "precision medicine":
-        return "bg-pillar-light-blue"
+        return "bg-pillar-light-blue/20 text-pillar-light-blue"
       case "pipeline acceleration":
-        return "bg-pillar-magenta"
+        return "bg-pillar-magenta/20 text-pillar-magenta"
       case "patient engagement":
-        return "bg-pillar-lime"
+        return "bg-pillar-lime/20 text-pillar-lime"
       default:
-        return "bg-purple-800"
+        return "bg-gray-100 text-gray-700"
     }
   }
 
-  const getPillarTextColor = (pillarName: string) => {
-    switch (pillarName.toLowerCase()) {
-      case "science & innovation":
-        return "text-cyan-500"
-      case "growth & ta leadership":
-        return "text-pink-600"
-      case "people & sustainability":
-        return "text-pillar-lime"
-      case "precision medicine":
-        return "text-pillar-light-blue"
-      case "pipeline acceleration":
-        return "text-pillar-magenta"
-      case "patient engagement":
-        return "text-pillar-lime"
+  const getQuarterHeaderColor = (quarter: string) => {
+    switch (quarter) {
+      case "Q1":
+        return "bg-blue-50 text-blue-700"
+      case "Q2":
+        return "bg-green-50 text-green-700"
+      case "Q3":
+        return "bg-amber-50 text-amber-700"
+      case "Q4":
+        return "bg-purple-50 text-purple-700"
       default:
-        return "text-purple-800"
+        return "bg-gray-50 text-gray-700"
     }
   }
 
@@ -412,140 +402,115 @@ export default function DetailsPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="bg-lime-400 py-2 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">ORD 2024 Scorecard: {pillarName}</h1>
-        <div className="bg-red-600 text-white px-4 py-1">Overall Status</div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <Camera size={16} />
-            <span>Capture Screen</span>
-          </button>
-
-          <Link
-            href="/"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <BarChart2 size={16} />
-            <span>Pillar View</span>
-          </Link>
-
-          <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <Menu size={16} />
-            <span>AI Chat</span>
-          </button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-pillar-lime/20 border-b border-pillar-lime/30">
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-gray-900">Strategic Programs Details</h1>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsChatOpen(true)}
+                className="inline-flex items-center px-4 py-2 bg-pillar-magenta text-white rounded-md hover:bg-pillar-magenta/90 transition-colors"
+              >
+                <BarChart2 className="w-5 h-5 mr-2" />
+                AI Assistant
+              </button>
+              <button
+                onClick={captureScreen}
+                className="inline-flex items-center px-4 py-2 bg-pillar-lime text-gray-900 rounded-md hover:bg-pillar-lime/90 transition-colors"
+              >
+                <Camera className="w-5 h-5 mr-2" />
+                Capture
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
-      </header>
-
-      {/* Filter section */}
-      <div className="bg-lime-100 py-3 px-4">
-        <div className="flex items-center mb-3">
-          <div className="flex-1">
-            <Dropdown
+      {/* Filters */}
+      <div className="container mx-auto px-4 py-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <FilterDropdown
+              label="Pillar"
               options={pillarOptions}
               value={selectedPillar}
               onChange={handlePillarChange}
-              label="Strategic Pillar:"
-              placeholder="Select a pillar..."
-              labelWidth="w-36"
+            />
+            <FilterDropdown
+              label="Category"
+              options={categoryOptions}
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+            />
+            <FilterDropdown
+              label="Goal"
+              options={goalOptions}
+              value={selectedGoal}
+              onChange={handleGoalChange}
             />
           </div>
-          <div className="ml-4 flex items-center">
-            <span className="font-medium text-lg mr-2">ORD LT sponsor:</span>
-            <span>{sponsor}</span>
+        </div>
+
+        {/* Table */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Program</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Goal</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Category</th>
+                  <th className="px-6 py-4 text-left text-sm font-semibold text-gray-900">Pillar</th>
+                  <th className={`px-6 py-4 text-center text-sm font-semibold ${getQuarterHeaderColor("Q1")}`}>Q1</th>
+                  <th className={`px-6 py-4 text-center text-sm font-semibold ${getQuarterHeaderColor("Q2")}`}>Q2</th>
+                  <th className={`px-6 py-4 text-center text-sm font-semibold ${getQuarterHeaderColor("Q3")}`}>Q3</th>
+                  <th className={`px-6 py-4 text-center text-sm font-semibold ${getQuarterHeaderColor("Q4")}`}>Q4</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {filteredPrograms.map((program) => (
+                  <tr key={program.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-sm text-gray-900">{program.text}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{program.goalText}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">{program.categoryName}</td>
+                    <td className="px-6 py-4">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPillarHeaderColor(program.pillarName)}`}>
+                        {program.pillarName}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <StatusIndicator status={program.q1Status || "on-track"} />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <StatusIndicator status={program.q2Status || "on-track"} />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <StatusIndicator status={program.q3Status || "on-track"} />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <StatusIndicator status={program.q4Status || "on-track"} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-
-        <div className="mb-3">
-          <Dropdown
-            options={categoryOptions}
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            label="Category:"
-            placeholder="Select a category..."
-            labelWidth="w-36"
-          />
-        </div>
-
-        <div>
-          <Dropdown
-            options={goalOptions}
-            value={selectedGoal}
-            onChange={handleGoalChange}
-            label="Strategic Goal:"
-            placeholder="Select a goal..."
-            labelWidth="w-36"
-          />
-        </div>
       </div>
 
-      {/* Table section - make it fill the remaining space */}
-      <div className="flex-1 p-4 overflow-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left w-1/5 text-base`}>
-                2024 proposed strategic programs
-              </th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center w-1/5 text-base">Q1</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center w-1/5 text-base">Q2</th>
-              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center w-1/5 text-base">Q3</th>
-              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center w-1/5 text-base">Q4</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredPrograms.length > 0 ? (
-              filteredPrograms.map((program) => (
-                <tr key={program.id}>
-                  <td className="border border-gray-300 p-3">
-                    <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
-                  </td>
-                  <td className="border border-gray-300 p-3">
-                    <div className="mb-2 text-base">
-                      {program.q1Objective || "On target against year-to-date number"}
-                    </div>
-                    <StatusCircle status={program.q1Status || "on-track"} />
-                  </td>
-                  <td className="border border-gray-300 p-3">
-                    <div className="mb-2 text-base">
-                      {program.q2Objective || "On target against year-to-date number"}
-                    </div>
-                    <StatusCircle status={program.q2Status || "on-track"} />
-                  </td>
-                  <td className="border border-gray-300 p-3">
-                    <div className="mb-2 text-base">
-                      {program.q3Objective || "On target against year-to-date number"}
-                    </div>
-                    <StatusCircle status={program.q3Status || "on-track"} />
-                  </td>
-                  <td className="border border-gray-300 p-3">
-                    <div className="mb-2 text-base">
-                      {program.q4Objective || "On target against year-to-date number"}
-                    </div>
-                    <StatusCircle status={program.q4Status || "on-track"} />
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
-                  No programs found with the current filter settings.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-      {/* Toast notification */}
-      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+      {/* AI Chat Modal */}
+      {isChatOpen && <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />}
+
+      {/* Toast Notifications */}
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          onClose={() => setToast(null)}
+        />
+      )}
     </div>
   )
 }
