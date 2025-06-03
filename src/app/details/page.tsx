@@ -9,6 +9,7 @@ import { BarChart2, Menu, Camera } from "lucide-react"
 import { AIChat } from "@/features/ai-chat/components/AIChat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/features/scorecard/types"
 import { Toast } from "@/shared/components/common/Toast"
+import { Dropdown } from "@/shared/components/ui/forms/Dropdown"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -448,7 +449,7 @@ export default function DetailsPage() {
       <div className="bg-lime-100 py-3 px-4">
         <div className="flex items-center mb-3">
           <div className="flex-1">
-            <FilterDropdown
+            <Dropdown
               options={pillarOptions}
               value={selectedPillar}
               onChange={handlePillarChange}
@@ -464,7 +465,7 @@ export default function DetailsPage() {
         </div>
 
         <div className="mb-3">
-          <FilterDropdown
+          <Dropdown
             options={categoryOptions}
             value={selectedCategory}
             onChange={handleCategoryChange}
@@ -475,7 +476,7 @@ export default function DetailsPage() {
         </div>
 
         <div>
-          <FilterDropdown
+          <Dropdown
             options={goalOptions}
             value={selectedGoal}
             onChange={handleGoalChange}
