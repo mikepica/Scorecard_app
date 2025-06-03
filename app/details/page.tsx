@@ -429,7 +429,7 @@ export default function DetailsPage() {
             className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
           >
             <BarChart2 size={16} />
-            <span>Pillar View</span>
+            <span>Goal-level view</span>
           </Link>
 
           <button
@@ -441,7 +441,7 @@ export default function DetailsPage() {
           </button>
         </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data} />
       </header>
 
       {/* Filter section */}
@@ -507,29 +507,37 @@ export default function DetailsPage() {
                   <td className="border border-gray-300 p-3">
                     <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
                   </td>
-                  <td className="border border-gray-300 p-3">
+                  <td className="border border-gray-300 p-3 pr-10 relative">
                     <div className="mb-2 text-base">
                       {program.q1Objective || "On target against year-to-date number"}
                     </div>
-                    <StatusCircle status={program.q1Status || "on-track"} />
+                    <div className="status-dot-container">
+                      <StatusCircle status={program.q1Status || "on-track"} />
+                    </div>
                   </td>
-                  <td className="border border-gray-300 p-3">
+                  <td className="border border-gray-300 p-3 pr-10 relative">
                     <div className="mb-2 text-base">
                       {program.q2Objective || "On target against year-to-date number"}
                     </div>
-                    <StatusCircle status={program.q2Status || "on-track"} />
+                    <div className="status-dot-container">
+                      <StatusCircle status={program.q2Status || "on-track"} />
+                    </div>
                   </td>
-                  <td className="border border-gray-300 p-3">
+                  <td className="border border-gray-300 p-3 pr-10 relative">
                     <div className="mb-2 text-base">
                       {program.q3Objective || "On target against year-to-date number"}
                     </div>
-                    <StatusCircle status={program.q3Status || "on-track"} />
+                    <div className="status-dot-container">
+                      <StatusCircle status={program.q3Status || "on-track"} />
+                    </div>
                   </td>
-                  <td className="border border-gray-300 p-3">
+                  <td className="border border-gray-300 p-3 pr-10 relative">
                     <div className="mb-2 text-base">
                       {program.q4Objective || "On target against year-to-date number"}
                     </div>
-                    <StatusCircle status={program.q4Status || "on-track"} />
+                    <div className="status-dot-container">
+                      <StatusCircle status={program.q4Status || "on-track"} />
+                    </div>
                   </td>
                 </tr>
               ))

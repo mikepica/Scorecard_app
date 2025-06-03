@@ -113,7 +113,7 @@ export default function Home() {
           </button>
         </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data} />
       </div>
 
       <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">

@@ -4,7 +4,7 @@ import "./globals.css"
 import "react-day-picker/dist/style.css"
 
 export const metadata: Metadata = {
-  title: "v0 App",
+  title: "ORD Scorecards",
   description: "Created with v0",
   generator: "v0.dev",
 }
