@@ -16,6 +16,9 @@ export interface StrategicProgram {
   q2Comments?: string
   q3Comments?: string
   q4Comments?: string
+  strategicGoalId: string
+  categoryId: string
+  strategicPillarId: string
 }
 
 export interface StrategicGoal {
@@ -37,13 +40,19 @@ export interface StrategicGoal {
   q3Comments?: string
   q4Comments?: string
   programs?: StrategicProgram[]
+  status?: "exceeded" | "on-track" | "delayed" | "missed"
+  comments?: string
+  categoryId: string
+  strategicPillarId: string
 }
 
 export interface Category {
   id: string
   name: string
-  pillar: string
+  status?: "exceeded" | "on-track" | "delayed" | "missed"
+  comments?: string
   goals: StrategicGoal[]
+  strategicPillarId: string
 }
 
 export interface Pillar {

@@ -6,6 +6,14 @@ import { ChevronDown, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import { EditableField } from "@/components/ui/editable-field"
 import { useEditableField } from "@/hooks/use-editable-field"
+import { Dropdown } from "@/components/dropdown"
+
+const STATUS_OPTIONS = [
+  { value: "exceeded", label: "Exceeded" },
+  { value: "on-track", label: "On Track" },
+  { value: "delayed", label: "Delayed" },
+  { value: "missed", label: "Missed" },
+]
 
 export function Scorecard({ data, onDataUpdate }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void }) {
   // Check if data and data.pillars exist before mapping
@@ -72,7 +80,7 @@ function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (n
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
           pillar.categories.map((category) => (
-            <CategorySection key={category.id} category={category} pillarName={pillar.name} onDataUpdate={onDataUpdate} />
+            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} />
           ))}
       </div>
       {/* Bottom line positioned slightly above the bottom */}
@@ -81,28 +89,78 @@ function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (n
   )
 }
 
-function CategorySection({ category, pillarName, onDataUpdate }: { category: Category; pillarName: string; onDataUpdate: (newData: ScoreCardData) => void }) {
+function CategorySection({ category, pillar, onDataUpdate }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
+  const [isEditing, setIsEditing] = useState(false)
+  // Handler for category status update
+  const handleCategoryStatusChange = async (newStatus: string) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id],
+        newValue: newStatus,
+        type: 'category',
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update category status');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+    setIsEditing(false)
+  }
   return (
     <div className="mb-4 last:mb-0">
-      <h3 className={`text-base font-medium mb-2 ${getCategoryColor(pillarName)}`}>{category.name}</h3>
+      <div className="flex items-center mb-2 gap-2">
+        <h3 className={`text-base font-medium ${getCategoryColor(pillar.name)}`}>{category.name}</h3>
+        {isEditing ? (
+          <Dropdown
+            options={STATUS_OPTIONS}
+            value={category.status || ""}
+            onChange={handleCategoryStatusChange}
+            label=""
+            placeholder="Status"
+          />
+        ) : (
+          <span onClick={() => setIsEditing(true)} style={{ cursor: 'pointer' }}>
+            <StatusIndicator status={category.status || "on-track"} />
+          </span>
+        )}
+      </div>
       <ul className="space-y-2">
         {category.goals && category.goals.map((goal) => (
-          <GoalItem key={goal.id} goal={goal} pillarName={pillarName} categoryName={category.name} onDataUpdate={onDataUpdate} />
+          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} />
         ))}
       </ul>
     </div>
   )
 }
 
-function GoalItem({ goal, pillarName, categoryName, onDataUpdate }: { goal: StrategicGoal; pillarName: string; categoryName: string; onDataUpdate: (newData: ScoreCardData) => void }) {
+function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void }) {
   const [expanded, setExpanded] = useState(false)
+  const [isEditing, setIsEditing] = useState(false)
   const hasPrograms = goal.programs && goal.programs.length > 0
 
   // Use Q4 status for display, fallback to other quarters if not available
-  const displayStatus = goal.q4Status || goal.q3Status || goal.q2Status || goal.q1Status
+  const displayStatus = goal.status || goal.q4Status || goal.q3Status || goal.q2Status || goal.q1Status
+
+  // Handler for goal status update
+  const handleGoalStatusChange = async (newStatus: string) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id, goal.id],
+        newValue: newStatus,
+        type: 'goal',
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update goal status');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+    setIsEditing(false)
+  }
 
   const { handleSave } = useEditableField({
-    fieldPath: [pillarName, categoryName, goal.text, "", "Strategic Goal"],
+    fieldPath: [pillar.id, category.id, goal.id, "", "Strategic Goal"],
     onDataUpdate,
   })
 
@@ -112,7 +170,7 @@ function GoalItem({ goal, pillarName, categoryName, onDataUpdate }: { goal: Stra
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fieldPath: [pillarName, categoryName, goal.text, programText, "Strategic Program"],
+        fieldPath: [pillar.id, category.id, goal.id, programText, "Strategic Program"],
         newValue,
       }),
     })
@@ -155,11 +213,23 @@ function GoalItem({ goal, pillarName, categoryName, onDataUpdate }: { goal: Stra
             className="text-base"
           />
         </div>
-        <StatusIndicator status={displayStatus} />
+        {isEditing ? (
+          <Dropdown
+            options={STATUS_OPTIONS}
+            value={displayStatus || ""}
+            onChange={handleGoalStatusChange}
+            label=""
+            placeholder="Status"
+          />
+        ) : (
+          <span onClick={() => setIsEditing(true)} style={{ cursor: 'pointer' }}>
+            <StatusIndicator status={displayStatus || "on-track"} />
+          </span>
+        )}
       </div>
 
       {expanded && hasPrograms && (
-        <ul className={`pl-6 mt-2 space-y-2 border-l-2 ${getProgramBorderColor(pillarName)}`}>
+        <ul className={`pl-6 mt-2 space-y-2 border-l-2 ${getProgramBorderColor(pillar.name)}`}>
           {goal.programs?.map((program) => (
             <li key={program.id} className="flex items-start justify-between gap-2">
               <EditableField

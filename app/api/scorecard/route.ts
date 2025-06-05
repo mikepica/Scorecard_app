@@ -1,41 +1,17 @@
 import { NextResponse } from "next/server"
 import { scorecardData } from "@/data/scorecard-data"
 import { promises as fs } from 'fs'
-import { parseCSV, transformCSVToScoreCardData } from '@/utils/csv-parser'
+import { parseCSV, transformCSVToScoreCardData, loadAndMergeScorecardCSVs } from '@/utils/csv-parser'
 import { config } from '@/config'
 
 export async function GET() {
   try {
-    const csvPath = config.csvFilePath
-    const csvText = await fs.readFile(csvPath, 'utf-8')
-    const csvData = csvText.split('\n').map(row => {
-      const values: string[] = []
-      let inQuotes = false
-      let currentValue = ""
-
-      for (let i = 0; i < row.length; i++) {
-        const char = row[i]
-
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === "," && !inQuotes) {
-          values.push(currentValue)
-          currentValue = ""
-        } else {
-          currentValue += char
-        }
-      }
-
-      values.push(currentValue)
-      return values
-    })
-
-    const transformedData = transformCSVToScoreCardData(csvData)
-    return NextResponse.json(transformedData)
+    const mergedData = await loadAndMergeScorecardCSVs()
+    return NextResponse.json(mergedData)
   } catch (error) {
-    console.error('Error reading CSV file:', error)
+    console.error('Error reading CSV files:', error)
     return NextResponse.json(
-      { error: 'Failed to read CSV file' },
+      { error: 'Failed to read CSV files' },
       { status: 500 }
     )
   }
