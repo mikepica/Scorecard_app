@@ -8,6 +8,7 @@ function mapStatus(status: string | null | undefined): "exceeded" | "on-track" |
   
   const statusMap: { [key: string]: "exceeded" | "on-track" | "delayed" | "missed" } = {
     "Green": "on-track",
+    "Blue": "exceeded",
     "Amber": "delayed",
     "Red": "missed",
     "exceeded": "exceeded",

@@ -1064,12 +1064,21 @@ import { Camera, BarChart2, Menu } from "lucide-react"
 import Link from "next/link"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
+import { Dropdown } from "@/components/dropdown"
 
 export default function Home() {
   const [data, setData] = useState<ScoreCardData>(scorecardData)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [selectedQuarter, setSelectedQuarter] = useState("q1")
+
+  const QUARTER_OPTIONS = [
+    { value: "q1", label: "Q1" },
+    { value: "q2", label: "Q2" },
+    { value: "q3", label: "Q3" },
+    { value: "q4", label: "Q4" },
+  ]
 
   useEffect(() => {
     async function loadData() {
@@ -1148,29 +1157,36 @@ export default function Home() {
       <div className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
         <h1 className="text-2xl font-bold">ORD 2024 Scorecard</h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <Dropdown
+            options={QUARTER_OPTIONS}
+            value={selectedQuarter}
+            onChange={setSelectedQuarter}
+            label="Quarter:"
+            labelWidth="w-24"
+          />
           <button
             onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Camera size={16} />
-            <span>Capture Screen</span>
+            <Camera size={20} />
+            <span className="whitespace-nowrap">Capture Screen</span>
           </button>
 
           <Link
             href="/details"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <BarChart2 size={16} />
-            <span>Program View</span>
+            <BarChart2 size={20} />
+            <span className="whitespace-nowrap">Program View</span>
           </Link>
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Menu size={16} />
-            <span>AI Chat</span>
+            <Menu size={20} />
+            <span className="whitespace-nowrap">AI Chat</span>
           </button>
         </div>
 
@@ -1187,7 +1203,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            <Scorecard data={data} onDataUpdate={handleDataUpdate} />
+            <Scorecard data={data} onDataUpdate={handleDataUpdate} selectedQuarter={selectedQuarter} />
           </div>
         )}
       </div>
@@ -1872,7 +1888,7 @@ const STATUS_OPTIONS = [
   { value: "missed", label: "Missed" },
 ]
 
-export function Scorecard({ data, onDataUpdate }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void }) {
+export function Scorecard({ data, onDataUpdate, selectedQuarter = "q4" }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter?: string }) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
     return <div className="w-full p-4 text-center">No scorecard data available</div>
@@ -1881,13 +1897,13 @@ export function Scorecard({ data, onDataUpdate }: { data: ScoreCardData; onDataU
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
       {data.pillars.map((pillar) => (
-        <PillarCard key={pillar.id} pillar={pillar} onDataUpdate={onDataUpdate} />
+        <PillarCard key={pillar.id} pillar={pillar} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
       ))}
     </div>
   )
 }
 
-function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
+function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   const getBgColor = (name: string) => {
     switch (name.toLowerCase()) {
       case "science & innovation":
@@ -1937,7 +1953,7 @@ function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (n
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
           pillar.categories.map((category) => (
-            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} />
+            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
           ))}
       </div>
       {/* Bottom line positioned slightly above the bottom */}
@@ -1946,7 +1962,7 @@ function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (n
   )
 }
 
-function CategorySection({ category, pillar, onDataUpdate }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
+function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   // Handler for category status update
   const handleCategoryStatusChange = async (newStatus: string | undefined) => {
     const response = await fetch('/api/scorecard/update', {
@@ -1973,14 +1989,14 @@ function CategorySection({ category, pillar, onDataUpdate }: { category: Categor
       </div>
       <ul className="space-y-2">
         {category.goals && category.goals.map((goal) => (
-          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} />
+          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
         ))}
       </ul>
     </div>
   )
 }
 
-function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void }) {
+function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   const [expanded, setExpanded] = useState(false)
   const hasPrograms = goal.programs && goal.programs.length > 0
 
@@ -2042,6 +2058,17 @@ function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoa
     }
   }
 
+  // Helper to get the correct status for the selected quarter
+  const getProgramStatus = (program: any) => {
+    switch (selectedQuarter) {
+      case "q1": return program.q1Status;
+      case "q2": return program.q2Status;
+      case "q3": return program.q3Status;
+      case "q4": return program.q4Status;
+      default: return program.q4Status;
+    }
+  }
+
   return (
     <li>
       <div className="flex items-start justify-between gap-2">
@@ -2073,7 +2100,7 @@ function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoa
                 className="text-sm"
               />
               <StatusCircle
-                status={program.q4Status || program.q3Status || program.q2Status || program.q1Status}
+                status={getProgramStatus(program)}
                 onStatusChange={async (newStatus) => {
                   const response = await fetch('/api/scorecard/update', {
                     method: 'POST',
@@ -7831,7 +7858,7 @@ export const config = {
 
 ```csv
 ﻿CategoryID,StrategicPillarID,Category,Status,Comments,,,,,,,,
-Cat100,SPill100,Biomarker Discovery,exceeded,Comprehensive biomarker validation and discovery platform requiring robust study designs, cross-functional coordination, and advanced analytics capabilities. Success depends on establishing standardized protocols, regulatory-grade validation criteria, and integrated data management systems across genomics and single-cell platforms. Critical focus areas include patient cohort identification, statistical analysis planning, and regulatory pathway alignment for clinical translation.,,
+Cat100,SPill100,Biomarker Discovery,Red,Comprehensive biomarker validation and discovery platform requiring robust study designs, cross-functional coordination, and advanced analytics capabilities. Success depends on establishing standardized protocols, regulatory-grade validation criteria, and integrated data management systems across genomics and single-cell platforms. Critical focus areas include patient cohort identification, statistical analysis planning, and regulatory pathway alignment for clinical translation.,,
 Cat101,SPill100,Targeted Therapies,Amber,Advanced therapeutic development portfolio spanning kinase inhibitors, bispecific antibodies, and AI-powered target selection requiring specialized expertise and comprehensive execution planning. Success factors include molecular target validation, manufacturing scalability, competitive landscape analysis, and cross-functional collaboration between computational and biological teams. Strategic emphasis on protocol standardization, regulatory strategy development, and clinical translation pathways.,
 Cat102,SPill100,Companion Diagnostics,Red,Integrated diagnostic development program focusing on therapy-diagnostic co-development, NGS panel regulatory approval, and assay standardization requiring strong regulatory strategy and vendor partnerships. Critical success factors include FDA interaction planning, clinical validation studies, manufacturing considerations, and seamless integration with therapeutic programs. Emphasis on protocol finalization, regulatory compliance, and clinical utility demonstration for market approval.,
 Cat103,SPill101,Early Clinical Development,Green,Process optimization and innovation initiative targeting IND cycle time reduction, adaptive trial designs, and first-in-human network expansion requiring operational excellence and regulatory efficiency improvements. Success depends on cross-functional coordination, statistical methodology advancement, site qualification, and investigator engagement strategies. Key focus areas include bottleneck identification, process standardization, and regulatory pathway optimization for accelerated development timelines.,
@@ -7846,8 +7873,8 @@ Cat107,SPill102,Access & Equity,Red,Patient-centered initiatives targeting minor
 ```csv
 StrategicProgramID,StrategicGoalID,CategoryID,StrategicPillarID,Strategic Program,Q1 Objective,Q2 Objective,Q3 Objective,Q4 Objective,ORD LT Sponsor(s),Sponsor(s)/Lead(s),Reporting owner(s),Q1 Status,Q2 Status,Q3 Status,Q4 Status,Q1 Comments,Q2 Comments,Q3 Comments,Q4 Comments
 SP100,SG100,Cat100,SPill100,Another change.,In Q1 we will launch the BD-01 Validate Initiative 1 project in support of the strategic goal to validate novel predictive biomarkers. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.,Achieve 50% of planned experiments for BD-01 Validate Initiative 1.,Complete data analysis phase of BD-01 Validate Initiative 1.,Submit year‑end review and next‑year plan for BD-01 Validate Initiative 1.,Dr. Alice Nguyen,on-track,exceeded,,exceeded,Critical biomarker validation initiative requiring robust study design and cross-functional team coordination. Success depends on establishing clear validation criteria and patient cohort identification protocols.,,,
-SP101,SG101,Cat100,SPill100,Change.,In Q1 we will launch the BD-02 Validate Initiative 2 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for BD-02 Validate Initiative 2.,Complete data analysis phase of BD-02 Validate Initiative 2.,Submit year‑end review and next‑year plan for BD-02 Validate Initiative 2.,Dr. Alice Nguyen,missed,,,,Second phase biomarker validation project building on BD-01 learnings. Focus on protocol standardization and data quality assurance will be essential for regulatory acceptance.,,,
-SP102,SG101,Cat100,SPill100,BD-03 Validate Initiative 3,In Q1 we will launch the BD-03 Validate Initiative 3 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for BD-03 Validate Initiative 3.,delayed,,,,Comprehensive biomarker validation program requiring integrated approach across discovery platforms. Protocol development and statistical analysis plan will be key deliverables for regulatory pathway.,,,
+SP101,SG101,Cat100,SPill100,Change.,In Q1 we will launch the BD-02 Validate Initiative 2 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for BD-02 Validate Initiative 2.,Complete data analysis phase of BD-02 Validate Initiative 2.,Submit year‑end review and next‑year plan for BD-02 Validate Initiative 2.,Dr. Alice Nguyen,exceeded,exceeded,delayed,,Second phase biomarker validation project building on BD-01 learnings. Focus on protocol standardization and data quality assurance will be essential for regulatory acceptance.,,,
+SP102,SG101,Cat100,SPill100,BD-03 Validate Initiative 3,In Q1 we will launch the BD-03 Validate Initiative 3 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for BD-03 Validate Initiative 3.,exceeded,,,,Comprehensive biomarker validation program requiring integrated approach across discovery platforms. Protocol development and statistical analysis plan will be key deliverables for regulatory pathway.,,,
 SP103,SG102,Cat100,SPill100,BD-04 Expand Initiative 4,In Q1 we will launch the BD-04 Expand Initiative 4 project in support of the strategic goal to expand tumor genomics database. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for BD-04 Expand Initiative 4.,Complete data analysis phase of BD-04 Expand Initiative 4.,Submit year‑end review and next‑year plan for BD-04 Expand Initiative 4.,Dr. Alice Nguyen,Green,exceeded,,,Database expansion initiative leveraging existing genomics infrastructure. Success requires robust data governance framework and integration with existing clinical datasets.,,,
 SP104,SG102,Cat100,SPill100,BD-05 Expand Initiative 5,In Q1 we will launch the BD-05 Expand Initiative 5 project in support of the strategic goal to expand tumor genomics database. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates.,Achieve 50% of planned experiments for BD-05 Expand Initiative 5.,Complete data analysis phase of BD-05 Expand Initiative 5.,Submit year‑end review and next‑year plan for BD-05 Expand Initiative 5.,Dr. Alice Nguyen,Green,,,,Large-scale genomics database project requiring significant computational resources and data management capabilities. Team assembly and technical infrastructure planning will be critical for execution.,,,
 SP105,SG102,Cat100,SPill100,BD-06 Expand Initiative 6,In Q1 we will launch the BD-06 Expand Initiative 6 project in support of the strategic goal to expand tumor genomics database. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Risks and mitigation strategies will be documented early to ensure the program remains on track.,Achieve 50% of planned experiments for BD-06 Expand Initiative 6.,Complete data analysis phase of BD-06 Expand Initiative 6.,Submit year‑end review and next‑year plan for BD-06 Expand Initiative 6.,Dr. Alice Nguyen,Red,,,,Advanced genomics expansion program requiring workshop-driven scope definition. Technical feasibility and resource allocation discussions will guide implementation strategy.,,,
@@ -7977,8 +8004,8 @@ export const scorecardData: ScoreCardData = loadedData
 
 ```csv
 ﻿StrategicGoalID,CategoryID,StrategicPillarID,Strategic Goal,Status,Comments,,,,,,,,
-SG100,Cat100,SPill100,Another change.,on-track,Placeholder strategic goal requiring definition and scope clarification. Implementation approach and success criteria need to be established through strategic planning initiatives.,,,,,,,,
-SG101,Cat100,SPill100,Validate novel predictive biomarkers,delayed,Multi-phase biomarker validation program requiring robust study design,  cross-functional coordination,, and regulatory-grade protocols. Success depends on establishing clear validation criteria, patient cohort identification, and statistical analysis planning for clinical translation and regulatory acceptance. Critical focus on protocol standardization and data quality assurance across validation phases.,,,,
+SG100,Cat100,SPill100,Another change.,Red,Placeholder strategic goal requiring definition and scope clarification. Implementation approach and success criteria need to be established through strategic planning initiatives.,,,,,,,,
+SG101,Cat100,SPill100,Validate novel predictive biomarkers,Blue,Multi-phase biomarker validation program requiring robust study design,  cross-functional coordination,, and regulatory-grade protocols. Success depends on establishing clear validation criteria, patient cohort identification, and statistical analysis planning for clinical translation and regulatory acceptance. Critical focus on protocol standardization and data quality assurance across validation phases.,,,
 SG102,Cat100,SPill100,Expand tumor genomics database,Red,Large-scale genomics infrastructure expansion requiring significant computational resources, robust data governance framework, and integration capabilities. Success factors include data management infrastructure, technical feasibility planning, and integration with existing clinical datasets. Strategic emphasis on scalability, data quality, and cross-platform compatibility for research applications.,,
 SG103,Cat100,SPill100,Advance single cell analytics platform,Green,Next-generation analytics platform development requiring specialized technical expertise, protocol standardization, and platform integration capabilities. Critical success factors include reproducibility across research applications, user training programs, and widespread adoption strategies. Key focus areas include technical validation, platform optimization, and establishment of standardized analytical workflows.,,
 SG104,Cat101,SPill100,Optimize next gen kinase inhibitors,Green,Advanced kinase inhibitor development program requiring comprehensive execution planning, molecular target validation, and competitive landscape analysis. Success depends on scientific plan optimization, lead compound selection, risk mitigation strategies, and leadership endorsement. Strategic emphasis on technical feasibility, development timelines, and maintaining program momentum through quarterly milestones.,
@@ -7986,7 +8013,7 @@ SG105,Cat101,SPill100,Develop bispecific antibodies portfolio,Green,Comprehensiv
 SG106,Cat101,SPill100,Integrate AI for target selection,Amber,AI-powered target identification platform requiring interdisciplinary collaboration between computational and biological teams, technology platform selection, and algorithmic validation. Success depends on data integration capabilities, validation criteria establishment, and technical specifications definition. Strategic emphasis on machine learning implementation, workshop-driven scope refinement, and cross-functional coordination.,,
 SG107,Cat102,SPill100,Codevelop CDx assays with therapy programs,Red,Integrated companion diagnostic development requiring comprehensive execution planning, vendor partnerships, and seamless therapy-diagnostic integration. Critical success factors include protocol finalization, regulatory alignment, clinical trial integration, and assay standardization. Key focus areas include regulatory strategy, clinical utility demonstration, and cross-functional collaboration between diagnostic and therapeutic teams.,
 SG108,Cat102,SPill100,Obtain FDA clearance for NGS panel,Green,NGS panel regulatory approval program requiring comprehensive regulatory strategy, clinical validation studies, and FDA interaction planning. Success depends on workshop-driven scope definition, scientific plan refinement, and manufacturing considerations. Strategic emphasis on regulatory pathway optimization, clinical evidence generation, and compliance with FDA requirements for market clearance.,,
-SG109,Cat103,SPill101,Reduce IND cycle time by 20%,Amber,Process optimization initiative targeting regulatory efficiency improvements, bottleneck identification, and cross-functional coordination enhancement. Critical success factors include process standardization, resource allocation optimization, and quality assurance improvements. Key focus areas include workflow analysis, regulatory submission optimization, and timeline compression strategies while maintaining compliance standards.,,
+SG109,Cat103,SPill101,Reduce IND cycle time by 20%,on-track,Process optimization initiative targeting regulatory efficiency improvements, bottleneck identification, and cross-functional coordination enhancement. Critical success factors include process standardization, resource allocation optimization, and quality assurance improvements. Key focus areas include workflow analysis, regulatory submission optimization, and timeline compression strategies while maintaining compliance standards.,,
 SG110,Cat103,SPill101,Implement adaptive trial designs,Red,Advanced statistical methodology implementation requiring specialized expertise, regulatory acceptance strategies, and operational feasibility planning. Success depends on protocol flexibility development, statistical innovation, and regulatory alignment for trial design approval. Strategic emphasis on scientific plan development, protocol standardization, and operational execution capabilities for complex trial designs.,,
 SG111,Cat103,SPill101,Expand first human trial network,Green,Trial network expansion initiative requiring site identification strategies, investigator engagement, and operational excellence development. Critical success factors include geographic coverage optimization, site qualification criteria, investigator training programs, and regulatory alignment. Key focus areas include network development planning, site selection optimization, and operational infrastructure for early-phase clinical trials.,
 SG112,Cat104,SPill101,Harmonize global filings,Green,Global regulatory coordination program requiring comprehensive execution planning, cross-regional alignment, and milestone tracking systems. Success depends on process standardization, submission efficiency optimization, and leadership endorsement across multiple jurisdictions. Strategic emphasis on regulatory intelligence, cross-functional collaboration, and achieving harmonization objectives through structured implementation planning.,,
@@ -8966,6 +8993,7 @@ function mapStatus(status: string | null | undefined): "exceeded" | "on-track" |
   
   const statusMap: { [key: string]: "exceeded" | "on-track" | "delayed" | "missed" } = {
     "Green": "on-track",
+    "Blue": "exceeded",
     "Amber": "delayed",
     "Red": "missed",
     "exceeded": "exceeded",
@@ -9331,17 +9359,17 @@ export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
         q2Objective,
         q3Objective,
         q4Objective,
-        q1Status: mapStatus(row[headers.indexOf('Q1 Status')]),
-        q2Status: mapStatus(row[headers.indexOf('Q2 Status')]),
-        q3Status: mapStatus(row[headers.indexOf('Q3 Status')]),
-        q4Status: mapStatus(row[headers.indexOf('Q4 Status')]),
-        q1Comments: trimText(row[headers.indexOf('Q1 Comments')]),
-        q2Comments: trimText(row[headers.indexOf('Q2 Comments')]),
-        q3Comments: trimText(row[headers.indexOf('Q3 Comments')]),
-        q4Comments: trimText(row[headers.indexOf('Q4 Comments')]),
-        ordLtSponsors: trimText(row[headers.indexOf('ORD LT Sponsor(s)')]),
-        sponsorsLeads: trimText(row[headers.indexOf('Sponsor(s)/Lead(s)')]),
-        reportingOwners: trimText(row[headers.indexOf('Reporting owner(s)')]),
+        q1Status: mapStatus(row[dummyHeaders.indexOf('Q1 Status')]),
+        q2Status: mapStatus(row[dummyHeaders.indexOf('Q2 Status')]),
+        q3Status: mapStatus(row[dummyHeaders.indexOf('Q3 Status')]),
+        q4Status: mapStatus(row[dummyHeaders.indexOf('Q4 Status')]),
+        q1Comments: trimText(row[dummyHeaders.indexOf('Q1 Comments')]),
+        q2Comments: trimText(row[dummyHeaders.indexOf('Q2 Comments')]),
+        q3Comments: trimText(row[dummyHeaders.indexOf('Q3 Comments')]),
+        q4Comments: trimText(row[dummyHeaders.indexOf('Q4 Comments')]),
+        ordLtSponsors: trimText(row[dummyHeaders.indexOf('ORD LT Sponsor(s)')]),
+        sponsorsLeads: trimText(row[dummyHeaders.indexOf('Sponsor(s)/Lead(s)')]),
+        reportingOwners: trimText(row[dummyHeaders.indexOf('Reporting owner(s)')]),
       };
       if (!goal.programs) goal.programs = [];
       goal.programs.push(program);

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
 
     let csvPath: string, idColumn: string, statusColumn: string, idValue: string, isProgram = false
-    let updateRowFn: (row: string[], header: string[]) => void
+    let updateRowFn: (row: string[], header: string[], normalizedHeader: string[]) => void
     if (type === 'program') {
       // Program status update (DummyData.csv)
       csvPath = path.join(process.cwd(), 'data', 'DummyData.csv')
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
       }
       statusColumn = quarter && quarterToStatusColumn[quarter] ? quarterToStatusColumn[quarter] : 'Q4 Status'
       idValue = programId
-      updateRowFn = (row: string[], header: string[]) => {
-        const statusIdx = header.indexOf(statusColumn)
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const statusIdx = normalizedHeader.indexOf(statusColumn)
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
     } else if (type === 'category') {
@@ -63,8 +63,8 @@ export async function POST(request: Request) {
       const [pillarId, categoryId] = fieldPath
       idValue = categoryId
       statusColumn = 'Status'
-      updateRowFn = (row: string[], header: string[]) => {
-        const statusIdx = header.indexOf(statusColumn)
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const statusIdx = normalizedHeader.indexOf(statusColumn)
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
     } else if (type === 'goal') {
@@ -74,8 +74,8 @@ export async function POST(request: Request) {
       const [pillarId, categoryId, goalId] = fieldPath
       idValue = goalId
       statusColumn = 'Status'
-      updateRowFn = (row: string[], header: string[]) => {
-        const statusIdx = header.indexOf(statusColumn)
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const statusIdx = normalizedHeader.indexOf(statusColumn)
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
     } else {
@@ -98,7 +98,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: `${type} not found`, allIds, idValue }, { status: 404 })
     }
     // Update the status
-    updateRowFn(rows[rowIdx], header)
+    updateRowFn(rows[rowIdx], header, normalizedHeader)
     // Write back to CSV
     const newCsvContent = rows.map(row => row.join(",")).join("\n")
     try {
