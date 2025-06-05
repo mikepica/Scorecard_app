@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { StatusSelector } from "./status-selector"
 
 interface StatusCircleProps {
@@ -8,6 +8,8 @@ interface StatusCircleProps {
 
 export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
   const [showSelector, setShowSelector] = useState(false)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const circleRef = useRef<HTMLDivElement>(null)
 
   const getStatusColor = (status?: string) => {
     if (!status) return "bg-gray-300"
@@ -36,7 +38,8 @@ export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
   }
 
   const handleClick = () => {
-    if (onStatusChange) {
+    if (onStatusChange && circleRef.current) {
+      setAnchorRect(circleRef.current.getBoundingClientRect())
       setShowSelector(true)
     }
   }
@@ -50,6 +53,7 @@ export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
   return (
     <div className="relative">
       <div
+        ref={circleRef}
         className={`w-6 h-6 rounded-full ${getStatusColor(status)} mx-auto cursor-pointer hover:ring-2 hover:ring-gray-400`}
         title={getStatusTooltip(status)}
         onClick={handleClick}
@@ -59,6 +63,7 @@ export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
           currentStatus={status}
           onStatusChange={handleStatusChange}
           onClose={() => setShowSelector(false)}
+          anchorRect={anchorRect}
         />
       )}
     </div>
