@@ -107,30 +107,30 @@ export default function Home() {
             value={selectedQuarter}
             onChange={setSelectedQuarter}
             label="Quarter:"
-            labelWidth="w-20"
+            labelWidth="w-24"
           />
           <button
             onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Camera size={16} />
-            <span>Capture Screen</span>
+            <Camera size={20} />
+            <span className="whitespace-nowrap">Capture Screen</span>
           </button>
 
           <Link
             href="/details"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <BarChart2 size={16} />
-            <span>Program View</span>
+            <BarChart2 size={20} />
+            <span className="whitespace-nowrap">Program View</span>
           </Link>
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Menu size={16} />
-            <span>AI Chat</span>
+            <Menu size={20} />
+            <span className="whitespace-nowrap">AI Chat</span>
           </button>
         </div>
 
