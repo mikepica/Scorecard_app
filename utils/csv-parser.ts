@@ -65,24 +65,27 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
     // Map status values to the app's expected format
     const mapStatus = (status: string | null): "exceeded" | "on-track" | "delayed" | "missed" | undefined => {
       if (!status) return undefined
-
       switch (status.toLowerCase()) {
         case "green":
+        case "on-track":
           return "on-track"
         case "amber":
+        case "delayed":
           return "delayed"
         case "red":
+        case "missed":
           return "missed"
         case "blue":
+        case "exceeded":
           return "exceeded"
         default:
-          return "on-track"
+          return undefined
       }
     }
 
     // Create program
     const program: StrategicProgram = {
-      id: `pr${programId++}`,
+      id: rowData["StrategicProgramID"] || `pr${programId++}`,
       text: programText,
       q1Objective: rowData["Q1 Objective"] || undefined,
       q2Objective: rowData["Q2 Objective"] || undefined,

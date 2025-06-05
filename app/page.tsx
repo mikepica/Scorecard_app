@@ -31,6 +31,11 @@ export default function Home() {
     loadData()
   }, [])
 
+  const handleDataUpdate = (newData: ScoreCardData) => {
+    setData(newData)
+    setToast({ message: "Changes saved successfully", type: "success" })
+  }
+
   // Function to capture the screen
   const captureScreen = async () => {
     try {
@@ -126,7 +131,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            <Scorecard data={data} />
+            <Scorecard data={data} onDataUpdate={handleDataUpdate} />
           </div>
         )}
       </div>

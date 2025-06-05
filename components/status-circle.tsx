@@ -1,4 +1,14 @@
-export function StatusCircle({ status }: { status?: string }) {
+import { useState } from "react"
+import { StatusSelector } from "./status-selector"
+
+interface StatusCircleProps {
+  status?: string
+  onStatusChange?: (newStatus: string | undefined) => void
+}
+
+export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
+  const [showSelector, setShowSelector] = useState(false)
+
   const getStatusColor = (status?: string) => {
     if (!status) return "bg-gray-300"
 
@@ -20,5 +30,37 @@ export function StatusCircle({ status }: { status?: string }) {
     }
   }
 
-  return <div className={`w-6 h-6 rounded-full ${getStatusColor(status)} mx-auto`} title={status}></div>
+  const getStatusTooltip = (status?: string) => {
+    if (!status) return "Not defined"
+    return status
+  }
+
+  const handleClick = () => {
+    if (onStatusChange) {
+      setShowSelector(true)
+    }
+  }
+
+  const handleStatusChange = (newStatus: string | undefined) => {
+    if (onStatusChange) {
+      onStatusChange(newStatus)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <div
+        className={`w-6 h-6 rounded-full ${getStatusColor(status)} mx-auto cursor-pointer hover:ring-2 hover:ring-gray-400`}
+        title={getStatusTooltip(status)}
+        onClick={handleClick}
+      />
+      {showSelector && (
+        <StatusSelector
+          currentStatus={status}
+          onStatusChange={handleStatusChange}
+          onClose={() => setShowSelector(false)}
+        />
+      )}
+    </div>
+  )
 }

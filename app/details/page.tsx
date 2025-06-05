@@ -399,6 +399,31 @@ export default function DetailsPage() {
     }
   }
 
+  // Handle status update
+  const handleStatusUpdate = async (programId: string, quarter: "q1" | "q2" | "q3" | "q4", newStatus: string | undefined) => {
+    try {
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [programId, quarter, "Status"],
+          newValue: newStatus,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update status')
+      }
+
+      const updatedData = await response.json()
+      setData(updatedData)
+      setToast({ message: "Status updated successfully", type: "success" })
+    } catch (error) {
+      console.error("Error updating status:", error)
+      setToast({ message: "Failed to update status", type: "error" })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -512,7 +537,10 @@ export default function DetailsPage() {
                       {program.q1Objective || "On target against year-to-date number"}
                     </div>
                     <div className="status-dot-container">
-                      <StatusCircle status={program.q1Status || "on-track"} />
+                      <StatusCircle 
+                        status={program.q1Status} 
+                        onStatusChange={(newStatus) => handleStatusUpdate(program.id, "q1", newStatus)}
+                      />
                     </div>
                   </td>
                   <td className="border border-gray-300 p-3 pr-10 relative">
@@ -520,7 +548,10 @@ export default function DetailsPage() {
                       {program.q2Objective || "On target against year-to-date number"}
                     </div>
                     <div className="status-dot-container">
-                      <StatusCircle status={program.q2Status || "on-track"} />
+                      <StatusCircle 
+                        status={program.q2Status} 
+                        onStatusChange={(newStatus) => handleStatusUpdate(program.id, "q2", newStatus)}
+                      />
                     </div>
                   </td>
                   <td className="border border-gray-300 p-3 pr-10 relative">
@@ -528,7 +559,10 @@ export default function DetailsPage() {
                       {program.q3Objective || "On target against year-to-date number"}
                     </div>
                     <div className="status-dot-container">
-                      <StatusCircle status={program.q3Status || "on-track"} />
+                      <StatusCircle 
+                        status={program.q3Status} 
+                        onStatusChange={(newStatus) => handleStatusUpdate(program.id, "q3", newStatus)}
+                      />
                     </div>
                   </td>
                   <td className="border border-gray-300 p-3 pr-10 relative">
@@ -536,7 +570,10 @@ export default function DetailsPage() {
                       {program.q4Objective || "On target against year-to-date number"}
                     </div>
                     <div className="status-dot-container">
-                      <StatusCircle status={program.q4Status || "on-track"} />
+                      <StatusCircle 
+                        status={program.q4Status} 
+                        onStatusChange={(newStatus) => handleStatusUpdate(program.id, "q4", newStatus)}
+                      />
                     </div>
                   </td>
                 </tr>

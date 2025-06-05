@@ -1,5 +1,7 @@
-export function StatusIndicator({ status }: { status: "exceeded" | "on-track" | "delayed" | "missed" | string }) {
+export function StatusIndicator({ status }: { status?: string }) {
   const getStatusColor = () => {
+    if (!status) return "bg-gray-300"
+
     switch (status) {
       case "exceeded":
         return "bg-blue-400"
@@ -14,5 +16,5 @@ export function StatusIndicator({ status }: { status: "exceeded" | "on-track" | 
     }
   }
 
-  return <div className={`w-5 h-5 rounded-full ${getStatusColor()} flex-shrink-0`}></div>
+  return <div className={`w-5 h-5 rounded-full ${getStatusColor()} flex-shrink-0`} title={status || "Not defined"}></div>
 }
