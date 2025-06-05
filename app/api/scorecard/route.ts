@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server"
-import { scorecardData } from "@/data/scorecard-data"
-import { promises as fs } from 'fs'
-import { parseCSV, transformCSVToScoreCardData, loadAndMergeScorecardCSVs } from '@/utils/csv-parser'
-import { config } from '@/config'
+import { loadAndMergeScorecardCSVs } from '@/utils/csv-parser'
 
 export async function GET() {
   try {
     const mergedData = await loadAndMergeScorecardCSVs()
+    console.dir(mergedData, { depth: null })
     return NextResponse.json(mergedData)
   } catch (error) {
     console.error('Error reading CSV files:', error)
