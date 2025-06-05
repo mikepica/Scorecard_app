@@ -29,7 +29,6 @@ export function useEditableField({ fieldPath, onDataUpdate }: UseEditableFieldPr
       const updatedData = await response.json()
       onDataUpdate(updatedData)
     } catch (error) {
-      console.error('Error updating field:', error)
       throw error
     }
   }, [fieldPath, onDataUpdate])

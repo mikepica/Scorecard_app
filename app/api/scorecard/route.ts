@@ -4,10 +4,8 @@ import { loadAndMergeScorecardCSVs } from '@/utils/csv-parser'
 export async function GET() {
   try {
     const mergedData = await loadAndMergeScorecardCSVs()
-    console.dir(mergedData, { depth: null })
     return NextResponse.json(mergedData)
   } catch (error) {
-    console.error('Error reading CSV files:', error)
     return NextResponse.json(
       { error: 'Failed to read CSV files' },
       { status: 500 }

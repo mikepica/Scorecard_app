@@ -120,7 +120,6 @@ export function AIChat({ isOpen, onClose, context }: AIChatProps) {
     } catch (error: unknown) {
       // Only show error if it's not an abort error
       if (error instanceof Error && error.name !== 'AbortError') {
-        console.error('Error getting AI response:', error)
         const errorMessage: Message = {
           id: (Date.now() + 1).toString(),
           text: "I apologize, but I encountered an error. Please try again.",

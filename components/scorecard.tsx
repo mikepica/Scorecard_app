@@ -7,6 +7,7 @@ import { useState } from "react"
 import { EditableField } from "@/components/ui/editable-field"
 import { useEditableField } from "@/hooks/use-editable-field"
 import { Dropdown } from "@/components/dropdown"
+import { StatusCircle } from "@/components/status-circle"
 
 const STATUS_OPTIONS = [
   { value: "exceeded", label: "Exceeded" },
@@ -15,7 +16,7 @@ const STATUS_OPTIONS = [
   { value: "missed", label: "Missed" },
 ]
 
-export function Scorecard({ data, onDataUpdate }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void }) {
+export function Scorecard({ data, onDataUpdate, selectedQuarter = "q4" }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter?: string }) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
     return <div className="w-full p-4 text-center">No scorecard data available</div>
@@ -24,13 +25,13 @@ export function Scorecard({ data, onDataUpdate }: { data: ScoreCardData; onDataU
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
       {data.pillars.map((pillar) => (
-        <PillarCard key={pillar.id} pillar={pillar} onDataUpdate={onDataUpdate} />
+        <PillarCard key={pillar.id} pillar={pillar} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
       ))}
     </div>
   )
 }
 
-function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
+function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   const getBgColor = (name: string) => {
     switch (name.toLowerCase()) {
       case "science & innovation":
@@ -80,7 +81,7 @@ function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (n
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
           pillar.categories.map((category) => (
-            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} />
+            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
           ))}
       </div>
       {/* Bottom line positioned slightly above the bottom */}
@@ -89,10 +90,9 @@ function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (n
   )
 }
 
-function CategorySection({ category, pillar, onDataUpdate }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
-  const [isEditing, setIsEditing] = useState(false)
+function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   // Handler for category status update
-  const handleCategoryStatusChange = async (newStatus: string) => {
+  const handleCategoryStatusChange = async (newStatus: string | undefined) => {
     const response = await fetch('/api/scorecard/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -105,45 +105,34 @@ function CategorySection({ category, pillar, onDataUpdate }: { category: Categor
     if (!response.ok) throw new Error('Failed to update category status');
     const updatedData = await response.json();
     onDataUpdate(updatedData);
-    setIsEditing(false)
   }
   return (
     <div className="mb-4 last:mb-0">
       <div className="flex items-center mb-2 gap-2">
         <h3 className={`text-base font-medium ${getCategoryColor(pillar.name)}`}>{category.name}</h3>
-        {isEditing ? (
-          <Dropdown
-            options={STATUS_OPTIONS}
-            value={category.status || ""}
-            onChange={handleCategoryStatusChange}
-            label=""
-            placeholder="Status"
-          />
-        ) : (
-          <span onClick={() => setIsEditing(true)} style={{ cursor: 'pointer' }}>
-            <StatusIndicator status={category.status || "on-track"} />
-          </span>
-        )}
+        <StatusCircle
+          status={category.status}
+          onStatusChange={handleCategoryStatusChange}
+        />
       </div>
       <ul className="space-y-2">
         {category.goals && category.goals.map((goal) => (
-          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} />
+          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
         ))}
       </ul>
     </div>
   )
 }
 
-function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void }) {
+function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   const [expanded, setExpanded] = useState(false)
-  const [isEditing, setIsEditing] = useState(false)
   const hasPrograms = goal.programs && goal.programs.length > 0
 
   // Use Q4 status for display, fallback to other quarters if not available
   const displayStatus = goal.status || goal.q4Status || goal.q3Status || goal.q2Status || goal.q1Status
 
   // Handler for goal status update
-  const handleGoalStatusChange = async (newStatus: string) => {
+  const handleGoalStatusChange = async (newStatus: string | undefined) => {
     const response = await fetch('/api/scorecard/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -156,7 +145,6 @@ function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoa
     if (!response.ok) throw new Error('Failed to update goal status');
     const updatedData = await response.json();
     onDataUpdate(updatedData);
-    setIsEditing(false)
   }
 
   const { handleSave } = useEditableField({
@@ -198,6 +186,17 @@ function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoa
     }
   }
 
+  // Helper to get the correct status for the selected quarter
+  const getProgramStatus = (program: any) => {
+    switch (selectedQuarter) {
+      case "q1": return program.q1Status;
+      case "q2": return program.q2Status;
+      case "q3": return program.q3Status;
+      case "q4": return program.q4Status;
+      default: return program.q4Status;
+    }
+  }
+
   return (
     <li>
       <div className="flex items-start justify-between gap-2">
@@ -213,19 +212,10 @@ function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoa
             className="text-base"
           />
         </div>
-        {isEditing ? (
-          <Dropdown
-            options={STATUS_OPTIONS}
-            value={displayStatus || ""}
-            onChange={handleGoalStatusChange}
-            label=""
-            placeholder="Status"
-          />
-        ) : (
-          <span onClick={() => setIsEditing(true)} style={{ cursor: 'pointer' }}>
-            <StatusIndicator status={displayStatus || "on-track"} />
-          </span>
-        )}
+        <StatusCircle
+          status={displayStatus}
+          onStatusChange={handleGoalStatusChange}
+        />
       </div>
 
       {expanded && hasPrograms && (
@@ -237,8 +227,22 @@ function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoa
                 onSave={async (newValue) => handleProgramSave(program.text, newValue)}
                 className="text-sm"
               />
-              <StatusIndicator
-                status={program.q4Status || program.q3Status || program.q2Status || program.q1Status}
+              <StatusCircle
+                status={getProgramStatus(program)}
+                onStatusChange={async (newStatus) => {
+                  const response = await fetch('/api/scorecard/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
+                      newValue: newStatus,
+                      type: 'program',
+                    }),
+                  })
+                  if (!response.ok) throw new Error('Failed to update program status');
+                  const updatedData = await response.json();
+                  onDataUpdate(updatedData);
+                }}
               />
             </li>
           ))}

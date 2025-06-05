@@ -8,12 +8,21 @@ import { Camera, BarChart2, Menu } from "lucide-react"
 import Link from "next/link"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
+import { Dropdown } from "@/components/dropdown"
 
 export default function Home() {
   const [data, setData] = useState<ScoreCardData>(scorecardData)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [selectedQuarter, setSelectedQuarter] = useState("q1")
+
+  const QUARTER_OPTIONS = [
+    { value: "q1", label: "Q1" },
+    { value: "q2", label: "Q2" },
+    { value: "q3", label: "Q3" },
+    { value: "q4", label: "Q4" },
+  ]
 
   useEffect(() => {
     async function loadData() {
@@ -22,7 +31,7 @@ export default function Home() {
         const loadedData = await loadScorecardData()
         setData(loadedData)
       } catch (error) {
-        console.error("Error loading data:", error)
+        // Remove all console.error statements
       } finally {
         setLoading(false)
       }
@@ -82,7 +91,7 @@ export default function Home() {
         setToast({ message: "Screen captured successfully", type: "success" })
       }, "image/png")
     } catch (error) {
-      console.error("Error capturing screen:", error)
+      // Remove all console.error statements
       setToast({ message: "Failed to capture screen", type: "error" })
     }
   }
@@ -92,7 +101,14 @@ export default function Home() {
       <div className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
         <h1 className="text-2xl font-bold">ORD 2024 Scorecard</h1>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
+          <Dropdown
+            options={QUARTER_OPTIONS}
+            value={selectedQuarter}
+            onChange={setSelectedQuarter}
+            label="Quarter:"
+            labelWidth="w-20"
+          />
           <button
             onClick={captureScreen}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
@@ -131,7 +147,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            <Scorecard data={data} onDataUpdate={handleDataUpdate} />
+            <Scorecard data={data} onDataUpdate={handleDataUpdate} selectedQuarter={selectedQuarter} />
           </div>
         )}
       </div>

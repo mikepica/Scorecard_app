@@ -31,7 +31,7 @@ function parseCSVSync(csvText: string): string[][] {
 
 export async function POST(request: Request) {
   try {
-    const { fieldPath, newValue, type } = await request.json()
+    const { fieldPath, newValue, type, quarter }: { fieldPath: string[], newValue: string, type: string, quarter?: 'q1' | 'q2' | 'q3' | 'q4' } = await request.json()
     // type: 'program' | 'category' | 'goal'
     // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
 
@@ -43,7 +43,14 @@ export async function POST(request: Request) {
       idColumn = 'StrategicProgramID'
       isProgram = true
       const [pillarId, categoryId, goalId, programId] = fieldPath
-      statusColumn = 'Q4 Status' // Default to Q4 for now
+      // Use the quarter parameter to determine which status column to update
+      const quarterToStatusColumn = {
+        q1: 'Q1 Status',
+        q2: 'Q2 Status',
+        q3: 'Q3 Status',
+        q4: 'Q4 Status',
+      }
+      statusColumn = quarter && quarterToStatusColumn[quarter] ? quarterToStatusColumn[quarter] : 'Q4 Status'
       idValue = programId
       updateRowFn = (row: string[], header: string[]) => {
         const statusIdx = header.indexOf(statusColumn)
@@ -79,8 +86,6 @@ export async function POST(request: Request) {
     const csvContent = await fs.readFile(csvPath, 'utf-8')
     const rows = parseCSVString(csvContent)
     const header = rows[0]
-    console.log('CSV header row:', header)
-    // Normalize header values (remove BOM, whitespace, carriage returns)
     const normalizedHeader = header.map(h => h.replace(/^\uFEFF/, '').replace(/\r/g, '').trim())
     const idIdx = normalizedHeader.indexOf(idColumn)
     if (idIdx === -1) {
@@ -88,7 +93,6 @@ export async function POST(request: Request) {
     }
     // Find the row by ID
     const allIds = rows.slice(1).map(row => row[idIdx])
-    console.log(`Update type: ${type}, Looking for ID: ${idValue}, All IDs:`, allIds)
     const rowIdx = rows.findIndex((row, idx) => idx !== 0 && row[idIdx]?.trim() === idValue.trim())
     if (rowIdx === -1) {
       return NextResponse.json({ error: `${type} not found`, allIds, idValue }, { status: 404 })
@@ -97,13 +101,16 @@ export async function POST(request: Request) {
     updateRowFn(rows[rowIdx], header)
     // Write back to CSV
     const newCsvContent = rows.map(row => row.join(",")).join("\n")
-    await fs.writeFile(csvPath, newCsvContent)
+    try {
+      await fs.writeFile(csvPath, newCsvContent)
+    } catch (writeError) {
+      return NextResponse.json({ error: 'Failed to write CSV file' }, { status: 500 })
+    }
 
     // Return the updated merged hierarchy
     const mergedData = await loadAndMergeScorecardCSVs()
     return NextResponse.json(mergedData)
   } catch (error) {
-    console.error("Error updating status:", error)
     return NextResponse.json({ error: "Failed to update status" }, { status: 500 })
   }
 } 

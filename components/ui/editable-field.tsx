@@ -46,9 +46,6 @@ export function EditableField({
     try {
       await onSave(editValue)
       setIsEditing(false)
-    } catch (error) {
-      console.error("Failed to save:", error)
-      // Optionally show error toast here
     } finally {
       setIsSaving(false)
     }

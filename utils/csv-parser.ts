@@ -1,26 +1,22 @@
-import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
-import { promises as fs } from 'fs'
-import path from 'path'
+import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard";
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Helper function to map status values
-function mapStatus(status: string | null): 'exceeded' | 'on-track' | 'delayed' | 'missed' | undefined {
-  if (!status) return undefined
-  switch (status.toLowerCase()) {
-    case 'green':
-    case 'on-track':
-      return 'on-track'
-    case 'amber':
-    case 'delayed':
-      return 'delayed'
-    case 'red':
-    case 'missed':
-      return 'missed'
-    case 'blue':
-    case 'exceeded':
-      return 'exceeded'
-    default:
-      return undefined
-  }
+function mapStatus(status: string | null | undefined): "exceeded" | "on-track" | "delayed" | "missed" | undefined {
+  if (!status || status.trim() === '') return undefined;
+  
+  const statusMap: { [key: string]: "exceeded" | "on-track" | "delayed" | "missed" } = {
+    "Green": "on-track",
+    "Amber": "delayed",
+    "Red": "missed",
+    "exceeded": "exceeded",
+    "on-track": "on-track",
+    "delayed": "delayed",
+    "missed": "missed"
+  };
+  
+  return statusMap[status.trim()];
 }
 
 // Helper to normalize IDs
@@ -36,9 +32,6 @@ function trimText(val: string | undefined | null): string {
 // Helper to get column index safely
 function colIdx(headers: string[], col: string): number {
   const idx = headers.findIndex(h => h.trim() === col.trim());
-  if (idx === -1) {
-    console.error('CSV column not found:', col, 'in', headers);
-  }
   return idx;
 }
 
@@ -144,6 +137,7 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
   const progQ3CommentsIdx = mainHeader.indexOf('Q3 Comments')
   const progQ4CommentsIdx = mainHeader.indexOf('Q4 Comments')
 
+  let debugCount = 0;
   dataRows.forEach((row) => {
     const rowData = headers.reduce(
       (obj, header, index) => {
@@ -167,14 +161,14 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
     // Create program
     const program: StrategicProgram = {
       id: programId,
-      text: programText,
+      text: programText || `Program ${programId}`,
+      strategicGoalId: goalId,
+      categoryId: categoryId,
+      strategicPillarId: pillarId,
       q1Objective: rowData["Q1 Objective"] || undefined,
       q2Objective: rowData["Q2 Objective"] || undefined,
       q3Objective: rowData["Q3 Objective"] || undefined,
       q4Objective: rowData["Q4 Objective"] || undefined,
-      ordLtSponsors: rowData["ORD LT Sponsor(s)"] || undefined,
-      sponsorsLeads: rowData["Sponsor(s)/Lead(s)"] || undefined,
-      reportingOwners: rowData["Reporting owner(s)"] || undefined,
       q1Status: mapStatus(rowData["Q1 Status"]),
       q2Status: mapStatus(rowData["Q2 Status"]),
       q3Status: mapStatus(rowData["Q3 Status"]),
@@ -183,9 +177,9 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
       q2Comments: rowData["Q2 Comments"] || undefined,
       q3Comments: rowData["Q3 Comments"] || undefined,
       q4Comments: rowData["Q4 Comments"] || undefined,
-      strategicGoalId: goalId,
-      categoryId: categoryId,
-      strategicPillarId: pillarId
+      ordLtSponsors: rowData["ORD LT Sponsor(s)"] || undefined,
+      sponsorsLeads: rowData["Sponsor(s)/Lead(s)"] || undefined,
+      reportingOwners: rowData["Reporting owner(s)"] || undefined,
     }
 
     // Get or create pillar
@@ -236,6 +230,10 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
     if (!goal.programs) {
       goal.programs = []
     }
+    if (debugCount < 5) {
+      console.log('BACKEND DEBUG - Program object:', program);
+      debugCount++;
+    }
     goal.programs.push(program)
   })
 
@@ -246,6 +244,7 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
 
 // Function to load and merge data from all CSV files
 export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
+  console.log('CSV PARSER: loadAndMergeScorecardCSVs called');
   try {
     const [dummyData, strategicGoals, categoryStatus, strategicPillars] = await Promise.all([
       parseCSV('data/DummyData.csv'),
@@ -304,7 +303,9 @@ export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
     const pillarsMap = new Map<string, Pillar>();
     const categoriesMap = new Map<string, Category>();
     const goalsMap = new Map<string, StrategicGoal>();
-    dummyRows.forEach(row => {
+    const headers = dummyRows[0];
+    const dataRows = dummyRows.slice(1);
+    dataRows.forEach(row => {
       const pillarId = norm(row[colIdx(dummyHeaders, 'StrategicPillarID')]);
       const categoryId = norm(row[colIdx(dummyHeaders, 'CategoryID')]);
       const goalId = norm(row[colIdx(dummyHeaders, 'StrategicGoalID')]);
@@ -371,7 +372,18 @@ export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
         q1Objective,
         q2Objective,
         q3Objective,
-        q4Objective
+        q4Objective,
+        q1Status: mapStatus(row[dummyHeaders.indexOf('Q1 Status')]),
+        q2Status: mapStatus(row[dummyHeaders.indexOf('Q2 Status')]),
+        q3Status: mapStatus(row[dummyHeaders.indexOf('Q3 Status')]),
+        q4Status: mapStatus(row[dummyHeaders.indexOf('Q4 Status')]),
+        q1Comments: trimText(row[dummyHeaders.indexOf('Q1 Comments')]),
+        q2Comments: trimText(row[dummyHeaders.indexOf('Q2 Comments')]),
+        q3Comments: trimText(row[dummyHeaders.indexOf('Q3 Comments')]),
+        q4Comments: trimText(row[dummyHeaders.indexOf('Q4 Comments')]),
+        ordLtSponsors: trimText(row[dummyHeaders.indexOf('ORD LT Sponsor(s)')]),
+        sponsorsLeads: trimText(row[dummyHeaders.indexOf('Sponsor(s)/Lead(s)')]),
+        reportingOwners: trimText(row[dummyHeaders.indexOf('Reporting owner(s)')]),
       };
       if (!goal.programs) goal.programs = [];
       goal.programs.push(program);

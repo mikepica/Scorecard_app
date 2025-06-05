@@ -42,7 +42,7 @@ jobs:
         run: |
           echo "React App Demo"
           tag=latest
-          docker build . -t harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag --file src\Dockerfile
+          docker build . -t harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag --file src/Dockerfile
           docker push harbor.csis.astrazeneca.net/azimuth-demo/scorecard-app:$tag
 
       - name: Docker Size
@@ -53,6 +53,8 @@ jobs:
 
 ```
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+
 
 # dependencies
 /node_modules
@@ -83,47 +85,81 @@ next-env.d.ts
 
 ```
 
+# app/api/chat/route.ts
+
+```ts
+import { NextResponse } from 'next/server';
+import OpenAI from 'openai';
+import { promises as fs } from 'fs';
+import path from 'path';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+
+    // Validate request body
+    if (!body.messages || !Array.isArray(body.messages)) {
+      return NextResponse.json(
+        { error: 'Invalid messages format' },
+        { status: 400 }
+      );
+    }
+
+    const { messages, context } = body;
+
+    // Load system prompt from file
+    const promptPath = path.join(process.cwd(), 'llm-system-prompt.md');
+    const systemPrompt = await fs.readFile(promptPath, 'utf-8');
+
+    // Limit context size to prevent token overflow
+    const contextString = JSON.stringify(context);
+    const maxContextLength = 20000; // Adjust based on needs
+    const truncatedContext = contextString.length > maxContextLength 
+      ? contextString.substring(0, maxContextLength) + '...[truncated]'
+      : contextString;
+
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1",
+      temperature: 0.3,
+      messages: [
+        {
+          role: "system",
+          content: `${systemPrompt}\n\nHere is the context of the scorecard data: ${truncatedContext}`
+        },
+        ...messages
+      ],
+    });
+
+    return NextResponse.json({ 
+      response: completion.choices[0].message.content 
+    });
+  } catch (error) {
+    console.error('Error in chat API:', error);
+    return NextResponse.json(
+      { error: 'Failed to process chat request' },
+      { status: 500 }
+    );
+  }
+} 
+```
+
 # app/api/scorecard/route.ts
 
 ```ts
 import { NextResponse } from "next/server"
-import { scorecardData } from "@/data/scorecard-data"
-import { promises as fs } from 'fs'
-import { parseCSV, transformCSVToScoreCardData } from '@/utils/csv-parser'
-import { config } from '@/config'
+import { loadAndMergeScorecardCSVs } from '@/utils/csv-parser'
 
 export async function GET() {
   try {
-    const csvPath = config.csvFilePath
-    const csvText = await fs.readFile(csvPath, 'utf-8')
-    const csvData = csvText.split('\n').map(row => {
-      const values: string[] = []
-      let inQuotes = false
-      let currentValue = ""
-
-      for (let i = 0; i < row.length; i++) {
-        const char = row[i]
-
-        if (char === '"') {
-          inQuotes = !inQuotes
-        } else if (char === "," && !inQuotes) {
-          values.push(currentValue)
-          currentValue = ""
-        } else {
-          currentValue += char
-        }
-      }
-
-      values.push(currentValue)
-      return values
-    })
-
-    const transformedData = transformCSVToScoreCardData(csvData)
-    return NextResponse.json(transformedData)
+    const mergedData = await loadAndMergeScorecardCSVs()
+    return NextResponse.json(mergedData)
   } catch (error) {
-    console.error('Error reading CSV file:', error)
     return NextResponse.json(
-      { error: 'Failed to read CSV file' },
+      { error: 'Failed to read CSV files' },
       { status: 500 }
     )
   }
@@ -141,6 +177,127 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid data format" }, { status: 400 })
   }
 }
+```
+
+# app/api/scorecard/update/route.ts
+
+```ts
+import { NextResponse } from "next/server"
+import { promises as fs } from "fs"
+import path from "path"
+import { transformCSVToScoreCardData, loadAndMergeScorecardCSVs, parseCSVString } from "@/utils/csv-parser"
+
+// For best practice, consider using an environment variable for this path in production
+const CSV_FILE_PATH = path.join(process.cwd(), "data", "DummyData.csv")
+
+// Synchronous CSV parser for local string content (handles quoted fields)
+function parseCSVSync(csvText: string): string[][] {
+  const rows = csvText.split("\n")
+  return rows.map((row) => {
+    const values: string[] = []
+    let inQuotes = false
+    let currentValue = ""
+    for (let i = 0; i < row.length; i++) {
+      const char = row[i]
+      if (char === '"') {
+        inQuotes = !inQuotes
+      } else if (char === "," && !inQuotes) {
+        values.push(currentValue)
+        currentValue = ""
+      } else {
+        currentValue += char
+      }
+    }
+    values.push(currentValue)
+    return values
+  })
+}
+
+export async function POST(request: Request) {
+  try {
+    const { fieldPath, newValue, type, quarter }: { fieldPath: string[], newValue: string, type: string, quarter?: 'q1' | 'q2' | 'q3' | 'q4' } = await request.json()
+    // type: 'program' | 'category' | 'goal'
+    // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
+
+    let csvPath: string, idColumn: string, statusColumn: string, idValue: string, isProgram = false
+    let updateRowFn: (row: string[], header: string[]) => void
+    if (type === 'program') {
+      // Program status update (DummyData.csv)
+      csvPath = path.join(process.cwd(), 'data', 'DummyData.csv')
+      idColumn = 'StrategicProgramID'
+      isProgram = true
+      const [pillarId, categoryId, goalId, programId] = fieldPath
+      // Use the quarter parameter to determine which status column to update
+      const quarterToStatusColumn = {
+        q1: 'Q1 Status',
+        q2: 'Q2 Status',
+        q3: 'Q3 Status',
+        q4: 'Q4 Status',
+      }
+      statusColumn = quarter && quarterToStatusColumn[quarter] ? quarterToStatusColumn[quarter] : 'Q4 Status'
+      idValue = programId
+      updateRowFn = (row: string[], header: string[]) => {
+        const statusIdx = header.indexOf(statusColumn)
+        if (statusIdx !== -1) row[statusIdx] = newValue || ''
+      }
+    } else if (type === 'category') {
+      // Category status update (Category-status-comments.csv)
+      csvPath = path.join(process.cwd(), 'data', 'Category-status-comments.csv')
+      idColumn = 'CategoryID'
+      const [pillarId, categoryId] = fieldPath
+      idValue = categoryId
+      statusColumn = 'Status'
+      updateRowFn = (row: string[], header: string[]) => {
+        const statusIdx = header.indexOf(statusColumn)
+        if (statusIdx !== -1) row[statusIdx] = newValue || ''
+      }
+    } else if (type === 'goal') {
+      // Goal status update (Strategic-Goals.csv)
+      csvPath = path.join(process.cwd(), 'data', 'Strategic-Goals.csv')
+      idColumn = 'StrategicGoalID'
+      const [pillarId, categoryId, goalId] = fieldPath
+      idValue = goalId
+      statusColumn = 'Status'
+      updateRowFn = (row: string[], header: string[]) => {
+        const statusIdx = header.indexOf(statusColumn)
+        if (statusIdx !== -1) row[statusIdx] = newValue || ''
+      }
+    } else {
+      return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+    }
+
+    // Read and parse the CSV
+    const csvContent = await fs.readFile(csvPath, 'utf-8')
+    const rows = parseCSVString(csvContent)
+    const header = rows[0]
+    const normalizedHeader = header.map(h => h.replace(/^\uFEFF/, '').replace(/\r/g, '').trim())
+    const idIdx = normalizedHeader.indexOf(idColumn)
+    if (idIdx === -1) {
+      return NextResponse.json({ error: `${idColumn} column not found`, header: normalizedHeader }, { status: 404 })
+    }
+    // Find the row by ID
+    const allIds = rows.slice(1).map(row => row[idIdx])
+    const rowIdx = rows.findIndex((row, idx) => idx !== 0 && row[idIdx]?.trim() === idValue.trim())
+    if (rowIdx === -1) {
+      return NextResponse.json({ error: `${type} not found`, allIds, idValue }, { status: 404 })
+    }
+    // Update the status
+    updateRowFn(rows[rowIdx], header)
+    // Write back to CSV
+    const newCsvContent = rows.map(row => row.join(",")).join("\n")
+    try {
+      await fs.writeFile(csvPath, newCsvContent)
+    } catch (writeError) {
+      return NextResponse.json({ error: 'Failed to write CSV file' }, { status: 500 })
+    }
+
+    // Return the updated merged hierarchy
+    const mergedData = await loadAndMergeScorecardCSVs()
+    return NextResponse.json(mergedData)
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to update status" }, { status: 500 })
+  }
+} 
 ```
 
 # app/details/page.tsx
@@ -547,6 +704,38 @@ export default function DetailsPage() {
     }
   }
 
+  // Handle status update
+  const handleStatusUpdate = async (
+    pillarId: string,
+    categoryId: string,
+    goalId: string,
+    programId: string,
+    quarter: string,
+    newStatus: string
+  ) => {
+    try {
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [String(pillarId), String(categoryId), String(goalId), String(programId)],
+          newValue: newStatus,
+          type: 'program',
+          quarter,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update status')
+      }
+      const updatedData = await response.json()
+      setData(updatedData)
+      setToast({ message: 'Status updated successfully', type: 'success' })
+    } catch (error) {
+      console.error('Error updating status:', error)
+      setToast({ message: 'Failed to update status', type: 'error' })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -589,7 +778,7 @@ export default function DetailsPage() {
           </button>
         </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data} />
       </header>
 
       {/* Filter section */}
@@ -650,45 +839,62 @@ export default function DetailsPage() {
           </thead>
           <tbody>
             {filteredPrograms.length > 0 ? (
-              filteredPrograms.map((program) => (
-                <tr key={program.id}>
-                  <td className="border border-gray-300 p-3">
-                    <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
-                  </td>
-                  <td className="border border-gray-300 p-3 pr-10 relative">
-                    <div className="mb-2 text-base">
-                      {program.q1Objective || "On target against year-to-date number"}
-                    </div>
-                    <div className="status-dot-container">
-                      <StatusCircle status={program.q1Status || "on-track"} />
-                    </div>
-                  </td>
-                  <td className="border border-gray-300 p-3 pr-10 relative">
-                    <div className="mb-2 text-base">
-                      {program.q2Objective || "On target against year-to-date number"}
-                    </div>
-                    <div className="status-dot-container">
-                      <StatusCircle status={program.q2Status || "on-track"} />
-                    </div>
-                  </td>
-                  <td className="border border-gray-300 p-3 pr-10 relative">
-                    <div className="mb-2 text-base">
-                      {program.q3Objective || "On target against year-to-date number"}
-                    </div>
-                    <div className="status-dot-container">
-                      <StatusCircle status={program.q3Status || "on-track"} />
-                    </div>
-                  </td>
-                  <td className="border border-gray-300 p-3 pr-10 relative">
-                    <div className="mb-2 text-base">
-                      {program.q4Objective || "On target against year-to-date number"}
-                    </div>
-                    <div className="status-dot-container">
-                      <StatusCircle status={program.q4Status || "on-track"} />
-                    </div>
-                  </td>
-                </tr>
-              ))
+              filteredPrograms.map((program, idx) => {
+                if (idx < 5) {
+                  console.log('DEBUG - Program object:', program);
+                }
+                return (
+                  <tr key={program.id}>
+                    <td className="border border-gray-300 p-3">
+                      <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
+                    </td>
+                    <td className="border border-gray-300 p-3 pr-10 relative">
+                      <div className="mb-2 text-base">
+                        {program.q1Objective || "On target against year-to-date number"}
+                      </div>
+                      <div className="status-dot-container">
+                        <StatusCircle
+                          status={program.q1Status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q1", newStatus ?? '')}
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-gray-300 p-3 pr-10 relative">
+                      <div className="mb-2 text-base">
+                        {program.q2Objective || "On target against year-to-date number"}
+                      </div>
+                      <div className="status-dot-container">
+                        <StatusCircle
+                          status={program.q2Status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q2", newStatus ?? '')}
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-gray-300 p-3 pr-10 relative">
+                      <div className="mb-2 text-base">
+                        {program.q3Objective || "On target against year-to-date number"}
+                      </div>
+                      <div className="status-dot-container">
+                        <StatusCircle
+                          status={program.q3Status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q3", newStatus ?? '')}
+                        />
+                      </div>
+                    </td>
+                    <td className="border border-gray-300 p-3 pr-10 relative">
+                      <div className="mb-2 text-base">
+                        {program.q4Objective || "On target against year-to-date number"}
+                      </div>
+                      <div className="status-dot-container">
+                        <StatusCircle
+                          status={program.q4Status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q4", newStatus ?? '')}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             ) : (
               <tr>
                 <td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
@@ -872,7 +1078,7 @@ export default function Home() {
         const loadedData = await loadScorecardData()
         setData(loadedData)
       } catch (error) {
-        console.error("Error loading data:", error)
+        // Remove all console.error statements
       } finally {
         setLoading(false)
       }
@@ -880,6 +1086,11 @@ export default function Home() {
 
     loadData()
   }, [])
+
+  const handleDataUpdate = (newData: ScoreCardData) => {
+    setData(newData)
+    setToast({ message: "Changes saved successfully", type: "success" })
+  }
 
   // Function to capture the screen
   const captureScreen = async () => {
@@ -927,7 +1138,7 @@ export default function Home() {
         setToast({ message: "Screen captured successfully", type: "success" })
       }, "image/png")
     } catch (error) {
-      console.error("Error capturing screen:", error)
+      // Remove all console.error statements
       setToast({ message: "Failed to capture screen", type: "error" })
     }
   }
@@ -963,7 +1174,7 @@ export default function Home() {
           </button>
         </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data} />
       </div>
 
       <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">
@@ -976,7 +1187,7 @@ export default function Home() {
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            <Scorecard data={data} />
+            <Scorecard data={data} onDataUpdate={handleDataUpdate} />
           </div>
         )}
       </div>
@@ -1125,8 +1336,12 @@ export default function UploadPage() {
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, Send } from "lucide-react"
+import { X, Send, RefreshCw } from "lucide-react"
 import { Overlay } from "./overlay"
+import type { ScoreCardData } from "@/types/scorecard"
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeSanitize from 'rehype-sanitize'
 
 type Message = {
   id: string
@@ -1135,30 +1350,63 @@ type Message = {
   timestamp: Date
 }
 
-export function AIChat({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: "welcome",
-      text: "Hello! I'm your AI assistant. How can I help you with your scorecard today?",
-      sender: "ai",
-      timestamp: new Date(),
-    },
-  ])
+type AIChatProps = {
+  isOpen: boolean
+  onClose: () => void
+  context: ScoreCardData
+}
+
+export function AIChat({ isOpen, onClose, context }: AIChatProps) {
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
+
+  // Initialize chat with context
+  useEffect(() => {
+    if (isOpen && messages.length === 0) {
+      setMessages([
+        {
+          id: "welcome",
+          text: "Hello! I have access to your scorecard data and can help you analyze it. How can I assist you today?",
+          sender: "ai",
+          timestamp: new Date(),
+        },
+      ])
+    }
+  }, [isOpen, messages.length])
 
   // Scroll to bottom when messages change
   useEffect(() => {
-    if (messagesEndRef.current) {
+    if (typeof window !== 'undefined' && messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
     }
   }, [messages])
 
-  // Handle sending a message
-  const handleSendMessage = () => {
-    if (!input.trim()) return
+  // Reset chat
+  const handleReset = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+      abortControllerRef.current = null
+    }
+    setMessages([])
+    setInput("")
+    setIsLoading(false)
+  }
 
-    // Add user message
+  // Handle sending a message
+  const handleSendMessage = async () => {
+    if (!input.trim() || isLoading) return
+
+    // Abort any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController()
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text: input,
@@ -1167,31 +1415,57 @@ export function AIChat({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
     }
     setMessages((prev) => [...prev, userMessage])
     setInput("")
+    setIsLoading(true)
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            ...messages.map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.text
+            })),
+            {
+              role: 'user',
+              content: input
+            }
+          ],
+          context
+        }),
+        signal: abortControllerRef.current.signal
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response')
+      }
+
+      const data = await response.json()
+      
       const aiResponse: Message = {
         id: (Date.now() + 1).toString(),
-        text: getAIResponse(input),
+        text: data.response,
         sender: "ai",
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiResponse])
-    }, 1000)
-  }
-
-  // Simple AI response generator
-  const getAIResponse = (userInput: string): string => {
-    const input = userInput.toLowerCase()
-
-    if (input.includes("hello") || input.includes("hi")) {
-      return "Hello! How can I help you with your scorecard today?"
-    } else if (input.includes("help")) {
-      return "I can help you understand your scorecard data, suggest improvements, or answer questions about specific metrics."
-    } else if (input.length < 10) {
-      return "Could you provide more details so I can better assist you?"
-    } else {
-      return "I've analyzed your scorecard data. Would you like me to suggest improvements for any specific pillar or category?"
+    } catch (error: unknown) {
+      // Only show error if it's not an abort error
+      if (error instanceof Error && error.name !== 'AbortError') {
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          text: "I apologize, but I encountered an error. Please try again.",
+          sender: "ai",
+          timestamp: new Date(),
+        }
+        setMessages((prev) => [...prev, errorMessage])
+      }
+    } finally {
+      setIsLoading(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -1204,18 +1478,33 @@ export function AIChat({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
 
   return (
     <>
-      <Overlay isVisible={isOpen} onClick={onClose} />
+      <Overlay isVisible={isOpen} onClick={() => {
+        if (abortControllerRef.current) {
+          abortControllerRef.current.abort()
+          abortControllerRef.current = null
+        }
+        onClose()
+      }} />
       <div
-        className={`fixed right-0 top-0 h-full w-full md:w-96 bg-white shadow-lg z-50 flex flex-col transition-transform duration-300 ${
+        className={`fixed right-0 top-0 h-full w-full md:w-[768px] bg-white shadow-lg z-50 flex flex-col transition-transform duration-300 ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
       >
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white">
           <h2 className="text-lg font-semibold">AI Chat</h2>
-          <button onClick={onClose} className="p-1 rounded-full hover:bg-purple-700">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleReset} 
+              className="p-1 rounded-full hover:bg-purple-700"
+              title="Reset Chat"
+            >
+              <RefreshCw size={20} />
+            </button>
+            <button onClick={onClose} className="p-1 rounded-full hover:bg-purple-700">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
@@ -1230,11 +1519,30 @@ export function AIChat({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
                   message.sender === "user" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-800"
                 }`}
               >
-                {message.text}
+                {message.sender === "ai" ? (
+                  <div className="prose prose-sm max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                      {message.text}
+                    </ReactMarkdown>
+                  </div>
+                ) : (
+                  message.text
+                )}
               </div>
               <span className="text-xs text-gray-500 mt-1">{formatTime(message.timestamp)}</span>
             </div>
           ))}
+          {isLoading && (
+            <div className="flex items-start">
+              <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
+                <div className="flex space-x-2">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                </div>
+              </div>
+            </div>
+          )}
           <div ref={messagesEndRef} />
         </div>
 
@@ -1248,10 +1556,11 @@ export function AIChat({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
               onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               placeholder="Type your message..."
               className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+              disabled={isLoading}
             />
             <button
               onClick={handleSendMessage}
-              disabled={!input.trim()}
+              disabled={!input.trim() || isLoading}
               className="p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
             >
               <Send size={20} />
@@ -1551,8 +1860,19 @@ import { PillarIcon } from "@/components/pillar-icon"
 import type { ScoreCardData, Pillar, Category, StrategicGoal } from "@/types/scorecard"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { useState } from "react"
+import { EditableField } from "@/components/ui/editable-field"
+import { useEditableField } from "@/hooks/use-editable-field"
+import { Dropdown } from "@/components/dropdown"
+import { StatusCircle } from "@/components/status-circle"
 
-export function Scorecard({ data }: { data: ScoreCardData }) {
+const STATUS_OPTIONS = [
+  { value: "exceeded", label: "Exceeded" },
+  { value: "on-track", label: "On Track" },
+  { value: "delayed", label: "Delayed" },
+  { value: "missed", label: "Missed" },
+]
+
+export function Scorecard({ data, onDataUpdate }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void }) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
     return <div className="w-full p-4 text-center">No scorecard data available</div>
@@ -1561,13 +1881,13 @@ export function Scorecard({ data }: { data: ScoreCardData }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
       {data.pillars.map((pillar) => (
-        <PillarCard key={pillar.id} pillar={pillar} />
+        <PillarCard key={pillar.id} pillar={pillar} onDataUpdate={onDataUpdate} />
       ))}
     </div>
   )
 }
 
-function PillarCard({ pillar }: { pillar: Pillar }) {
+function PillarCard({ pillar, onDataUpdate }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
   const getBgColor = (name: string) => {
     switch (name.toLowerCase()) {
       case "science & innovation":
@@ -1617,7 +1937,7 @@ function PillarCard({ pillar }: { pillar: Pillar }) {
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
           pillar.categories.map((category) => (
-            <CategorySection key={category.id} category={category} pillarName={pillar.name} />
+            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} />
           ))}
       </div>
       {/* Bottom line positioned slightly above the bottom */}
@@ -1626,23 +1946,82 @@ function PillarCard({ pillar }: { pillar: Pillar }) {
   )
 }
 
-function CategorySection({ category, pillarName }: { category: Category; pillarName: string }) {
+function CategorySection({ category, pillar, onDataUpdate }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void }) {
+  // Handler for category status update
+  const handleCategoryStatusChange = async (newStatus: string | undefined) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id],
+        newValue: newStatus,
+        type: 'category',
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update category status');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+  }
   return (
     <div className="mb-4 last:mb-0">
-      <h3 className={`text-base font-medium mb-2 ${getCategoryColor(pillarName)}`}>{category.name}</h3>
+      <div className="flex items-center mb-2 gap-2">
+        <h3 className={`text-base font-medium ${getCategoryColor(pillar.name)}`}>{category.name}</h3>
+        <StatusCircle
+          status={category.status}
+          onStatusChange={handleCategoryStatusChange}
+        />
+      </div>
       <ul className="space-y-2">
-        {category.goals && category.goals.map((goal) => <GoalItem key={goal.id} goal={goal} pillarName={pillarName} />)}
+        {category.goals && category.goals.map((goal) => (
+          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} />
+        ))}
       </ul>
     </div>
   )
 }
 
-function GoalItem({ goal, pillarName }: { goal: StrategicGoal; pillarName: string }) {
+function GoalItem({ goal, pillar, category, onDataUpdate }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void }) {
   const [expanded, setExpanded] = useState(false)
   const hasPrograms = goal.programs && goal.programs.length > 0
 
   // Use Q4 status for display, fallback to other quarters if not available
-  const displayStatus = goal.q4Status || goal.q3Status || goal.q2Status || goal.q1Status || "on-track"
+  const displayStatus = goal.status || goal.q4Status || goal.q3Status || goal.q2Status || goal.q1Status
+
+  // Handler for goal status update
+  const handleGoalStatusChange = async (newStatus: string | undefined) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id, goal.id],
+        newValue: newStatus,
+        type: 'goal',
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update goal status');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+  }
+
+  const { handleSave } = useEditableField({
+    fieldPath: [pillar.id, category.id, goal.id, "", "Strategic Goal"],
+    onDataUpdate,
+  })
+
+  // Local handler for program editing
+  const handleProgramSave = async (programText: string, newValue: string) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id, goal.id, programText, "Strategic Program"],
+        newValue,
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update field');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+  }
 
   const getProgramBorderColor = (pillarName: string) => {
     switch (pillarName.toLowerCase()) {
@@ -1672,18 +2051,43 @@ function GoalItem({ goal, pillarName }: { goal: StrategicGoal; pillarName: strin
               {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
           )}
-          <span className="text-base">{goal.text}</span>
+          <EditableField
+            value={goal.text}
+            onSave={handleSave}
+            className="text-base"
+          />
         </div>
-        <StatusIndicator status={displayStatus} />
+        <StatusCircle
+          status={displayStatus}
+          onStatusChange={handleGoalStatusChange}
+        />
       </div>
 
       {expanded && hasPrograms && (
-        <ul className={`pl-6 mt-2 space-y-2 border-l-2 ${getProgramBorderColor(pillarName)}`}>
+        <ul className={`pl-6 mt-2 space-y-2 border-l-2 ${getProgramBorderColor(pillar.name)}`}>
           {goal.programs?.map((program) => (
             <li key={program.id} className="flex items-start justify-between gap-2">
-              <span className="text-sm">{program.text}</span>
-              <StatusIndicator
-                status={program.q4Status || program.q3Status || program.q2Status || program.q1Status || "on-track"}
+              <EditableField
+                value={program.text}
+                onSave={async (newValue) => handleProgramSave(program.text, newValue)}
+                className="text-sm"
+              />
+              <StatusCircle
+                status={program.q4Status || program.q3Status || program.q2Status || program.q1Status}
+                onStatusChange={async (newStatus) => {
+                  const response = await fetch('/api/scorecard/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
+                      newValue: newStatus,
+                      type: 'program',
+                    }),
+                  })
+                  if (!response.ok) throw new Error('Failed to update program status');
+                  const updatedData = await response.json();
+                  onDataUpdate(updatedData);
+                }}
               />
             </li>
           ))}
@@ -1719,7 +2123,19 @@ function getCategoryColor(pillarName: string) {
 # components/status-circle.tsx
 
 ```tsx
-export function StatusCircle({ status }: { status?: string }) {
+import { useState, useRef } from "react"
+import { StatusSelector } from "./status-selector"
+
+interface StatusCircleProps {
+  status?: string
+  onStatusChange?: (newStatus: string | undefined) => void
+}
+
+export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
+  const [showSelector, setShowSelector] = useState(false)
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const circleRef = useRef<HTMLDivElement>(null)
+
   const getStatusColor = (status?: string) => {
     if (!status) return "bg-gray-300"
 
@@ -1741,7 +2157,42 @@ export function StatusCircle({ status }: { status?: string }) {
     }
   }
 
-  return <div className={`w-6 h-6 rounded-full ${getStatusColor(status)} mx-auto`} title={status}></div>
+  const getStatusTooltip = (status?: string) => {
+    if (!status) return "Not defined"
+    return status
+  }
+
+  const handleClick = () => {
+    if (onStatusChange && circleRef.current) {
+      setAnchorRect(circleRef.current.getBoundingClientRect())
+      setShowSelector(true)
+    }
+  }
+
+  const handleStatusChange = (newStatus: string | undefined) => {
+    if (onStatusChange) {
+      onStatusChange(newStatus)
+    }
+  }
+
+  return (
+    <div className="relative">
+      <div
+        ref={circleRef}
+        className={`w-6 h-6 rounded-full ${getStatusColor(status)} mx-auto cursor-pointer hover:ring-2 hover:ring-gray-400`}
+        title={getStatusTooltip(status)}
+        onClick={handleClick}
+      />
+      {showSelector && (
+        <StatusSelector
+          currentStatus={status}
+          onStatusChange={handleStatusChange}
+          onClose={() => setShowSelector(false)}
+          anchorRect={anchorRect}
+        />
+      )}
+    </div>
+  )
 }
 
 ```
@@ -1749,8 +2200,10 @@ export function StatusCircle({ status }: { status?: string }) {
 # components/status-indicator.tsx
 
 ```tsx
-export function StatusIndicator({ status }: { status: "exceeded" | "on-track" | "delayed" | "missed" | string }) {
+export function StatusIndicator({ status }: { status?: string }) {
   const getStatusColor = () => {
+    if (!status) return "bg-gray-300"
+
     switch (status) {
       case "exceeded":
         return "bg-blue-400"
@@ -1765,9 +2218,95 @@ export function StatusIndicator({ status }: { status: "exceeded" | "on-track" | 
     }
   }
 
-  return <div className={`w-5 h-5 rounded-full ${getStatusColor()} flex-shrink-0`}></div>
+  return <div className={`w-5 h-5 rounded-full ${getStatusColor()} flex-shrink-0`} title={status || "Not defined"}></div>
 }
 
+```
+
+# components/status-selector.tsx
+
+```tsx
+import { useState, useRef, useEffect } from "react"
+import { createPortal } from "react-dom"
+
+interface StatusSelectorProps {
+  currentStatus?: string
+  onStatusChange: (newStatus: string | undefined) => void
+  onClose: () => void
+  anchorRect?: DOMRect | null
+}
+
+export function StatusSelector({ currentStatus, onStatusChange, onClose, anchorRect }: StatusSelectorProps) {
+  const [selectedStatus, setSelectedStatus] = useState<string | undefined>(currentStatus)
+  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null)
+
+  const statusOptions = [
+    { value: "exceeded", label: "Exceeded", color: "bg-blue-500" },
+    { value: "on-track", label: "On Track", color: "bg-green-500" },
+    { value: "delayed", label: "Delayed", color: "bg-yellow-500" },
+    { value: "missed", label: "Missed", color: "bg-red-500" },
+    { value: undefined, label: "Not Defined", color: "bg-gray-300" },
+  ]
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        onClose()
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [onClose])
+
+  // Position the dropdown near the triggering element
+  useEffect(() => {
+    if (anchorRect) {
+      setDropdownPos({ top: anchorRect.bottom + window.scrollY, left: anchorRect.left + window.scrollX })
+    } else {
+      const parent = dropdownRef.current?.parentElement
+      if (parent) {
+        const rect = parent.getBoundingClientRect()
+        setDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX })
+      }
+    }
+  }, [anchorRect])
+
+  const handleStatusSelect = (status: string | undefined) => {
+    setSelectedStatus(status)
+    onStatusChange(status)
+    onClose()
+  }
+
+  const dropdown = (
+    <div
+      ref={dropdownRef}
+      className="fixed z-[1000] mt-1 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5"
+      style={dropdownPos ? { top: dropdownPos.top, left: dropdownPos.left } : {}}
+    >
+      <div className="py-1" role="menu" aria-orientation="vertical">
+        {statusOptions.map((option) => (
+          <button
+            key={option.value || "undefined"}
+            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${
+              selectedStatus === option.value ? "bg-gray-50" : ""
+            }`}
+            onClick={() => handleStatusSelect(option.value)}
+            role="menuitem"
+          >
+            <div className={`w-4 h-4 rounded-full ${option.color}`} />
+            <span>{option.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+
+  if (typeof window === "undefined") return null
+  return createPortal(dropdown, document.body)
+} 
 ```
 
 # components/theme-provider.tsx
@@ -4087,6 +4626,104 @@ export {
   DropdownMenuRadioGroup,
 }
 
+```
+
+# components/ui/editable-field.tsx
+
+```tsx
+import * as React from "react"
+import { useState, useRef, useEffect } from "react"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+
+interface EditableFieldProps {
+  value: string
+  onSave: (newValue: string) => Promise<void>
+  type?: "text" | "textarea"
+  className?: string
+  placeholder?: string
+}
+
+export function EditableField({
+  value,
+  onSave,
+  type = "text",
+  className,
+  placeholder,
+}: EditableFieldProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState(value)
+  const [isSaving, setIsSaving] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handleContextMenu = (e: MouseEvent) => {
+      if (containerRef.current?.contains(e.target as Node)) {
+        e.preventDefault()
+        setIsEditing(true)
+      }
+    }
+
+    document.addEventListener("contextmenu", handleContextMenu)
+    return () => document.removeEventListener("contextmenu", handleContextMenu)
+  }, [])
+
+  const handleSave = async () => {
+    if (editValue === value) {
+      setIsEditing(false)
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      await onSave(editValue)
+      setIsEditing(false)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault()
+      handleSave()
+    } else if (e.key === "Escape") {
+      setIsEditing(false)
+      setEditValue(value)
+    }
+  }
+
+  if (isEditing) {
+    const InputComponent = type === "textarea" ? Textarea : Input
+    return (
+      <div ref={containerRef} className={cn("relative", className)}>
+        <InputComponent
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onBlur={handleSave}
+          disabled={isSaving}
+          placeholder={placeholder}
+          className="w-full"
+          autoFocus
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "cursor-pointer hover:bg-gray-50 rounded px-2 py-1",
+        className
+      )}
+    >
+      {value || placeholder}
+    </div>
+  )
+} 
 ```
 
 # components/ui/form.tsx
@@ -7190,81 +7827,94 @@ export const config = {
 } 
 ```
 
+# data/Category-status-comments.csv
+
+```csv
+﻿CategoryID,StrategicPillarID,Category,Status,Comments,,,,,,,,
+Cat100,SPill100,Biomarker Discovery,exceeded,Comprehensive biomarker validation and discovery platform requiring robust study designs, cross-functional coordination, and advanced analytics capabilities. Success depends on establishing standardized protocols, regulatory-grade validation criteria, and integrated data management systems across genomics and single-cell platforms. Critical focus areas include patient cohort identification, statistical analysis planning, and regulatory pathway alignment for clinical translation.,,
+Cat101,SPill100,Targeted Therapies,Amber,Advanced therapeutic development portfolio spanning kinase inhibitors, bispecific antibodies, and AI-powered target selection requiring specialized expertise and comprehensive execution planning. Success factors include molecular target validation, manufacturing scalability, competitive landscape analysis, and cross-functional collaboration between computational and biological teams. Strategic emphasis on protocol standardization, regulatory strategy development, and clinical translation pathways.,
+Cat102,SPill100,Companion Diagnostics,Red,Integrated diagnostic development program focusing on therapy-diagnostic co-development, NGS panel regulatory approval, and assay standardization requiring strong regulatory strategy and vendor partnerships. Critical success factors include FDA interaction planning, clinical validation studies, manufacturing considerations, and seamless integration with therapeutic programs. Emphasis on protocol finalization, regulatory compliance, and clinical utility demonstration for market approval.,
+Cat103,SPill101,Early Clinical Development,Green,Process optimization and innovation initiative targeting IND cycle time reduction, adaptive trial designs, and first-in-human network expansion requiring operational excellence and regulatory efficiency improvements. Success depends on cross-functional coordination, statistical methodology advancement, site qualification, and investigator engagement strategies. Key focus areas include bottleneck identification, process standardization, and regulatory pathway optimization for accelerated development timelines.,
+Cat104,SPill101,Regulatory Affairs,Green,Global regulatory harmonization and agency engagement strategy requiring comprehensive execution planning, cross-regional coordination, and manufacturing readiness enhancement. Critical success factors include milestone tracking, stakeholder relationship management, regulatory intelligence, and CMC compliance across multiple jurisdictions. Strategic emphasis on filing efficiency, agency communication, quality systems development, and leadership endorsement for harmonization objectives.
+Cat105,SPill101,Digital Trial Innovation,Green,Technology-driven platform deployment focusing on decentralized trials, wearables integration, and data capture automation requiring specialized technical expertise and infrastructure development. Success factors include platform scalability, user adoption, data quality assurance, and clinical integration capabilities. Key implementation considerations include technology validation, workflow optimization, regulatory acceptance, and patient engagement through digital innovation.
+Cat106,SPill102,Real-World Evidence,Amber,Comprehensive evidence generation platform encompassing registry development, comparative effectiveness studies, and EHR data integration requiring robust data governance and analytical capabilities. Critical success factors include patient recruitment strategies, data quality assurance, statistical methodology, and regulatory-grade evidence generation. Strategic focus on community partnerships, data standardization, signal detection capabilities, and clinical utility demonstration for regulatory acceptance.
+Cat107,SPill102,Access & Equity,Red,Patient-centered initiatives targeting minority enrollment enhancement and financial assistance programs requiring community engagement expertise and comprehensive support strategies. Success depends on cultural competency development, protocol accessibility, community partnerships, and program design optimization. Key focus areas include outreach effectiveness, eligibility criteria development, patient support infrastructure, and enrollment retention strategies for diverse patient populations.,,
+```
+
 # data/DummyData.csv
 
 ```csv
-Strategic Pillar,Category,Strategic Goal,Strategic Program,Q1 Objective,Q2 Objective,Q3 Objective,Q4 Objective,ORD LT Sponsor(s),Sponsor(s)/Lead(s),Reporting owner(s),Q1 Status,Q2 Status,Q3 Status,Q4 Status,Q1 Comments,Q2 Comments,Q3 Comments,Q4 Comments
-Precision Medicine,Biomarker Discovery,Validate novel predictive biomarkers,BD-01 Validate Initiative 1,"In Q1 we will launch the BD-01 Validate Initiative 1 project in support of the strategic goal to validate novel predictive biomarkers. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.",Achieve 50% of planned experiments for BD-01 Validate Initiative 1.,Complete data analysis phase of BD-01 Validate Initiative 1.,Submit year‑end review and next‑year plan for BD-01 Validate Initiative 1.,Dr. Alice Nguyen,Elijah Hernandez,Ethan Jackson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Validate novel predictive biomarkers,BD-02 Validate Initiative 2,"In Q1 we will launch the BD-02 Validate Initiative 2 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for BD-02 Validate Initiative 2.,Complete data analysis phase of BD-02 Validate Initiative 2.,Submit year‑end review and next‑year plan for BD-02 Validate Initiative 2.,Dr. Alice Nguyen,Noah Martin,Ethan Jackson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Validate novel predictive biomarkers,BD-03 Validate Initiative 3,"In Q1 we will launch the BD-03 Validate Initiative 3 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for BD-03 Validate Initiative 3.,Complete data analysis phase of BD-03 Validate Initiative 3.,Submit year‑end review and next‑year plan for BD-03 Validate Initiative 3.,Dr. Alice Nguyen,Henry Garcia,Sophia Jackson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Expand tumor genomics database,BD-04 Expand Initiative 4,"In Q1 we will launch the BD-04 Expand Initiative 4 project in support of the strategic goal to expand tumor genomics database. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for BD-04 Expand Initiative 4.,Complete data analysis phase of BD-04 Expand Initiative 4.,Submit year‑end review and next‑year plan for BD-04 Expand Initiative 4.,Dr. Alice Nguyen,James Wilson,James Lopez,Amber,,,,Minor delays; mitigation plan in place.,,,
-Precision Medicine,Biomarker Discovery,Expand tumor genomics database,BD-05 Expand Initiative 5,"In Q1 we will launch the BD-05 Expand Initiative 5 project in support of the strategic goal to expand tumor genomics database. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates.",Achieve 50% of planned experiments for BD-05 Expand Initiative 5.,Complete data analysis phase of BD-05 Expand Initiative 5.,Submit year‑end review and next‑year plan for BD-05 Expand Initiative 5.,Dr. Alice Nguyen,Charlotte Lopez,James Lopez,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Expand tumor genomics database,BD-06 Expand Initiative 6,"In Q1 we will launch the BD-06 Expand Initiative 6 project in support of the strategic goal to expand tumor genomics database. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Risks and mitigation strategies will be documented early to ensure the program remains on track.",Achieve 50% of planned experiments for BD-06 Expand Initiative 6.,Complete data analysis phase of BD-06 Expand Initiative 6.,Submit year‑end review and next‑year plan for BD-06 Expand Initiative 6.,Dr. Alice Nguyen,Henry Rodriguez,Isabella Anderson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Advance single‑cell analytics platform,BD-07 Advance Initiative 7,"In Q1 we will launch the BD-07 Advance Initiative 7 project in support of the strategic goal to advance single‑cell analytics platform. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for BD-07 Advance Initiative 7.,Complete data analysis phase of BD-07 Advance Initiative 7.,Submit year‑end review and next‑year plan for BD-07 Advance Initiative 7.,Dr. Alice Nguyen,Benjamin Smith,Jacob Brown,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Advance single‑cell analytics platform,BD-08 Advance Initiative 8,"In Q1 we will launch the BD-08 Advance Initiative 8 project in support of the strategic goal to advance single‑cell analytics platform. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for BD-08 Advance Initiative 8.,Complete data analysis phase of BD-08 Advance Initiative 8.,Submit year‑end review and next‑year plan for BD-08 Advance Initiative 8.,Dr. Alice Nguyen,Olivia Hernandez,Olivia Hernandez,Green,,,,On track; milestones met.,,,
-Precision Medicine,Biomarker Discovery,Advance single‑cell analytics platform,BD-09 Advance Initiative 9,"In Q1 we will launch the BD-09 Advance Initiative 9 project in support of the strategic goal to advance single‑cell analytics platform. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for BD-09 Advance Initiative 9.,Complete data analysis phase of BD-09 Advance Initiative 9.,Submit year‑end review and next‑year plan for BD-09 Advance Initiative 9.,Dr. Alice Nguyen,Benjamin Rodriguez,Olivia Hernandez,Amber,,,,Minor delays; mitigation plan in place.,,,
-Precision Medicine,Targeted Therapies,Optimize next‑gen kinase inhibitors,TT-10 Optimize Initiative 10,In Q1 we will launch the TT-10 Optimize Initiative 10 project in support of the strategic goal to optimize next‑gen kinase inhibitors. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Risks and mitigation strategies will be documented early to ensure the program remains on track. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for TT-10 Optimize Initiative 10.,Complete data analysis phase of TT-10 Optimize Initiative 10.,Submit year‑end review and next‑year plan for TT-10 Optimize Initiative 10.,Dr. Michael Rossi,Lucas Thomas,Charlotte Hernandez,Green,,,,On track; milestones met.,,,
-Precision Medicine,Targeted Therapies,Optimize next‑gen kinase inhibitors,TT-11 Optimize Initiative 11,"In Q1 we will launch the TT-11 Optimize Initiative 11 project in support of the strategic goal to optimize next‑gen kinase inhibitors. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for TT-11 Optimize Initiative 11.,Complete data analysis phase of TT-11 Optimize Initiative 11.,Submit year‑end review and next‑year plan for TT-11 Optimize Initiative 11.,Dr. Michael Rossi,Jacob Martinez,Charlotte Hernandez,Red,,,,Significant risk; exec escalation.,,,
-Precision Medicine,Targeted Therapies,Optimize next‑gen kinase inhibitors,TT-12 Optimize Initiative 12,"In Q1 we will launch the TT-12 Optimize Initiative 12 project in support of the strategic goal to optimize next‑gen kinase inhibitors. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for TT-12 Optimize Initiative 12.,Complete data analysis phase of TT-12 Optimize Initiative 12.,Submit year‑end review and next‑year plan for TT-12 Optimize Initiative 12.,Dr. Michael Rossi,Abigail Martin,James Jackson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Targeted Therapies,Develop bispecific antibodies portfolio,TT-13 Develop Initiative 13,"In Q1 we will launch the TT-13 Develop Initiative 13 project in support of the strategic goal to develop bispecific antibodies portfolio. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for TT-13 Develop Initiative 13.,Complete data analysis phase of TT-13 Develop Initiative 13.,Submit year‑end review and next‑year plan for TT-13 Develop Initiative 13.,Dr. Michael Rossi,Mason Gonzalez,Emma Rodriguez,Red,,,,Significant risk; exec escalation.,,,
-Precision Medicine,Targeted Therapies,Develop bispecific antibodies portfolio,TT-14 Develop Initiative 14,"In Q1 we will launch the TT-14 Develop Initiative 14 project in support of the strategic goal to develop bispecific antibodies portfolio. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for TT-14 Develop Initiative 14.,Complete data analysis phase of TT-14 Develop Initiative 14.,Submit year‑end review and next‑year plan for TT-14 Develop Initiative 14.,Dr. Michael Rossi,Charlotte Williams,Sophia Davis,Red,,,,Significant risk; exec escalation.,,,
-Precision Medicine,Targeted Therapies,Develop bispecific antibodies portfolio,TT-15 Develop Initiative 15,"In Q1 we will launch the TT-15 Develop Initiative 15 project in support of the strategic goal to develop bispecific antibodies portfolio. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for TT-15 Develop Initiative 15.,Complete data analysis phase of TT-15 Develop Initiative 15.,Submit year‑end review and next‑year plan for TT-15 Develop Initiative 15.,Dr. Michael Rossi,Jacob Miller,Emma Rodriguez,Red,,,,Significant risk; exec escalation.,,,
-Precision Medicine,Targeted Therapies,Integrate AI for target selection,TT-16 Integrate Initiative 16,"In Q1 we will launch the TT-16 Integrate Initiative 16 project in support of the strategic goal to integrate ai for target selection. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.",Achieve 50% of planned experiments for TT-16 Integrate Initiative 16.,Complete data analysis phase of TT-16 Integrate Initiative 16.,Submit year‑end review and next‑year plan for TT-16 Integrate Initiative 16.,Dr. Michael Rossi,Elijah Davis,Noah Davis,Green,,,,On track; milestones met.,,,
-Precision Medicine,Targeted Therapies,Integrate AI for target selection,TT-17 Integrate Initiative 17,"In Q1 we will launch the TT-17 Integrate Initiative 17 project in support of the strategic goal to integrate ai for target selection. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for TT-17 Integrate Initiative 17.,Complete data analysis phase of TT-17 Integrate Initiative 17.,Submit year‑end review and next‑year plan for TT-17 Integrate Initiative 17.,Dr. Michael Rossi,Charlotte Anderson,Logan Garcia,Green,,,,On track; milestones met.,,,
-Precision Medicine,Targeted Therapies,Integrate AI for target selection,TT-18 Integrate Initiative 18,"In Q1 we will launch the TT-18 Integrate Initiative 18 project in support of the strategic goal to integrate ai for target selection. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for TT-18 Integrate Initiative 18.,Complete data analysis phase of TT-18 Integrate Initiative 18.,Submit year‑end review and next‑year plan for TT-18 Integrate Initiative 18.,Dr. Michael Rossi,Henry Jackson,Logan Garcia,Green,,,,On track; milestones met.,,,
-Precision Medicine,Companion Diagnostics,Co‑develop CDx assays with therapy programs,CDX-19 Co‑develop Initiative 19,"In Q1 we will launch the CDX-19 Co‑develop Initiative 19 project in support of the strategic goal to co‑develop cdx assays with therapy programs. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Vendor assessments will be completed to decide on any external partnerships needed. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for CDX-19 Co‑develop Initiative 19.,Complete data analysis phase of CDX-19 Co‑develop Initiative 19.,Submit year‑end review and next‑year plan for CDX-19 Co‑develop Initiative 19.,Dr. Priya Desai,Liam Gonzalez,Liam Brown,Green,,,,On track; milestones met.,,,
-Precision Medicine,Companion Diagnostics,Co‑develop CDx assays with therapy programs,CDX-20 Co‑develop Initiative 20,"In Q1 we will launch the CDX-20 Co‑develop Initiative 20 project in support of the strategic goal to co‑develop cdx assays with therapy programs. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.",Achieve 50% of planned experiments for CDX-20 Co‑develop Initiative 20.,Complete data analysis phase of CDX-20 Co‑develop Initiative 20.,Submit year‑end review and next‑year plan for CDX-20 Co‑develop Initiative 20.,Dr. Priya Desai,Henry Johnson,Mia Wilson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Companion Diagnostics,Co‑develop CDx assays with therapy programs,CDX-21 Co‑develop Initiative 21,"In Q1 we will launch the CDX-21 Co‑develop Initiative 21 project in support of the strategic goal to co‑develop cdx assays with therapy programs. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for CDX-21 Co‑develop Initiative 21.,Complete data analysis phase of CDX-21 Co‑develop Initiative 21.,Submit year‑end review and next‑year plan for CDX-21 Co‑develop Initiative 21.,Dr. Priya Desai,Harper Williams,Liam Brown,Green,,,,On track; milestones met.,,,
-Precision Medicine,Companion Diagnostics,Obtain FDA clearance for NGS panel,CDX-22 Obtain Initiative 22,"In Q1 we will launch the CDX-22 Obtain Initiative 22 project in support of the strategic goal to obtain fda clearance for ngs panel. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Risks and mitigation strategies will be documented early to ensure the program remains on track.",Achieve 50% of planned experiments for CDX-22 Obtain Initiative 22.,Complete data analysis phase of CDX-22 Obtain Initiative 22.,Submit year‑end review and next‑year plan for CDX-22 Obtain Initiative 22.,Dr. Priya Desai,Elijah Anderson,Liam Jackson,Green,,,,On track; milestones met.,,,
-Precision Medicine,Companion Diagnostics,Obtain FDA clearance for NGS panel,CDX-23 Obtain Initiative 23,"In Q1 we will launch the CDX-23 Obtain Initiative 23 project in support of the strategic goal to obtain fda clearance for ngs panel. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness.",Achieve 50% of planned experiments for CDX-23 Obtain Initiative 23.,Complete data analysis phase of CDX-23 Obtain Initiative 23.,Submit year‑end review and next‑year plan for CDX-23 Obtain Initiative 23.,Dr. Priya Desai,Benjamin Martin,Ava Davis,Amber,,,,Minor delays; mitigation plan in place.,,,
-Precision Medicine,Companion Diagnostics,Obtain FDA clearance for NGS panel,CDX-24 Obtain Initiative 24,"In Q1 we will launch the CDX-24 Obtain Initiative 24 project in support of the strategic goal to obtain fda clearance for ngs panel. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Risks and mitigation strategies will be documented early to ensure the program remains on track. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for CDX-24 Obtain Initiative 24.,Complete data analysis phase of CDX-24 Obtain Initiative 24.,Submit year‑end review and next‑year plan for CDX-24 Obtain Initiative 24.,Dr. Priya Desai,Liam Thomas,Liam Jackson,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Reduce IND cycle time by 20%,ECD-25 Reduce Initiative 25,"In Q1 we will launch the ECD-25 Reduce Initiative 25 project in support of the strategic goal to reduce ind cycle time by 20%. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for ECD-25 Reduce Initiative 25.,Complete data analysis phase of ECD-25 Reduce Initiative 25.,Submit year‑end review and next‑year plan for ECD-25 Reduce Initiative 25.,Dr. James Carter,Mason Anderson,Charlotte Moore,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Reduce IND cycle time by 20%,ECD-26 Reduce Initiative 26,"In Q1 we will launch the ECD-26 Reduce Initiative 26 project in support of the strategic goal to reduce ind cycle time by 20%. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for ECD-26 Reduce Initiative 26.,Complete data analysis phase of ECD-26 Reduce Initiative 26.,Submit year‑end review and next‑year plan for ECD-26 Reduce Initiative 26.,Dr. James Carter,Ethan Miller,Charlotte Moore,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Reduce IND cycle time by 20%,ECD-27 Reduce Initiative 27,"In Q1 we will launch the ECD-27 Reduce Initiative 27 project in support of the strategic goal to reduce ind cycle time by 20%. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.",Achieve 50% of planned experiments for ECD-27 Reduce Initiative 27.,Complete data analysis phase of ECD-27 Reduce Initiative 27.,Submit year‑end review and next‑year plan for ECD-27 Reduce Initiative 27.,Dr. James Carter,Ava Smith,Jacob Williams,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Reduce IND cycle time by 20%,ECD-28 Reduce Initiative 28,"In Q1 we will launch the ECD-28 Reduce Initiative 28 project in support of the strategic goal to reduce ind cycle time by 20%. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for ECD-28 Reduce Initiative 28.,Complete data analysis phase of ECD-28 Reduce Initiative 28.,Submit year‑end review and next‑year plan for ECD-28 Reduce Initiative 28.,Dr. James Carter,Henry Wilson,Jacob Williams,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Implement adaptive trial designs,ECD-29 Implement Initiative 29,"In Q1 we will launch the ECD-29 Implement Initiative 29 project in support of the strategic goal to implement adaptive trial designs. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.",Achieve 50% of planned experiments for ECD-29 Implement Initiative 29.,Complete data analysis phase of ECD-29 Implement Initiative 29.,Submit year‑end review and next‑year plan for ECD-29 Implement Initiative 29.,Dr. James Carter,Emma Miller,Emma Brown,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Implement adaptive trial designs,ECD-30 Implement Initiative 30,"In Q1 we will launch the ECD-30 Implement Initiative 30 project in support of the strategic goal to implement adaptive trial designs. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.",Achieve 50% of planned experiments for ECD-30 Implement Initiative 30.,Complete data analysis phase of ECD-30 Implement Initiative 30.,Submit year‑end review and next‑year plan for ECD-30 Implement Initiative 30.,Dr. James Carter,Emma Taylor,Emma Brown,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Early Clinical Development,Implement adaptive trial designs,ECD-31 Implement Initiative 31,"In Q1 we will launch the ECD-31 Implement Initiative 31 project in support of the strategic goal to implement adaptive trial designs. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Risks and mitigation strategies will be documented early to ensure the program remains on track. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for ECD-31 Implement Initiative 31.,Complete data analysis phase of ECD-31 Implement Initiative 31.,Submit year‑end review and next‑year plan for ECD-31 Implement Initiative 31.,Dr. James Carter,Sophia Brown,Emma Brown,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Expand first‑in‑human trial network,ECD-32 Expand Initiative 32,"In Q1 we will launch the ECD-32 Expand Initiative 32 project in support of the strategic goal to expand first‑in‑human trial network. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. An early engagement with clinical teams will ensure downstream study readiness. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for ECD-32 Expand Initiative 32.,Complete data analysis phase of ECD-32 Expand Initiative 32.,Submit year‑end review and next‑year plan for ECD-32 Expand Initiative 32.,Dr. James Carter,Mason Rodriguez,Jacob Jackson,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Early Clinical Development,Expand first‑in‑human trial network,ECD-33 Expand Initiative 33,"In Q1 we will launch the ECD-33 Expand Initiative 33 project in support of the strategic goal to expand first‑in‑human trial network. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for ECD-33 Expand Initiative 33.,Complete data analysis phase of ECD-33 Expand Initiative 33.,Submit year‑end review and next‑year plan for ECD-33 Expand Initiative 33.,Dr. James Carter,Noah Thomas,Noah Gonzalez,Red,,,,Significant risk; exec escalation.,,,
-Pipeline Acceleration,Early Clinical Development,Expand first‑in‑human trial network,ECD-34 Expand Initiative 34,"In Q1 we will launch the ECD-34 Expand Initiative 34 project in support of the strategic goal to expand first‑in‑human trial network. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for ECD-34 Expand Initiative 34.,Complete data analysis phase of ECD-34 Expand Initiative 34.,Submit year‑end review and next‑year plan for ECD-34 Expand Initiative 34.,Dr. James Carter,Charlotte Williams,Jacob Jackson,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Regulatory Affairs,Harmonize global filings,RA-35 Harmonize Initiative 35,In Q1 we will launch the RA-35 Harmonize Initiative 35 project in support of the strategic goal to harmonize global filings. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. We will set up a dashboard to track milestones and provide transparent real‑time updates. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for RA-35 Harmonize Initiative 35.,Complete data analysis phase of RA-35 Harmonize Initiative 35.,Submit year‑end review and next‑year plan for RA-35 Harmonize Initiative 35.,Dr. Sophia Hernandez,Isabella Anderson,Olivia Lopez,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Regulatory Affairs,Harmonize global filings,RA-36 Harmonize Initiative 36,"In Q1 we will launch the RA-36 Harmonize Initiative 36 project in support of the strategic goal to harmonize global filings. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for RA-36 Harmonize Initiative 36.,Complete data analysis phase of RA-36 Harmonize Initiative 36.,Submit year‑end review and next‑year plan for RA-36 Harmonize Initiative 36.,Dr. Sophia Hernandez,Isabella Jones,Noah Johnson,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Regulatory Affairs,Harmonize global filings,RA-37 Harmonize Initiative 37,"In Q1 we will launch the RA-37 Harmonize Initiative 37 project in support of the strategic goal to harmonize global filings. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness.",Achieve 50% of planned experiments for RA-37 Harmonize Initiative 37.,Complete data analysis phase of RA-37 Harmonize Initiative 37.,Submit year‑end review and next‑year plan for RA-37 Harmonize Initiative 37.,Dr. Sophia Hernandez,Noah Jones,Noah Johnson,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Regulatory Affairs,Strengthen agency engagement strategy,RA-38 Strengthen Initiative 38,"In Q1 we will launch the RA-38 Strengthen Initiative 38 project in support of the strategic goal to strengthen agency engagement strategy. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for RA-38 Strengthen Initiative 38.,Complete data analysis phase of RA-38 Strengthen Initiative 38.,Submit year‑end review and next‑year plan for RA-38 Strengthen Initiative 38.,Dr. Sophia Hernandez,Emma Johnson,Jacob Smith,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Regulatory Affairs,Strengthen agency engagement strategy,RA-39 Strengthen Initiative 39,"In Q1 we will launch the RA-39 Strengthen Initiative 39 project in support of the strategic goal to strengthen agency engagement strategy. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for RA-39 Strengthen Initiative 39.,Complete data analysis phase of RA-39 Strengthen Initiative 39.,Submit year‑end review and next‑year plan for RA-39 Strengthen Initiative 39.,Dr. Sophia Hernandez,Sophia Rodriguez,Sophia Garcia,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Regulatory Affairs,Strengthen agency engagement strategy,RA-40 Strengthen Initiative 40,"In Q1 we will launch the RA-40 Strengthen Initiative 40 project in support of the strategic goal to strengthen agency engagement strategy. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for RA-40 Strengthen Initiative 40.,Complete data analysis phase of RA-40 Strengthen Initiative 40.,Submit year‑end review and next‑year plan for RA-40 Strengthen Initiative 40.,Dr. Sophia Hernandez,Logan Jackson,Jacob Smith,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Regulatory Affairs,Strengthen agency engagement strategy,RA-41 Strengthen Initiative 41,"In Q1 we will launch the RA-41 Strengthen Initiative 41 project in support of the strategic goal to strengthen agency engagement strategy. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Vendor assessments will be completed to decide on any external partnerships needed. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for RA-41 Strengthen Initiative 41.,Complete data analysis phase of RA-41 Strengthen Initiative 41.,Submit year‑end review and next‑year plan for RA-41 Strengthen Initiative 41.,Dr. Sophia Hernandez,Jacob Thomas,Sophia Garcia,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Regulatory Affairs,Enhance CMC readiness,RA-42 Enhance Initiative 42,"In Q1 we will launch the RA-42 Enhance Initiative 42 project in support of the strategic goal to enhance cmc readiness. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for RA-42 Enhance Initiative 42.,Complete data analysis phase of RA-42 Enhance Initiative 42.,Submit year‑end review and next‑year plan for RA-42 Enhance Initiative 42.,Dr. Sophia Hernandez,Charlotte Wilson,Sophia Johnson,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Regulatory Affairs,Enhance CMC readiness,RA-43 Enhance Initiative 43,"In Q1 we will launch the RA-43 Enhance Initiative 43 project in support of the strategic goal to enhance cmc readiness. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for RA-43 Enhance Initiative 43.,Complete data analysis phase of RA-43 Enhance Initiative 43.,Submit year‑end review and next‑year plan for RA-43 Enhance Initiative 43.,Dr. Sophia Hernandez,Benjamin Garcia,Noah Thomas,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Regulatory Affairs,Enhance CMC readiness,RA-44 Enhance Initiative 44,"In Q1 we will launch the RA-44 Enhance Initiative 44 project in support of the strategic goal to enhance cmc readiness. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.",Achieve 50% of planned experiments for RA-44 Enhance Initiative 44.,Complete data analysis phase of RA-44 Enhance Initiative 44.,Submit year‑end review and next‑year plan for RA-44 Enhance Initiative 44.,Dr. Sophia Hernandez,Amelia Jackson,Sophia Johnson,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Digital Trial Innovation,Deploy decentralized trial platform,DTI-45 Deploy Initiative 45,"In Q1 we will launch the DTI-45 Deploy Initiative 45 project in support of the strategic goal to deploy decentralized trial platform. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Vendor assessments will be completed to decide on any external partnerships needed. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for DTI-45 Deploy Initiative 45.,Complete data analysis phase of DTI-45 Deploy Initiative 45.,Submit year‑end review and next‑year plan for DTI-45 Deploy Initiative 45.,Dr. Wei Zhang,Emma Jones,Henry Smith,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Deploy decentralized trial platform,DTI-46 Deploy Initiative 46,"In Q1 we will launch the DTI-46 Deploy Initiative 46 project in support of the strategic goal to deploy decentralized trial platform. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for DTI-46 Deploy Initiative 46.,Complete data analysis phase of DTI-46 Deploy Initiative 46.,Submit year‑end review and next‑year plan for DTI-46 Deploy Initiative 46.,Dr. Wei Zhang,Isabella Hernandez,Benjamin Wilson,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Deploy decentralized trial platform,DTI-47 Deploy Initiative 47,"In Q1 we will launch the DTI-47 Deploy Initiative 47 project in support of the strategic goal to deploy decentralized trial platform. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. We will set up a dashboard to track milestones and provide transparent real‑time updates. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for DTI-47 Deploy Initiative 47.,Complete data analysis phase of DTI-47 Deploy Initiative 47.,Submit year‑end review and next‑year plan for DTI-47 Deploy Initiative 47.,Dr. Wei Zhang,Logan Williams,Benjamin Wilson,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Leverage wearables for safety monitoring,DTI-48 Leverage Initiative 48,"In Q1 we will launch the DTI-48 Leverage Initiative 48 project in support of the strategic goal to leverage wearables for safety monitoring. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for DTI-48 Leverage Initiative 48.,Complete data analysis phase of DTI-48 Leverage Initiative 48.,Submit year‑end review and next‑year plan for DTI-48 Leverage Initiative 48.,Dr. Wei Zhang,Jacob Johnson,Jacob Brown,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Leverage wearables for safety monitoring,DTI-49 Leverage Initiative 49,"In Q1 we will launch the DTI-49 Leverage Initiative 49 project in support of the strategic goal to leverage wearables for safety monitoring. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for DTI-49 Leverage Initiative 49.,Complete data analysis phase of DTI-49 Leverage Initiative 49.,Submit year‑end review and next‑year plan for DTI-49 Leverage Initiative 49.,Dr. Wei Zhang,Isabella Garcia,Jacob Brown,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Leverage wearables for safety monitoring,DTI-50 Leverage Initiative 50,"In Q1 we will launch the DTI-50 Leverage Initiative 50 project in support of the strategic goal to leverage wearables for safety monitoring. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for DTI-50 Leverage Initiative 50.,Complete data analysis phase of DTI-50 Leverage Initiative 50.,Submit year‑end review and next‑year plan for DTI-50 Leverage Initiative 50.,Dr. Wei Zhang,Abigail Martinez,Isabella Williams,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Digital Trial Innovation,Leverage wearables for safety monitoring,DTI-51 Leverage Initiative 51,"In Q1 we will launch the DTI-51 Leverage Initiative 51 project in support of the strategic goal to leverage wearables for safety monitoring. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for DTI-51 Leverage Initiative 51.,Complete data analysis phase of DTI-51 Leverage Initiative 51.,Submit year‑end review and next‑year plan for DTI-51 Leverage Initiative 51.,Dr. Wei Zhang,Amelia Moore,Jacob Brown,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Automate data capture workflows,DTI-52 Automate Initiative 52,"In Q1 we will launch the DTI-52 Automate Initiative 52 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.",Achieve 50% of planned experiments for DTI-52 Automate Initiative 52.,Complete data analysis phase of DTI-52 Automate Initiative 52.,Submit year‑end review and next‑year plan for DTI-52 Automate Initiative 52.,Dr. Wei Zhang,Mason Brown,Charlotte Martinez,Green,,,,On track; milestones met.,,,
-Pipeline Acceleration,Digital Trial Innovation,Automate data capture workflows,DTI-53 Automate Initiative 53,"In Q1 we will launch the DTI-53 Automate Initiative 53 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed.",Achieve 50% of planned experiments for DTI-53 Automate Initiative 53.,Complete data analysis phase of DTI-53 Automate Initiative 53.,Submit year‑end review and next‑year plan for DTI-53 Automate Initiative 53.,Dr. Wei Zhang,Lucas Johnson,Charlotte Martinez,Red,,,,Significant risk; exec escalation.,,,
-Pipeline Acceleration,Digital Trial Innovation,Automate data capture workflows,DTI-54 Automate Initiative 54,"In Q1 we will launch the DTI-54 Automate Initiative 54 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates.",Achieve 50% of planned experiments for DTI-54 Automate Initiative 54.,Complete data analysis phase of DTI-54 Automate Initiative 54.,Submit year‑end review and next‑year plan for DTI-54 Automate Initiative 54.,Dr. Wei Zhang,Elijah Taylor,Lucas Williams,Amber,,,,Minor delays; mitigation plan in place.,,,
-Pipeline Acceleration,Digital Trial Innovation,Automate data capture workflows,DTI-55 Automate Initiative 55,"In Q1 we will launch the DTI-55 Automate Initiative 55 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates.",Achieve 50% of planned experiments for DTI-55 Automate Initiative 55.,Complete data analysis phase of DTI-55 Automate Initiative 55.,Submit year‑end review and next‑year plan for DTI-55 Automate Initiative 55.,Dr. Wei Zhang,Mason Gonzalez,Charlotte Martinez,Green,,,,On track; milestones met.,,,
-Patient Engagement,Real‑World Evidence,Build oncology RWE registry,RWE-56 Build Initiative 56,"In Q1 we will launch the RWE-56 Build Initiative 56 project in support of the strategic goal to build oncology rwe registry. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Vendor assessments will be completed to decide on any external partnerships needed. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for RWE-56 Build Initiative 56.,Complete data analysis phase of RWE-56 Build Initiative 56.,Submit year‑end review and next‑year plan for RWE-56 Build Initiative 56.,Dr. Karen Johnson,Mason Wilson,Logan Wilson,Amber,,,,Minor delays; mitigation plan in place.,,,
-Patient Engagement,Real‑World Evidence,Build oncology RWE registry,RWE-57 Build Initiative 57,"In Q1 we will launch the RWE-57 Build Initiative 57 project in support of the strategic goal to build oncology rwe registry. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for RWE-57 Build Initiative 57.,Complete data analysis phase of RWE-57 Build Initiative 57.,Submit year‑end review and next‑year plan for RWE-57 Build Initiative 57.,Dr. Karen Johnson,Noah Moore,Elijah Johnson,Amber,,,,Minor delays; mitigation plan in place.,,,
-Patient Engagement,Real‑World Evidence,Build oncology RWE registry,RWE-58 Build Initiative 58,"In Q1 we will launch the RWE-58 Build Initiative 58 project in support of the strategic goal to build oncology rwe registry. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for RWE-58 Build Initiative 58.,Complete data analysis phase of RWE-58 Build Initiative 58.,Submit year‑end review and next‑year plan for RWE-58 Build Initiative 58.,Dr. Karen Johnson,James Hernandez,Elijah Johnson,Green,,,,On track; milestones met.,,,
-Patient Engagement,Real‑World Evidence,Generate comparative effectiveness studies,RWE-59 Generate Initiative 59,In Q1 we will launch the RWE-59 Generate Initiative 59 project in support of the strategic goal to generate comparative effectiveness studies. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for RWE-59 Generate Initiative 59.,Complete data analysis phase of RWE-59 Generate Initiative 59.,Submit year‑end review and next‑year plan for RWE-59 Generate Initiative 59.,Dr. Karen Johnson,Noah Thomas,Evelyn Anderson,Green,,,,On track; milestones met.,,,
-Patient Engagement,Real‑World Evidence,Generate comparative effectiveness studies,RWE-60 Generate Initiative 60,"In Q1 we will launch the RWE-60 Generate Initiative 60 project in support of the strategic goal to generate comparative effectiveness studies. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed. Completion of training for all contributors is also targeted within this timeframe.",Achieve 50% of planned experiments for RWE-60 Generate Initiative 60.,Complete data analysis phase of RWE-60 Generate Initiative 60.,Submit year‑end review and next‑year plan for RWE-60 Generate Initiative 60.,Dr. Karen Johnson,James Wilson,Evelyn Anderson,Green,,,,On track; milestones met.,,,
-Patient Engagement,Real‑World Evidence,Generate comparative effectiveness studies,RWE-61 Generate Initiative 61,In Q1 we will launch the RWE-61 Generate Initiative 61 project in support of the strategic goal to generate comparative effectiveness studies. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for RWE-61 Generate Initiative 61.,Complete data analysis phase of RWE-61 Generate Initiative 61.,Submit year‑end review and next‑year plan for RWE-61 Generate Initiative 61.,Dr. Karen Johnson,Mason Hernandez,Evelyn Anderson,Green,,,,On track; milestones met.,,,
-Patient Engagement,Real‑World Evidence,Integrate EHR data for signal detection,RWE-62 Integrate Initiative 62,"In Q1 we will launch the RWE-62 Integrate Initiative 62 project in support of the strategic goal to integrate ehr data for signal detection. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.",Achieve 50% of planned experiments for RWE-62 Integrate Initiative 62.,Complete data analysis phase of RWE-62 Integrate Initiative 62.,Submit year‑end review and next‑year plan for RWE-62 Integrate Initiative 62.,Dr. Karen Johnson,Elijah Jackson,Sophia Rodriguez,Amber,,,,Minor delays; mitigation plan in place.,,,
-Patient Engagement,Real‑World Evidence,Integrate EHR data for signal detection,RWE-63 Integrate Initiative 63,"In Q1 we will launch the RWE-63 Integrate Initiative 63 project in support of the strategic goal to integrate ehr data for signal detection. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for RWE-63 Integrate Initiative 63.,Complete data analysis phase of RWE-63 Integrate Initiative 63.,Submit year‑end review and next‑year plan for RWE-63 Integrate Initiative 63.,Dr. Karen Johnson,Charlotte Williams,Noah Gonzalez,Green,,,,On track; milestones met.,,,
-Patient Engagement,Real‑World Evidence,Integrate EHR data for signal detection,RWE-64 Integrate Initiative 64,"In Q1 we will launch the RWE-64 Integrate Initiative 64 project in support of the strategic goal to integrate ehr data for signal detection. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for RWE-64 Integrate Initiative 64.,Complete data analysis phase of RWE-64 Integrate Initiative 64.,Submit year‑end review and next‑year plan for RWE-64 Integrate Initiative 64.,Dr. Karen Johnson,Olivia Miller,Noah Gonzalez,Green,,,,On track; milestones met.,,,
-Patient Engagement,Access & Equity,Increase minority patient enrollment,AE-65 Increase Initiative 65,"In Q1 we will launch the AE-65 Increase Initiative 65 project in support of the strategic goal to increase minority patient enrollment. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.",Achieve 50% of planned experiments for AE-65 Increase Initiative 65.,Complete data analysis phase of AE-65 Increase Initiative 65.,Submit year‑end review and next‑year plan for AE-65 Increase Initiative 65.,Dr. David Lee,Liam Gonzalez,Logan Thomas,Green,,,,On track; milestones met.,,,
-Patient Engagement,Access & Equity,Increase minority patient enrollment,AE-66 Increase Initiative 66,"In Q1 we will launch the AE-66 Increase Initiative 66 project in support of the strategic goal to increase minority patient enrollment. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.",Achieve 50% of planned experiments for AE-66 Increase Initiative 66.,Complete data analysis phase of AE-66 Increase Initiative 66.,Submit year‑end review and next‑year plan for AE-66 Increase Initiative 66.,Dr. David Lee,Noah Gonzalez,Abigail Garcia,Green,,,,On track; milestones met.,,,
-Patient Engagement,Access & Equity,Increase minority patient enrollment,AE-67 Increase Initiative 67,"In Q1 we will launch the AE-67 Increase Initiative 67 project in support of the strategic goal to increase minority patient enrollment. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.",Achieve 50% of planned experiments for AE-67 Increase Initiative 67.,Complete data analysis phase of AE-67 Increase Initiative 67.,Submit year‑end review and next‑year plan for AE-67 Increase Initiative 67.,Dr. David Lee,Harper Thomas,Logan Thomas,Green,,,,On track; milestones met.,,,
-Patient Engagement,Access & Equity,Implement financial assistance programs,AE-68 Implement Initiative 68,In Q1 we will launch the AE-68 Implement Initiative 68 project in support of the strategic goal to implement financial assistance programs. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Risks and mitigation strategies will be documented early to ensure the program remains on track.,Achieve 50% of planned experiments for AE-68 Implement Initiative 68.,Complete data analysis phase of AE-68 Implement Initiative 68.,Submit year‑end review and next‑year plan for AE-68 Implement Initiative 68.,Dr. David Lee,Ethan Williams,Liam Garcia,Green,,,,On track; milestones met.,,,
-Patient Engagement,Access & Equity,Implement financial assistance programs,AE-69 Implement Initiative 69,"In Q1 we will launch the AE-69 Implement Initiative 69 project in support of the strategic goal to implement financial assistance programs. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.",Achieve 50% of planned experiments for AE-69 Implement Initiative 69.,Complete data analysis phase of AE-69 Implement Initiative 69.,Submit year‑end review and next‑year plan for AE-69 Implement Initiative 69.,Dr. David Lee,Lucas Rodriguez,Henry Miller,Green,,,,On track; milestones met.,,,
-Patient Engagement,Access & Equity,Implement financial assistance programs,AE-70 Implement Initiative 70,"In Q1 we will launch the AE-70 Implement Initiative 70 project in support of the strategic goal to implement financial assistance programs. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Risks and mitigation strategies will be documented early to ensure the program remains on track.",Achieve 50% of planned experiments for AE-70 Implement Initiative 70.,Complete data analysis phase of AE-70 Implement Initiative 70.,Submit year‑end review and next‑year plan for AE-70 Implement Initiative 70.,Dr. David Lee,Ethan Miller,Liam Garcia,Green,,,,On track; milestones met.,,,
-
+StrategicProgramID,StrategicGoalID,CategoryID,StrategicPillarID,Strategic Program,Q1 Objective,Q2 Objective,Q3 Objective,Q4 Objective,ORD LT Sponsor(s),Sponsor(s)/Lead(s),Reporting owner(s),Q1 Status,Q2 Status,Q3 Status,Q4 Status,Q1 Comments,Q2 Comments,Q3 Comments,Q4 Comments
+SP100,SG100,Cat100,SPill100,Another change.,In Q1 we will launch the BD-01 Validate Initiative 1 project in support of the strategic goal to validate novel predictive biomarkers. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.,Achieve 50% of planned experiments for BD-01 Validate Initiative 1.,Complete data analysis phase of BD-01 Validate Initiative 1.,Submit year‑end review and next‑year plan for BD-01 Validate Initiative 1.,Dr. Alice Nguyen,on-track,exceeded,,exceeded,Critical biomarker validation initiative requiring robust study design and cross-functional team coordination. Success depends on establishing clear validation criteria and patient cohort identification protocols.,,,
+SP101,SG101,Cat100,SPill100,Change.,In Q1 we will launch the BD-02 Validate Initiative 2 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for BD-02 Validate Initiative 2.,Complete data analysis phase of BD-02 Validate Initiative 2.,Submit year‑end review and next‑year plan for BD-02 Validate Initiative 2.,Dr. Alice Nguyen,missed,,,,Second phase biomarker validation project building on BD-01 learnings. Focus on protocol standardization and data quality assurance will be essential for regulatory acceptance.,,,
+SP102,SG101,Cat100,SPill100,BD-03 Validate Initiative 3,In Q1 we will launch the BD-03 Validate Initiative 3 project in support of the strategic goal to validate novel predictive biomarkers. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for BD-03 Validate Initiative 3.,delayed,,,,Comprehensive biomarker validation program requiring integrated approach across discovery platforms. Protocol development and statistical analysis plan will be key deliverables for regulatory pathway.,,,
+SP103,SG102,Cat100,SPill100,BD-04 Expand Initiative 4,In Q1 we will launch the BD-04 Expand Initiative 4 project in support of the strategic goal to expand tumor genomics database. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for BD-04 Expand Initiative 4.,Complete data analysis phase of BD-04 Expand Initiative 4.,Submit year‑end review and next‑year plan for BD-04 Expand Initiative 4.,Dr. Alice Nguyen,Green,exceeded,,,Database expansion initiative leveraging existing genomics infrastructure. Success requires robust data governance framework and integration with existing clinical datasets.,,,
+SP104,SG102,Cat100,SPill100,BD-05 Expand Initiative 5,In Q1 we will launch the BD-05 Expand Initiative 5 project in support of the strategic goal to expand tumor genomics database. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates.,Achieve 50% of planned experiments for BD-05 Expand Initiative 5.,Complete data analysis phase of BD-05 Expand Initiative 5.,Submit year‑end review and next‑year plan for BD-05 Expand Initiative 5.,Dr. Alice Nguyen,Green,,,,Large-scale genomics database project requiring significant computational resources and data management capabilities. Team assembly and technical infrastructure planning will be critical for execution.,,,
+SP105,SG102,Cat100,SPill100,BD-06 Expand Initiative 6,In Q1 we will launch the BD-06 Expand Initiative 6 project in support of the strategic goal to expand tumor genomics database. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Risks and mitigation strategies will be documented early to ensure the program remains on track.,Achieve 50% of planned experiments for BD-06 Expand Initiative 6.,Complete data analysis phase of BD-06 Expand Initiative 6.,Submit year‑end review and next‑year plan for BD-06 Expand Initiative 6.,Dr. Alice Nguyen,Red,,,,Advanced genomics expansion program requiring workshop-driven scope definition. Technical feasibility and resource allocation discussions will guide implementation strategy.,,,
+SP106,SG103,Cat100,SPill100,BD-07 Advance Initiative 7,In Q1 we will launch the BD-07 Advance Initiative 7 project in support of the strategic goal to advance single‑cell analytics platform. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for BD-07 Advance Initiative 7.,Complete data analysis phase of BD-07 Advance Initiative 7.,Submit year‑end review and next‑year plan for BD-07 Advance Initiative 7.,Dr. Alice Nguyen,Green,,,,Next-generation single-cell platform implementation requiring specialized technical expertise. Protocol development will focus on standardization and reproducibility across research applications.,,,
+SP107,SG103,Cat100,SPill100,BD-08 Advance Initiative 8,In Q1 we will launch the BD-08 Advance Initiative 8 project in support of the strategic goal to advance single‑cell analytics platform. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for BD-08 Advance Initiative 8.,Complete data analysis phase of BD-08 Advance Initiative 8.,Green,,,,Advanced analytics platform deployment building on existing single-cell capabilities. Technical protocols and validation studies will be essential for platform adoption.,,,
+SP108,SG103,Cat100,SPill100,BD-09 Advance Initiative 9,In Q1 we will launch the BD-09 Advance Initiative 9 project in support of the strategic goal to advance single‑cell analytics platform. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for BD-09 Advance Initiative 9.,Complete data analysis phase of BD-09 Advance Initiative 9.,Green,,,,Comprehensive single-cell analytics initiative requiring dedicated team formation. Platform integration and user training will be key success factors for widespread adoption.,,,
+SP109,SG104,Cat101,SPill100,TT-10 Optimize Initiative 10,In Q1 we will launch the TT-10 Optimize Initiative 10 project in support of the strategic goal to optimize next‑gen kinase inhibitors. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Risks and mitigation strategies will be documented early to ensure the program remains on track. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for TT-10 Optimize Initiative 10.,Complete data analysis phase of TT-10 Optimize Initiative 10.,Submit year‑end review and next‑year plan for TT-10 Optimize Initiative 10.,Dr. Michael Rossi,Lucas Thomas,Charlotte Hernandez,Green,,,,Advanced kinase inhibitor optimization program with comprehensive execution planning. Risk mitigation strategies and leadership endorsement will be critical for maintaining program momentum and achieving quarterly milestones.,,,
+SP110,SG104,Cat101,SPill100,TT-11 Optimize Initiative 11,In Q1 we will launch the TT-11 Optimize Initiative 11 project in support of the strategic goal to optimize next‑gen kinase inhibitors. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for TT-11 Optimize Initiative 11.,Complete data analysis phase of TT-11 Optimize Initiative 11.,Green,,,,Kinase inhibitor development project requiring workshop-based scope refinement. Technical feasibility and competitive landscape analysis will guide development priorities.,,,
+SP111,SG104,Cat101,SPill100,TT-12 Optimize Initiative 12,In Q1 we will launch the TT-12 Optimize Initiative 12 project in support of the strategic goal to optimize next‑gen kinase inhibitors. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for TT-12 Optimize Initiative 12.,Green,,,,Strategic kinase inhibitor program focusing on scientific plan optimization. Molecular target validation and lead compound selection will be key decision points.,,,
+SP112,SG105,Cat101,SPill100,TT-13 Develop Initiative 13,In Q1 we will launch the TT-13 Develop Initiative 13 project in support of the strategic goal to develop bispecific antibodies portfolio. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for TT-13 Develop Initiative 13.,Complete data analysis phase of TT-13 Develop Initiative 13.,Submit year‑end review and next‑year plan for TT-13 Develop Initiative 13.,Dr. Michael Rossi,Amber,,,,Bispecific antibody portfolio development requiring specialized immunology expertise. Team formation and technical platform establishment will be foundational for program success.,,,
+SP113,SG105,Cat101,SPill100,TT-14 Develop Initiative 14,In Q1 we will launch the TT-14 Develop Initiative 14 project in support of the strategic goal to develop bispecific antibodies portfolio. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for TT-14 Develop Initiative 14.,Complete data analysis phase of TT-14 Develop Initiative 14.,Submit year‑end review and next‑year plan for TT-14 Develop Initiative 14.,Dr. Michael Rossi,Green,,,,Advanced bispecific antibody program focusing on protocol standardization and development timelines. Manufacturing considerations and regulatory strategy will guide implementation approach.,,,
+SP114,SG105,Cat101,SPill100,TT-15 Develop Initiative 15,In Q1 we will launch the TT-15 Develop Initiative 15 project in support of the strategic goal to develop bispecific antibodies portfolio. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for TT-15 Develop Initiative 15.,Green,,,,Comprehensive bispecific development initiative requiring robust protocol framework. Clinical translation pathway and manufacturing scalability will be critical success factors.,,,
+SP115,SG106,Cat101,SPill100,TT-16 Integrate Initiative 16,In Q1 we will launch the TT-16 Integrate Initiative 16 project in support of the strategic goal to integrate ai for target selection. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for TT-16 Integrate Initiative 16.,Complete data analysis phase of TT-16 Integrate Initiative 16.,Submit year‑end review and next‑year plan for TT-16 Integrate Initiative 16.,Dr. Michael Rossi,Green,,,,AI-powered target selection platform requiring interdisciplinary collaboration between computational and biological teams. Workshop outcomes will define technical specifications and validation approaches.,,,
+SP116,SG106,Cat101,SPill100,TT-17 Integrate Initiative 17,In Q1 we will launch the TT-17 Integrate Initiative 17 project in support of the strategic goal to integrate ai for target selection. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for TT-17 Integrate Initiative 17.,Complete data analysis phase of TT-17 Integrate Initiative 17.,Submit year‑end review and next‑year plan for TT-17 Integrate Initiative 17.,Dr. Michael Rossi,Green,,,,Machine learning integration project for target identification and validation. Protocol development will focus on data integration and algorithmic validation approaches.,,,
+SP117,SG106,Cat101,SPill100,TT-18 Integrate Initiative 18,In Q1 we will launch the TT-18 Integrate Initiative 18 project in support of the strategic goal to integrate ai for target selection. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for TT-18 Integrate Initiative 18.,Complete data analysis phase of TT-18 Integrate Initiative 18.,Submit year‑end review and next‑year plan for TT-18 Integrate Initiative 18.,Dr. Michael Rossi,Green,,,,Strategic AI implementation program requiring scope clarification through structured workshops. Technology platform selection and validation criteria will guide implementation strategy.,,,
+SP118,SG107,Cat102,SPill100,CDX-19 Co‑develop Initiative 19,In Q1 we will launch the CDX-19 Co‑develop Initiative 19 project in support of the strategic goal to co‑develop cdx assays with therapy programs. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Vendor assessments will be completed to decide on any external partnerships needed. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for CDX-19 Co‑develop Initiative 19.,Complete data analysis phase of CDX-19 Co‑develop Initiative 19.,Submit year‑end review and next‑year plan for CDX-19 Co‑develop Initiative 19.,Dr. Priya Desai,Green,,,,Companion diagnostic co-development program with comprehensive execution planning and vendor partnerships. Protocol finalization and regulatory alignment will be critical for successful therapy-diagnostic integration.,,,
+SP119,SG107,Cat102,SPill100,CDX-20 Co‑develop Initiative 20,In Q1 we will launch the CDX-20 Co‑develop Initiative 20 project in support of the strategic goal to co‑develop cdx assays with therapy programs. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for CDX-20 Co‑develop Initiative 20.,Complete data analysis phase of CDX-20 Co‑develop Initiative 20.,Submit year‑end review and next‑year plan for CDX-20 Co‑develop Initiative 20.,Dr. Priya Desai,Green,,,,CDx assay development initiative requiring core team establishment and technical platform selection. Regulatory strategy and clinical trial integration will be key planning elements.,,,
+SP120,SG107,Cat102,SPill100,CDX-21 Co‑develop Initiative 21,In Q1 we will launch the CDX-21 Co‑develop Initiative 21 project in support of the strategic goal to co‑develop cdx assays with therapy programs. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for CDX-21 Co‑develop Initiative 21.,Complete data analysis phase of CDX-21 Co‑develop Initiative 21.,Submit year‑end review and next‑year plan for CDX-21 Co‑develop Initiative 21.,Dr. Priya Desai,Green,,,,Companion diagnostic protocol development focusing on assay standardization and validation criteria. Clinical utility demonstration will be essential for regulatory approval pathway.,,,
+SP121,SG108,Cat102,SPill100,CDX-22 Obtain Initiative 22,In Q1 we will launch the CDX-22 Obtain Initiative 22 project in support of the strategic goal to obtain fda clearance for ngs panel. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Risks and mitigation strategies will be documented early to ensure the program remains on track.,Achieve 50% of planned experiments for CDX-22 Obtain Initiative 22.,Complete data analysis phase of CDX-22 Obtain Initiative 22.,Submit year‑end review and next‑year plan for CDX-22 Obtain Initiative 22.,Dr. Priya Desai,Amber,,,,FDA clearance initiative for NGS panel requiring workshop-driven scope definition. Regulatory strategy development and clinical validation planning will be critical success factors.,,,
+SP122,SG108,Cat102,SPill100,CDX-23 Obtain Initiative 23,In Q1 we will launch the CDX-23 Obtain Initiative 23 project in support of the strategic goal to obtain fda clearance for ngs panel. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness.,Achieve 50% of planned experiments for CDX-23 Obtain Initiative 23.,Complete data analysis phase of CDX-23 Obtain Initiative 23.,Submit year‑end review and next‑year plan for CDX-23 Obtain Initiative 23.,Dr. Priya Desai,Amber,,,,NGS panel regulatory approval program focusing on protocol development and validation studies. FDA interaction strategy and clinical evidence generation will guide implementation approach.,,,
+SP123,SG108,Cat102,SPill100,CDX-24 Obtain Initiative 24,In Q1 we will launch the CDX-24 Obtain Initiative 24 project in support of the strategic goal to obtain fda clearance for ngs panel. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Risks and mitigation strategies will be documented early to ensure the program remains on track. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for CDX-24 Obtain Initiative 24.,Complete data analysis phase of CDX-24 Obtain Initiative 24.,Submit year‑end review and next‑year plan for CDX-24 Obtain Initiative 24.,Dr. Priya Desai,Green,,,,Comprehensive NGS clearance initiative requiring scientific plan refinement and regulatory pathway optimization. Clinical validation studies and manufacturing considerations will be key deliverables.,,,
+SP124,SG109,Cat103,SPill101,ECD-25 Reduce Initiative 25,In Q1 we will launch the ECD-25 Reduce Initiative 25 project in support of the strategic goal to reduce ind cycle time by 20%. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for ECD-25 Reduce Initiative 25.,Complete data analysis phase of ECD-25 Reduce Initiative 25.,Submit year‑end review and next‑year plan for ECD-25 Reduce Initiative 25.,Dr. James Carter,Green,,,,IND cycle time reduction initiative requiring core team formation and process optimization analysis. Regulatory efficiency improvements and cross-functional coordination will be key success metrics.,,,
+SP125,SG109,Cat103,SPill101,ECD-26 Reduce Initiative 26,In Q1 we will launch the ECD-26 Reduce Initiative 26 project in support of the strategic goal to reduce ind cycle time by 20%. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for ECD-26 Reduce Initiative 26.,Complete data analysis phase of ECD-26 Reduce Initiative 26.,Green,,,,Process improvement program focusing on IND timeline optimization through workshop-based problem solving. Bottleneck identification and resource allocation will guide implementation strategy.,,,
+SP126,SG109,Cat103,SPill101,ECD-27 Reduce Initiative 27,In Q1 we will launch the ECD-27 Reduce Initiative 27 project in support of the strategic goal to reduce ind cycle time by 20%. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for ECD-27 Reduce Initiative 27.,Complete data analysis phase of ECD-27 Reduce Initiative 27.,Submit year‑end review and next‑year plan for ECD-27 Reduce Initiative 27.,Dr. James Carter,Green,,,,Strategic IND acceleration initiative requiring scientific plan refinement and process standardization. Regulatory pathway optimization and timeline compression will be primary objectives.,,,
+SP127,SG109,Cat103,SPill101,ECD-28 Reduce Initiative 28,In Q1 we will launch the ECD-28 Reduce Initiative 28 project in support of the strategic goal to reduce ind cycle time by 20%. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for ECD-28 Reduce Initiative 28.,Complete data analysis phase of ECD-28 Reduce Initiative 28.,Submit year‑end review and next‑year plan for ECD-28 Reduce Initiative 28.,Dr. James Carter,Red,,,,IND efficiency program focusing on protocol development and regulatory submission optimization. Process standardization and quality assurance will be critical for timeline reduction goals.,,,
+SP128,SG110,Cat103,SPill101,ECD-29 Implement Initiative 29,In Q1 we will launch the ECD-29 Implement Initiative 29 project in support of the strategic goal to implement adaptive trial designs. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for ECD-29 Implement Initiative 29.,Complete data analysis phase of ECD-29 Implement Initiative 29.,Submit year‑end review and next‑year plan for ECD-29 Implement Initiative 29.,Dr. James Carter,Green,,,,Adaptive trial design implementation requiring scientific plan development and statistical methodology refinement. Regulatory acceptance and operational feasibility will be key implementation challenges.,,,
+SP129,SG110,Cat103,SPill101,ECD-30 Implement Initiative 30,In Q1 we will launch the ECD-30 Implement Initiative 30 project in support of the strategic goal to implement adaptive trial designs. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.,Achieve 50% of planned experiments for ECD-30 Implement Initiative 30.,Complete data analysis phase of ECD-30 Implement Initiative 30.,Submit year‑end review and next‑year plan for ECD-30 Implement Initiative 30.,Dr. James Carter,Green,,,,Advanced trial design initiative requiring specialized statistical expertise and core team assembly. Protocol flexibility and regulatory alignment will be essential for successful implementation.,,,
+SP130,SG110,Cat103,SPill101,ECD-31 Implement Initiative 31,In Q1 we will launch the ECD-31 Implement Initiative 31 project in support of the strategic goal to implement adaptive trial designs. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Risks and mitigation strategies will be documented early to ensure the program remains on track. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for ECD-31 Implement Initiative 31.,Complete data analysis phase of ECD-31 Implement Initiative 31.,Green,,,,Comprehensive adaptive design program focusing on protocol standardization and regulatory strategy. Statistical innovation and operational execution will be critical success factors.,,,
+SP131,SG111,Cat103,SPill101,ECD-32 Expand Initiative 32,In Q1 we will launch the ECD-32 Expand Initiative 32 project in support of the strategic goal to expand first‑in‑human trial network. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. An early engagement with clinical teams will ensure downstream study readiness. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for ECD-32 Expand Initiative 32.,Complete data analysis phase of ECD-32 Expand Initiative 32.,Submit year‑end review and next‑year plan for ECD-32 Expand Initiative 32.,Dr. James Carter,Green,,,,Trial network expansion initiative requiring scientific plan optimization and site identification strategies. Geographic coverage and investigator engagement will be key expansion metrics.,,,
+SP132,SG111,Cat103,SPill101,ECD-33 Expand Initiative 33,In Q1 we will launch the ECD-33 Expand Initiative 33 project in support of the strategic goal to expand first‑in‑human trial network. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for ECD-33 Expand Initiative 33.,Complete data analysis phase of ECD-33 Expand Initiative 33.,Submit year‑end review and next‑year plan for ECD-33 Expand Initiative 33.,Dr. James Carter,Green,,,,First-in-human network development focusing on protocol standardization and site qualification criteria. Investigator training and regulatory alignment will be essential for network success.,,,
+SP133,SG111,Cat103,SPill101,ECD-34 Expand Initiative 34,In Q1 we will launch the ECD-34 Expand Initiative 34 project in support of the strategic goal to expand first‑in‑human trial network. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for ECD-34 Expand Initiative 34.,Complete data analysis phase of ECD-34 Expand Initiative 34.,Green,,,,Comprehensive trial network expansion requiring workshop-driven scope definition and implementation planning. Site selection criteria and operational excellence will guide network development.,,,
+SP134,SG112,Cat104,SPill101,RA-35 Harmonize Initiative 35,In Q1 we will launch the RA-35 Harmonize Initiative 35 project in support of the strategic goal to harmonize global filings. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. We will set up a dashboard to track milestones and provide transparent real‑time updates. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for RA-35 Harmonize Initiative 35.,Complete data analysis phase of RA-35 Harmonize Initiative 35.,Submit year‑end review and next‑year plan for RA-35 Harmonize Initiative 35.,Dr. Sophia Hernandez,Isabella Anderson,Olivia Lopez,Green,,,,Global regulatory harmonization program with comprehensive execution planning and milestone tracking dashboard. Leadership endorsement and cross-regional coordination will be critical for achieving harmonization objectives.,,,
+SP135,SG112,Cat104,SPill101,RA-36 Harmonize Initiative 36,In Q1 we will launch the RA-36 Harmonize Initiative 36 project in support of the strategic goal to harmonize global filings. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for RA-36 Harmonize Initiative 36.,Complete data analysis phase of RA-36 Harmonize Initiative 36.,Submit year‑end review and next‑year plan for RA-36 Harmonize Initiative 36.,Dr. Sophia Hernandez,Green,,,,Regulatory filing harmonization initiative requiring workshop-based scope definition and process standardization. Cross-regional alignment and submission efficiency will be key success metrics.,,,
+SP136,SG112,Cat104,SPill101,RA-37 Harmonize Initiative 37,In Q1 we will launch the RA-37 Harmonize Initiative 37 project in support of the strategic goal to harmonize global filings. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness.,Achieve 50% of planned experiments for RA-37 Harmonize Initiative 37.,Complete data analysis phase of RA-37 Harmonize Initiative 37.,Submit year‑end review and next‑year plan for RA-37 Harmonize Initiative 37.,Dr. Sophia Hernandez,Green,,,,Global filing coordination program focusing on protocol development and regulatory strategy alignment. Process optimization and cross-functional collaboration will guide implementation approach.,,,
+SP137,SG113,Cat104,SPill101,RA-38 Strengthen Initiative 38,In Q1 we will launch the RA-38 Strengthen Initiative 38 project in support of the strategic goal to strengthen agency engagement strategy. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for RA-38 Strengthen Initiative 38.,Complete data analysis phase of RA-38 Strengthen Initiative 38.,Submit year‑end review and next‑year plan for RA-38 Strengthen Initiative 38.,Dr. Sophia Hernandez,Green,,,,Agency engagement strategy enhancement requiring scientific plan refinement and stakeholder mapping. Regulatory relationship building and strategic communication will be key success factors.,,,
+SP138,SG113,Cat104,SPill101,RA-39 Strengthen Initiative 39,In Q1 we will launch the RA-39 Strengthen Initiative 39 project in support of the strategic goal to strengthen agency engagement strategy. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Vendor assessments will be completed to decide on any external partnerships needed. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for RA-39 Strengthen Initiative 39.,Complete data analysis phase of RA-39 Strengthen Initiative 39.,Submit year‑end review and next‑year plan for RA-39 Strengthen Initiative 39.,Dr. Sophia Hernandez,Green,,,,Strategic regulatory engagement program focusing on protocol development and agency interaction planning. Communication strategy and regulatory intelligence will guide implementation approach.,,,
+SP139,SG113,Cat104,SPill101,RA-40 Strengthen Initiative 40,In Q1 we will launch the RA-40 Strengthen Initiative 40 project in support of the strategic goal to strengthen agency engagement strategy. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for RA-40 Strengthen Initiative 40.,Complete data analysis phase of RA-40 Strengthen Initiative 40.,Submit year‑end review and next‑year plan for RA-40 Strengthen Initiative 40.,Dr. Sophia Hernandez,Red,,,,Comprehensive agency engagement initiative requiring scientific plan optimization and stakeholder relationship development. Strategic positioning and regulatory advocacy will be primary objectives.,,,
+SP140,SG113,Cat104,SPill101,RA-41 Strengthen Initiative 41,In Q1 we will launch the RA-41 Strengthen Initiative 41 project in support of the strategic goal to strengthen agency engagement strategy. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Vendor assessments will be completed to decide on any external partnerships needed. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for RA-41 Strengthen Initiative 41.,Complete data analysis phase of RA-41 Strengthen Initiative 41.,Submit year‑end review and next‑year plan for RA-41 Strengthen Initiative 41.,Dr. Sophia Hernandez,Green,,,,Agency engagement enhancement program requiring core team formation and relationship management strategy. Regulatory intelligence and strategic communication will be essential for program success.,,,
+SP141,SG114,Cat104,SPill101,RA-42 Enhance Initiative 42,In Q1 we will launch the RA-42 Enhance Initiative 42 project in support of the strategic goal to enhance cmc readiness. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for RA-42 Enhance Initiative 42.,Complete data analysis phase of RA-42 Enhance Initiative 42.,Amber,,,,CMC readiness enhancement initiative requiring specialized manufacturing expertise and core team assembly. Process optimization and regulatory compliance will be key development priorities.,,,
+SP142,SG114,Cat104,SPill101,RA-43 Enhance Initiative 43,In Q1 we will launch the RA-43 Enhance Initiative 43 project in support of the strategic goal to enhance cmc readiness. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for RA-43 Enhance Initiative 43.,Complete data analysis phase of RA-43 Enhance Initiative 43.,Submit year‑end review and next‑year plan for RA-43 Enhance Initiative 43.,Dr. Sophia Hernandez,Green,,,,Manufacturing readiness program requiring workshop-driven scope definition and technical capability assessment. Quality systems and regulatory alignment will guide implementation strategy.,,,
+SP143,SG114,Cat104,SPill101,RA-44 Enhance Initiative 44,In Q1 we will launch the RA-44 Enhance Initiative 44 project in support of the strategic goal to enhance cmc readiness. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness.,Achieve 50% of planned experiments for RA-44 Enhance Initiative 44.,Complete data analysis phase of RA-44 Enhance Initiative 44.,Submit year‑end review and next‑year plan for RA-44 Enhance Initiative 44.,Dr. Sophia Hernandez,Green,,,,Comprehensive CMC enhancement initiative requiring dedicated team formation and technical infrastructure development. Manufacturing excellence and regulatory compliance will be critical success factors.,,,
+SP144,SG115,Cat105,SPill101,DTI-45 Deploy Initiative 45,In Q1 we will launch the DTI-45 Deploy Initiative 45 project in support of the strategic goal to deploy decentralized trial platform. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Vendor assessments will be completed to decide on any external partnerships needed. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for DTI-45 Deploy Initiative 45.,Complete data analysis phase of DTI-45 Deploy Initiative 45.,Submit year‑end review and next‑year plan for DTI-45 Deploy Initiative 45.,Dr. Wei Zhang,Green,,,,Decentralized trial platform deployment requiring specialized technology expertise and core team formation. Platform integration and user adoption will be key implementation challenges.,,,
+SP145,SG115,Cat105,SPill101,DTI-46 Deploy Initiative 46,In Q1 we will launch the DTI-46 Deploy Initiative 46 project in support of the strategic goal to deploy decentralized trial platform. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for DTI-46 Deploy Initiative 46.,Complete data analysis phase of DTI-46 Deploy Initiative 46.,Green,,,,Digital trial platform initiative requiring technical team assembly and technology infrastructure development. Platform scalability and user experience will be essential for successful deployment.,,,
+SP146,SG115,Cat105,SPill101,DTI-47 Deploy Initiative 47,In Q1 we will launch the DTI-47 Deploy Initiative 47 project in support of the strategic goal to deploy decentralized trial platform. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. We will set up a dashboard to track milestones and provide transparent real‑time updates. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for DTI-47 Deploy Initiative 47.,Complete data analysis phase of DTI-47 Deploy Initiative 47.,Submit year‑end review and next‑year plan for DTI-47 Deploy Initiative 47.,Dr. Wei Zhang,Green,,,,Comprehensive decentralized platform program requiring scientific plan refinement and technology optimization. Operational excellence and patient engagement will be critical success factors.,,,
+SP147,SG116,Cat105,SPill101,DTI-48 Leverage Initiative 48,In Q1 we will launch the DTI-48 Leverage Initiative 48 project in support of the strategic goal to leverage wearables for safety monitoring. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for DTI-48 Leverage Initiative 48.,Complete data analysis phase of DTI-48 Leverage Initiative 48.,Submit year‑end review and next‑year plan for DTI-48 Leverage Initiative 48.,Dr. Wei Zhang,Green,,,,Wearables integration program requiring scientific plan development and technology validation studies. Data quality and regulatory acceptance will be key implementation considerations.,,,
+SP148,SG116,Cat105,SPill101,DTI-49 Leverage Initiative 49,In Q1 we will launch the DTI-49 Leverage Initiative 49 project in support of the strategic goal to leverage wearables for safety monitoring. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for DTI-49 Leverage Initiative 49.,Complete data analysis phase of DTI-49 Leverage Initiative 49.,Submit year‑end review and next‑year plan for DTI-49 Leverage Initiative 49.,Dr. Wei Zhang,Green,,,,Safety monitoring enhancement initiative using wearable technology requiring technical plan refinement. Data integration and clinical utility validation will be essential for program success.,,,
+SP149,SG116,Cat105,SPill101,DTI-50 Leverage Initiative 50,In Q1 we will launch the DTI-50 Leverage Initiative 50 project in support of the strategic goal to leverage wearables for safety monitoring. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for DTI-50 Leverage Initiative 50.,Green,,,,Wearables platform development requiring workshop-based scope definition and technical feasibility assessment. Technology integration and clinical validation will guide implementation strategy.,,,
+SP150,SG116,Cat105,SPill101,DTI-51 Leverage Initiative 51,In Q1 we will launch the DTI-51 Leverage Initiative 51 project in support of the strategic goal to leverage wearables for safety monitoring. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for DTI-51 Leverage Initiative 51.,Complete data analysis phase of DTI-51 Leverage Initiative 51.,Submit year‑end review and next‑year plan for DTI-51 Leverage Initiative 51.,Green,,,,Advanced wearables program with comprehensive execution planning and feasibility validation studies. Technical infrastructure and clinical integration will be critical for achieving safety monitoring objectives by quarter close.,,,
+SP151,SG117,Cat105,SPill101,DTI-52 Automate Initiative 52,In Q1 we will launch the DTI-52 Automate Initiative 52 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for DTI-52 Automate Initiative 52.,Complete data analysis phase of DTI-52 Automate Initiative 52.,Submit year‑end review and next‑year plan for DTI-52 Automate Initiative 52.,Dr. Wei Zhang,Green,,,,Data capture automation initiative requiring workshop-driven scope definition and process optimization analysis. Technical integration and workflow efficiency will be key success metrics.,,,
+SP152,SG117,Cat105,SPill101,DTI-53 Automate Initiative 53,In Q1 we will launch the DTI-53 Automate Initiative 53 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for DTI-53 Automate Initiative 53.,Complete data analysis phase of DTI-53 Automate Initiative 53.,Submit year‑end review and next‑year plan for DTI-53 Automate Initiative 53.,Dr. Wei Zhang,Amber,,,,Workflow automation program requiring structured scope definition and technical infrastructure development. Process standardization and efficiency gains will guide implementation priorities.,,,
+SP153,SG117,Cat105,SPill101,DTI-54 Automate Initiative 54,In Q1 we will launch the DTI-54 Automate Initiative 54 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates.,Achieve 50% of planned experiments for DTI-54 Automate Initiative 54.,Complete data analysis phase of DTI-54 Automate Initiative 54.,Submit year‑end review and next‑year plan for DTI-54 Automate Initiative 54.,Dr. Wei Zhang,Amber,,,,Comprehensive data automation initiative requiring workshop-based planning and technology integration strategy. Operational excellence and data quality will be essential for workflow optimization.,,,
+SP154,SG117,Cat105,SPill101,DTI-55 Automate Initiative 55,In Q1 we will launch the DTI-55 Automate Initiative 55 project in support of the strategic goal to automate data capture workflows. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates.,Achieve 50% of planned experiments for DTI-55 Automate Initiative 55.,Complete data analysis phase of DTI-55 Automate Initiative 55.,Submit year‑end review and next‑year plan for DTI-55 Automate Initiative 55.,Dr. Wei Zhang,Amber,,,,Advanced automation program requiring scope definition and technical capability assessment. System integration and user adoption will be critical for achieving workflow optimization goals.,,,
+SP155,SG118,Cat106,SPill102,RWE-56 Build Initiative 56,In Q1 we will launch the RWE-56 Build Initiative 56 project in support of the strategic goal to build oncology rwe registry. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. Vendor assessments will be completed to decide on any external partnerships needed. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for RWE-56 Build Initiative 56.,Complete data analysis phase of RWE-56 Build Initiative 56.,Submit year‑end review and next‑year plan for RWE-56 Build Initiative 56.,Dr. Karen Johnson,Amber,,,,Real-world evidence registry development requiring specialized data management expertise and core team formation. Data governance and patient recruitment will be key success factors.,,,
+SP156,SG118,Cat106,SPill102,RWE-57 Build Initiative 57,In Q1 we will launch the RWE-57 Build Initiative 57 project in support of the strategic goal to build oncology rwe registry. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for RWE-57 Build Initiative 57.,Red,,,,Oncology registry initiative focusing on protocol development and data collection standardization. Patient engagement and data quality assurance will be essential for registry success.,,,
+SP157,SG118,Cat106,SPill102,RWE-58 Build Initiative 58,In Q1 we will launch the RWE-58 Build Initiative 58 project in support of the strategic goal to build oncology rwe registry. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for RWE-58 Build Initiative 58.,Complete data analysis phase of RWE-58 Build Initiative 58.,Submit year‑end review and next‑year plan for RWE-58 Build Initiative 58.,Dr. Karen Johnson,Amber,,,,Comprehensive RWE registry program requiring protocol standardization and data management infrastructure. Clinical utility and regulatory acceptance will be critical development objectives.,,,
+SP158,SG119,Cat106,SPill102,RWE-59 Generate Initiative 59,In Q1 we will launch the RWE-59 Generate Initiative 59 project in support of the strategic goal to generate comparative effectiveness studies. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for RWE-59 Generate Initiative 59.,Complete data analysis phase of RWE-59 Generate Initiative 59.,Submit year‑end review and next‑year plan for RWE-59 Generate Initiative 59.,Dr. Karen Johnson,Noah Thomas,Evelyn Anderson,Amber,,,,Comparative effectiveness research program with comprehensive execution planning and feasibility validation. Study design and data collection protocols will be essential for generating regulatory-grade evidence.,,,
+SP159,SG119,Cat106,SPill102,RWE-60 Generate Initiative 60,In Q1 we will launch the RWE-60 Generate Initiative 60 project in support of the strategic goal to generate comparative effectiveness studies. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Vendor assessments will be completed to decide on any external partnerships needed. Completion of training for all contributors is also targeted within this timeframe.,Achieve 50% of planned experiments for RWE-60 Generate Initiative 60.,Complete data analysis phase of RWE-60 Generate Initiative 60.,Submit year‑end review and next‑year plan for RWE-60 Generate Initiative 60.,Dr. Karen Johnson,Amber,,,,Effectiveness studies initiative requiring scientific plan refinement and study design optimization. Data quality and statistical methodology will be key success factors for evidence generation.,,,
+SP160,SG119,Cat106,SPill102,RWE-61 Generate Initiative 61,In Q1 we will launch the RWE-61 Generate Initiative 61 project in support of the strategic goal to generate comparative effectiveness studies. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Vendor assessments will be completed to decide on any external partnerships needed.,Achieve 50% of planned experiments for RWE-61 Generate Initiative 61.,Complete data analysis phase of RWE-61 Generate Initiative 61.,Submit year‑end review and next‑year plan for RWE-61 Generate Initiative 61.,Dr. Karen Johnson,Mason Hernandez,Evelyn Anderson,Amber,,,,Advanced effectiveness research program with comprehensive planning and vendor partnership evaluation. External collaboration and data integration will be critical for study execution success.,,,
+SP161,SG120,Cat106,SPill102,RWE-62 Integrate Initiative 62,In Q1 we will launch the RWE-62 Integrate Initiative 62 project in support of the strategic goal to integrate ehr data for signal detection. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility.,Achieve 50% of planned experiments for RWE-62 Integrate Initiative 62.,Complete data analysis phase of RWE-62 Integrate Initiative 62.,Submit year‑end review and next‑year plan for RWE-62 Integrate Initiative 62.,Dr. Karen Johnson,Amber,,,,EHR data integration initiative requiring workshop-based scope definition and technical infrastructure development. Data quality and signal detection capabilities will be key implementation priorities.,,,
+SP162,SG120,Cat106,SPill102,RWE-63 Integrate Initiative 63,In Q1 we will launch the RWE-63 Integrate Initiative 63 project in support of the strategic goal to integrate ehr data for signal detection. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. Initial experiments or data pulls will begin by the end of the quarter to validate feasibility. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for RWE-63 Integrate Initiative 63.,Complete data analysis phase of RWE-63 Integrate Initiative 63.,Submit year‑end review and next‑year plan for RWE-63 Integrate Initiative 63.,Dr. Karen Johnson,Amber,,,,Electronic health record integration program focusing on protocol development and data standardization. Technical integration and analytical capabilities will be essential for signal detection success.,,,
+SP163,SG120,Cat106,SPill102,RWE-64 Integrate Initiative 64,In Q1 we will launch the RWE-64 Integrate Initiative 64 project in support of the strategic goal to integrate ehr data for signal detection. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for RWE-64 Integrate Initiative 64.,Complete data analysis phase of RWE-64 Integrate Initiative 64.,Amber,,,,Comprehensive EHR integration initiative requiring core team formation and data management strategy. Technical infrastructure and analytical workflows will be critical for detection capabilities.,,,
+SP164,SG121,Cat107,SPill102,AE-65 Increase Initiative 65,In Q1 we will launch the AE-65 Increase Initiative 65 project in support of the strategic goal to increase minority patient enrollment. This involves assembling the core team, finalizing the detailed project charter, and securing cross‑functional commitment. We will set up a dashboard to track milestones and provide transparent real‑time updates. Our stretch goal is to initiate early pilot work so that data is available for Q2 decision gates.,Achieve 50% of planned experiments for AE-65 Increase Initiative 65.,Complete data analysis phase of AE-65 Increase Initiative 65.,Submit year‑end review and next‑year plan for AE-65 Increase Initiative 65.,Dr. David Lee,Green,,,,Minority enrollment enhancement program requiring specialized outreach expertise and core team formation. Community engagement and protocol accessibility will be key success metrics.,,,
+SP165,SG121,Cat107,SPill102,AE-66 Increase Initiative 66,In Q1 we will launch the AE-66 Increase Initiative 66 project in support of the strategic goal to increase minority patient enrollment. Key deliverables include drafting protocols, outlining resource requirements, and obtaining governance approval. An early engagement with clinical teams will ensure downstream study readiness. By quarter close, we expect to have a resourced, scheduled, and risk‑assessed plan endorsed by sponsors.,Achieve 50% of planned experiments for AE-66 Increase Initiative 66.,Green,,,,Patient diversity initiative focusing on protocol development and enrollment strategy optimization. Community partnerships and cultural competency will be essential for achieving enrollment goals.,,,
+SP166,SG121,Cat107,SPill102,AE-67 Increase Initiative 67,In Q1 we will launch the AE-67 Increase Initiative 67 project in support of the strategic goal to increase minority patient enrollment. We will host a series of workshops to solidify scope, clarify success metrics, and map dependencies. We will set up a dashboard to track milestones and provide transparent real‑time updates. Success for Q1 will be measured by completion of the scoped deliverables and endorsement from the Oncology R&D Leadership Team.,Achieve 50% of planned experiments for AE-67 Increase Initiative 67.,Complete data analysis phase of AE-67 Increase Initiative 67.,Submit year‑end review and next‑year plan for AE-67 Increase Initiative 67.,Dr. David Lee,Green,,,,Comprehensive enrollment program requiring workshop-driven scope definition and community engagement strategy. Outreach effectiveness and protocol design will guide implementation approach.,,,
+SP167,SG122,Cat107,SPill102,AE-68 Implement Initiative 68,In Q1 we will launch the AE-68 Implement Initiative 68 project in support of the strategic goal to implement financial assistance programs. The kick‑off will culminate in a signed execution plan and a communication roll‑out to all contributors. Risks and mitigation strategies will be documented early to ensure the program remains on track.,Achieve 50% of planned experiments for AE-68 Implement Initiative 68.,Complete data analysis phase of AE-68 Implement Initiative 68.,Submit year‑end review and next‑year plan for AE-68 Implement Initiative 68.,Dr. David Lee,Ethan Williams,Liam Garcia,Green,,,,Financial assistance program implementation with comprehensive execution planning and risk management strategy. Program accessibility and patient support will be critical for achieving enrollment and retention objectives.,,,
+SP168,SG122,Cat107,SPill102,AE-69 Implement Initiative 69,In Q1 we will launch the AE-69 Implement Initiative 69 project in support of the strategic goal to implement financial assistance programs. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. An early engagement with clinical teams will ensure downstream study readiness. Quarter‑end exit criteria include a locked protocol, budget sign‑off, and an agreed set of KPIs.,Achieve 50% of planned experiments for AE-69 Implement Initiative 69.,Complete data analysis phase of AE-69 Implement Initiative 69.,Red,,,,Patient support initiative requiring scientific plan refinement and program design optimization. Financial modeling and eligibility criteria will be key development considerations.,,,
+SP169,SG122,Cat107,SPill102,AE-70 Implement Initiative 70,In Q1 we will launch the AE-70 Implement Initiative 70 project in support of the strategic goal to implement financial assistance programs. Our immediate focus will be to refine the scientific plan, align timelines with stakeholders, and allocate budget. Risks and mitigation strategies will be documented early to ensure the program remains on track.,Achieve 50% of planned experiments for AE-70 Implement Initiative 70.,Complete data analysis phase of AE-70 Implement Initiative 70.,Submit year‑end review and next‑year plan for AE-70 Implement Initiative 70.,Dr. David Lee,Green,,,,Comprehensive assistance program requiring scientific plan optimization and implementation strategy development. Program effectiveness and patient access will be primary success objectives.,,,
 ```
 
 # data/scorecard-data.ts
@@ -7321,6 +7971,90 @@ export async function loadScorecardData(): Promise<ScoreCardData> {
 
 // Export the data
 export const scorecardData: ScoreCardData = loadedData
+```
+
+# data/Strategic-Goals.csv
+
+```csv
+﻿StrategicGoalID,CategoryID,StrategicPillarID,Strategic Goal,Status,Comments,,,,,,,,
+SG100,Cat100,SPill100,Another change.,on-track,Placeholder strategic goal requiring definition and scope clarification. Implementation approach and success criteria need to be established through strategic planning initiatives.,,,,,,,,
+SG101,Cat100,SPill100,Validate novel predictive biomarkers,delayed,Multi-phase biomarker validation program requiring robust study design,  cross-functional coordination,, and regulatory-grade protocols. Success depends on establishing clear validation criteria, patient cohort identification, and statistical analysis planning for clinical translation and regulatory acceptance. Critical focus on protocol standardization and data quality assurance across validation phases.,,,,
+SG102,Cat100,SPill100,Expand tumor genomics database,Red,Large-scale genomics infrastructure expansion requiring significant computational resources, robust data governance framework, and integration capabilities. Success factors include data management infrastructure, technical feasibility planning, and integration with existing clinical datasets. Strategic emphasis on scalability, data quality, and cross-platform compatibility for research applications.,,
+SG103,Cat100,SPill100,Advance single cell analytics platform,Green,Next-generation analytics platform development requiring specialized technical expertise, protocol standardization, and platform integration capabilities. Critical success factors include reproducibility across research applications, user training programs, and widespread adoption strategies. Key focus areas include technical validation, platform optimization, and establishment of standardized analytical workflows.,,
+SG104,Cat101,SPill100,Optimize next gen kinase inhibitors,Green,Advanced kinase inhibitor development program requiring comprehensive execution planning, molecular target validation, and competitive landscape analysis. Success depends on scientific plan optimization, lead compound selection, risk mitigation strategies, and leadership endorsement. Strategic emphasis on technical feasibility, development timelines, and maintaining program momentum through quarterly milestones.,
+SG105,Cat101,SPill100,Develop bispecific antibodies portfolio,Green,Comprehensive bispecific antibody development initiative requiring specialized immunology expertise, manufacturing considerations, and clinical translation pathway planning. Critical success factors include technical platform establishment, protocol standardization, manufacturing scalability, and regulatory strategy development. Key focus areas include team formation, development timelines, and clinical utility demonstration.,
+SG106,Cat101,SPill100,Integrate AI for target selection,Amber,AI-powered target identification platform requiring interdisciplinary collaboration between computational and biological teams, technology platform selection, and algorithmic validation. Success depends on data integration capabilities, validation criteria establishment, and technical specifications definition. Strategic emphasis on machine learning implementation, workshop-driven scope refinement, and cross-functional coordination.,,
+SG107,Cat102,SPill100,Codevelop CDx assays with therapy programs,Red,Integrated companion diagnostic development requiring comprehensive execution planning, vendor partnerships, and seamless therapy-diagnostic integration. Critical success factors include protocol finalization, regulatory alignment, clinical trial integration, and assay standardization. Key focus areas include regulatory strategy, clinical utility demonstration, and cross-functional collaboration between diagnostic and therapeutic teams.,
+SG108,Cat102,SPill100,Obtain FDA clearance for NGS panel,Green,NGS panel regulatory approval program requiring comprehensive regulatory strategy, clinical validation studies, and FDA interaction planning. Success depends on workshop-driven scope definition, scientific plan refinement, and manufacturing considerations. Strategic emphasis on regulatory pathway optimization, clinical evidence generation, and compliance with FDA requirements for market clearance.,,
+SG109,Cat103,SPill101,Reduce IND cycle time by 20%,Amber,Process optimization initiative targeting regulatory efficiency improvements, bottleneck identification, and cross-functional coordination enhancement. Critical success factors include process standardization, resource allocation optimization, and quality assurance improvements. Key focus areas include workflow analysis, regulatory submission optimization, and timeline compression strategies while maintaining compliance standards.,,
+SG110,Cat103,SPill101,Implement adaptive trial designs,Red,Advanced statistical methodology implementation requiring specialized expertise, regulatory acceptance strategies, and operational feasibility planning. Success depends on protocol flexibility development, statistical innovation, and regulatory alignment for trial design approval. Strategic emphasis on scientific plan development, protocol standardization, and operational execution capabilities for complex trial designs.,,
+SG111,Cat103,SPill101,Expand first human trial network,Green,Trial network expansion initiative requiring site identification strategies, investigator engagement, and operational excellence development. Critical success factors include geographic coverage optimization, site qualification criteria, investigator training programs, and regulatory alignment. Key focus areas include network development planning, site selection optimization, and operational infrastructure for early-phase clinical trials.,
+SG112,Cat104,SPill101,Harmonize global filings,Green,Global regulatory coordination program requiring comprehensive execution planning, cross-regional alignment, and milestone tracking systems. Success depends on process standardization, submission efficiency optimization, and leadership endorsement across multiple jurisdictions. Strategic emphasis on regulatory intelligence, cross-functional collaboration, and achieving harmonization objectives through structured implementation planning.,,
+SG113,Cat104,SPill101,Strengthen agency engagement strategy,Green,Strategic regulatory relationship management requiring stakeholder mapping, communication strategy development, and regulatory intelligence enhancement. Critical success factors include agency interaction planning, relationship building, and strategic positioning with regulatory authorities. Key focus areas include regulatory advocacy, scientific plan refinement, and comprehensive engagement program development for multiple agencies.,,
+SG114,Cat104,SPill101,Enhance CMC readiness,Amber,Manufacturing readiness enhancement requiring specialized expertise, quality systems development, and regulatory compliance optimization. Success depends on process optimization, technical infrastructure development, and manufacturing excellence achievement. Strategic emphasis on core team formation, technical capability assessment, and regulatory alignment for chemistry, manufacturing, and controls requirements.
+SG115,Cat105,SPill101,Deploy decentralized trial platform,Red,Digital trial platform implementation requiring technology infrastructure development, user adoption strategies, and clinical integration capabilities. Critical success factors include platform scalability, technical expertise deployment, and patient engagement optimization. Key focus areas include technology validation, operational excellence, and user experience optimization for decentralized clinical trial execution.,,
+SG116,Cat105,SPill101,Leverage wearables for safety monitoring,Green,Advanced wearables integration program requiring technology validation, data quality assurance, and clinical utility demonstration. Success depends on technical plan refinement, data integration capabilities, and regulatory acceptance strategies. Strategic emphasis on feasibility validation, clinical integration, and comprehensive execution planning for safety monitoring enhancement through wearable technology platforms.,,
+SG117,Cat105,SPill101,Automate data capture workflows,Amber,Workflow automation initiative requiring technical infrastructure development, process optimization, and system integration capabilities. Critical success factors include scope definition, workflow efficiency improvements, and user adoption strategies. Key focus areas include technology integration, operational excellence, data quality enhancement, and comprehensive automation program development for clinical data capture processes.,
+SG118,Cat106,SPill102,Build oncology RWE registry,Red,Real-world evidence registry development requiring specialized data management expertise, patient recruitment strategies, and robust data governance frameworks. Success depends on protocol standardization, data collection infrastructure, and clinical utility demonstration. Strategic emphasis on patient engagement, data quality assurance, and regulatory acceptance for real-world evidence generation in oncology applications.,,
+SG119,Cat106,SPill102,Generate comparative effectiveness studies,Green,Comprehensive effectiveness research program requiring study design optimization, data quality assurance, and regulatory-grade evidence generation. Critical success factors include statistical methodology development, vendor partnerships, and external collaboration capabilities. Key focus areas include feasibility validation, data integration strategies, and evidence generation for comparative effectiveness research in clinical settings.,,
+SG120,Cat106,SPill102,Integrate EHR data for signal detection,Green,Electronic health record integration requiring technical infrastructure development, data standardization, and analytical capability enhancement. Success depends on data quality optimization, signal detection algorithm development, and technical integration planning. Strategic emphasis on data management strategy, analytical workflow development, and comprehensive integration capabilities for clinical signal detection applications.,,
+SG121,Cat107,SPill102,Increase minority patient enrollment,Green,Patient diversity enhancement requiring specialized outreach expertise, community engagement strategies, and protocol accessibility optimization. Critical success factors include community partnerships, cultural competency development, and enrollment strategy effectiveness. Key focus areas include outreach program development, protocol design optimization, and comprehensive engagement strategies for diverse patient population recruitment and retention.,,
+SG122,Cat107,SPill102,Implement financial assistance programs,Amber,Patient support program development requiring comprehensive execution planning, program design optimization, and accessibility enhancement. Success depends on financial modeling, eligibility criteria development, and patient support infrastructure establishment. Strategic emphasis on program effectiveness measurement, patient access improvement, and comprehensive assistance program implementation for enhanced patient enrollment and treatment accessibility.,,
+```
+
+# data/StrategicPillars.csv
+
+```csv
+﻿StrategicPillarID,Strategic Pillar
+SPill100,Precision Medicine
+SPill101,Pipeline Acceleration
+SPill102,Patient Engagement
+```
+
+# hooks/use-editable-field.ts
+
+```ts
+import { useState, useCallback } from 'react'
+import type { ScoreCardData } from '@/types/scorecard'
+
+interface UseEditableFieldProps {
+  fieldPath: string[]
+  onDataUpdate: (newData: ScoreCardData) => void
+}
+
+export function useEditableField({ fieldPath, onDataUpdate }: UseEditableFieldProps) {
+  const [isEditing, setIsEditing] = useState(false)
+
+  const handleSave = useCallback(async (newValue: string) => {
+    try {
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fieldPath,
+          newValue,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update field')
+      }
+
+      const updatedData = await response.json()
+      onDataUpdate(updatedData)
+    } catch (error) {
+      throw error
+    }
+  }, [fieldPath, onDataUpdate])
+
+  return {
+    isEditing,
+    setIsEditing,
+    handleSave,
+  }
+} 
 ```
 
 # hooks/use-mobile.tsx
@@ -7560,6 +8294,48 @@ export function cn(...inputs: ClassValue[]) {
 
 ```
 
+# llm-system-prompt.md
+
+```md
+# System Prompt for Scorecard AI Assistant
+
+You are an AI assistant specialized in analyzing and summarizing scorecard data for a large organization. Your primary goal is to help users understand, interpret, and act on the data provided in the context. The context will include structured information about strategic pillars, categories, goals, programs, objectives, statuses, and comments.
+
+## Instructions
+- Always use the provided context to answer user questions. If the answer is not in the context, say so.
+- Be concise, factual, and clear. Avoid speculation or making up information.
+- If a user asks for a summary, provide a high-level overview of the relevant data.
+- If a user asks about a specific pillar, category, goal, or program, reference the relevant details from the context.
+- If a user asks for risks, delays, or issues, highlight any items in the context marked as "delayed", "missed", or with negative comments.
+- If a user asks for opportunities or successes, highlight items marked as "on-track" or "exceeded".
+- Use markdown formatting for clarity (e.g., lists, bold, tables, headings).
+- If the user asks for a recommendation, base it strictly on the data in the context.
+
+## Example Behaviors
+- **Summary Request:**
+  - "Here is a summary of Q1 status by pillar: ..."
+- **Specific Query:**
+  - "The 'Precision Medicine' pillar has 3 goals, 2 are on-track, 1 is delayed."
+- **Risk/Issue Highlight:**
+  - "Goal BD-04 is delayed due to resource constraints. Mitigation is in place."
+- **If Data is Missing:**
+  - "I do not have information on that item in the current context."
+
+## Tone and Format
+- Be professional, supportive, and neutral.
+- Use markdown for structure (e.g., headings, bullet points, bold for statuses).
+- Avoid unnecessary verbosity.
+
+## Limitations
+- Do not answer questions outside the provided context.
+- Do not provide medical, legal, or financial advice.
+
+---
+
+**Context:**
+The context will be provided as structured data (JSON or similar) containing all relevant scorecard information. Use it as your sole source of truth for answering queries. 
+```
+
 # next-env.d.ts
 
 ```ts
@@ -7644,12 +8420,16 @@ export default nextConfig
     "lucide-react": "^0.454.0",
     "next": "15.2.4",
     "next-themes": "^0.4.4",
+    "openai": "^4.28.0",
     "react": "^18.2.0",
     "react-day-picker": "8.10.1",
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.54.1",
+    "react-markdown": "^9.0.1",
     "react-resizable-panels": "^2.1.7",
     "recharts": "2.15.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.0",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
@@ -7657,6 +8437,7 @@ export default nextConfig
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@tailwindcss/typography": "^0.5.16",
     "@types/node": "^22",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -7665,6 +8446,7 @@ export default nextConfig
     "typescript": "^5"
   }
 }
+
 ```
 
 # postcss.config.mjs
@@ -7813,12 +8595,12 @@ COPY components /app/components
 RUN npm install
 
 # Install Python 3 and pip
-RUN apt-get update && apt-get install -y python3 python3-pip python3-venv
+# RUN apt-get update && apt-get install -y python3 python3-pip python3-venv
 
 # Copy requirements.txt and install Python dependencies
-COPY requirements.txt ./
-RUN python3 -m venv venv && \
-    /bin/bash -c "source venv/bin/activate && pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt"
+# COPY requirements.txt ./
+# RUN python3 -m venv venv && \
+#    /bin/bash -c "source venv/bin/activate && pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir -r requirements.txt"
 
 # Copy the rest of the application code
 COPY . .
@@ -8057,7 +8839,10 @@ const config: Config = {
   		}
   	}
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    require('@tailwindcss/typography'),
+  ],
 };
 export default config;
 
@@ -8117,6 +8902,9 @@ export interface StrategicProgram {
   q2Comments?: string
   q3Comments?: string
   q4Comments?: string
+  strategicGoalId: string
+  categoryId: string
+  strategicPillarId: string
 }
 
 export interface StrategicGoal {
@@ -8138,13 +8926,19 @@ export interface StrategicGoal {
   q3Comments?: string
   q4Comments?: string
   programs?: StrategicProgram[]
+  status?: "exceeded" | "on-track" | "delayed" | "missed"
+  comments?: string
+  categoryId: string
+  strategicPillarId: string
 }
 
 export interface Category {
   id: string
   name: string
-  pillar: string
+  status?: "exceeded" | "on-track" | "delayed" | "missed"
+  comments?: string
   goals: StrategicGoal[]
+  strategicPillarId: string
 }
 
 export interface Pillar {
@@ -8162,37 +8956,69 @@ export interface ScoreCardData {
 # utils/csv-parser.ts
 
 ```ts
-import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
+import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard";
+import { promises as fs } from 'fs';
+import path from 'path';
 
-// Function to parse CSV data
-export async function parseCSV(url: string): Promise<string[][]> {
-  const response = await fetch(url)
-  const csvText = await response.text()
+// Helper function to map status values
+function mapStatus(status: string | null | undefined): "exceeded" | "on-track" | "delayed" | "missed" | undefined {
+  if (!status || status.trim() === '') return undefined;
+  
+  const statusMap: { [key: string]: "exceeded" | "on-track" | "delayed" | "missed" } = {
+    "Green": "on-track",
+    "Amber": "delayed",
+    "Red": "missed",
+    "exceeded": "exceeded",
+    "on-track": "on-track",
+    "delayed": "delayed",
+    "missed": "missed"
+  };
+  
+  return statusMap[status.trim()];
+}
 
-  // Split by lines and then by commas, handling quoted values
-  const rows = csvText.split("\n")
+// Helper to normalize IDs
+function norm(id: string | undefined | null): string {
+  return (id || '').trim().toUpperCase();
+}
 
+// Helper to trim display text
+function trimText(val: string | undefined | null): string {
+  return (val || '').trim();
+}
+
+// Helper to get column index safely
+function colIdx(headers: string[], col: string): number {
+  const idx = headers.findIndex(h => h.trim() === col.trim());
+  return idx;
+}
+
+// Function to parse CSV data from file
+export async function parseCSV(filePath: string): Promise<string[][]> {
+  const fullPath = path.join(process.cwd(), filePath)
+  const csvText = await fs.readFile(fullPath, 'utf-8')
+  return parseCSVString(csvText)
+}
+
+// Helper: parse CSV string to array
+export function parseCSVString(csvText: string): string[][] {
+  const rows = csvText.split('\n')
   return rows.map((row) => {
     const values: string[] = []
     let inQuotes = false
-    let currentValue = ""
-
+    let currentValue = ''
     for (let i = 0; i < row.length; i++) {
       const char = row[i]
-
       if (char === '"') {
         inQuotes = !inQuotes
-      } else if (char === "," && !inQuotes) {
+      } else if (char === ',' && !inQuotes) {
         values.push(currentValue)
-        currentValue = ""
+        currentValue = ''
       } else {
         currentValue += char
       }
     }
-
-    // Add the last value
     values.push(currentValue)
-
     return values
   })
 }
@@ -8206,12 +9032,70 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
   const categoriesMap = new Map<string, Category>()
   const goalsMap = new Map<string, StrategicGoal>()
 
-  // Generate unique IDs
-  let pillarId = 1
-  let categoryId = 1
-  let goalId = 1
-  let programId = 1
+  // Build lookup maps for category and goal by ID
+  const catHeader = csvData[1]
+  const catIdIdx = catHeader.indexOf('CategoryID')
+  const catPillarIdIdx = catHeader.indexOf('StrategicPillarID')
+  const catNameIdx = catHeader.indexOf('Category')
+  const catStatusIdx = catHeader.indexOf('Status')
+  const catCommentsIdx = catHeader.indexOf('Comments')
+  const catMap = new Map<string, { id?: string, pillarId?: string, status?: string, comments?: string, name?: string }>()
+  for (let i = 1; i < csvData[1].length; i++) {
+    const row = csvData[1][i]
+    if (!row[catIdIdx]) continue
+    catMap.set(row[catNameIdx], {
+      id: row[catIdIdx],
+      pillarId: row[catPillarIdIdx],
+      status: row[catStatusIdx],
+      comments: row[catCommentsIdx],
+      name: row[catNameIdx],
+    })
+  }
 
+  const goalHeader = csvData[2]
+  const goalIdIdx = goalHeader.indexOf('StrategicGoalID')
+  const goalCatIdIdx = goalHeader.indexOf('CategoryID')
+  const goalPillarIdIdx = goalHeader.indexOf('StrategicPillarID')
+  const goalNameIdx = goalHeader.indexOf('Strategic Goal')
+  const goalStatusIdx = goalHeader.indexOf('Status')
+  const goalCommentsIdx = goalHeader.indexOf('Comments')
+  const goalMap = new Map<string, { id?: string, catId?: string, pillarId?: string, status?: string, comments?: string }>()
+  for (let i = 1; i < csvData[2].length; i++) {
+    const row = csvData[2][i]
+    if (!row[goalIdIdx]) continue
+    goalMap.set(row[goalNameIdx], {
+      id: row[goalIdIdx],
+      catId: row[goalCatIdIdx],
+      pillarId: row[goalPillarIdIdx],
+      status: row[goalStatusIdx],
+      comments: row[goalCommentsIdx],
+    })
+  }
+
+  // Prepare main header and indices
+  const mainHeader = dataRows[0].map(h => h.replace(/^\uFEFF/, '').replace(/\r/g, '').trim())
+  const progGoalIdIdx = mainHeader.indexOf('StrategicGoalID')
+  const progCatIdIdx = mainHeader.indexOf('CategoryID')
+  const progPillarIdIdx = mainHeader.indexOf('StrategicPillarID')
+  const progIdIdx = mainHeader.indexOf('StrategicProgramID')
+  const progTextIdx = mainHeader.indexOf('Strategic Program')
+  const progQ1ObjIdx = mainHeader.indexOf('Q1 Objective')
+  const progQ2ObjIdx = mainHeader.indexOf('Q2 Objective')
+  const progQ3ObjIdx = mainHeader.indexOf('Q3 Objective')
+  const progQ4ObjIdx = mainHeader.indexOf('Q4 Objective')
+  const progOrdLtIdx = mainHeader.indexOf('ORD LT Sponsor(s)')
+  const progSponsorsIdx = mainHeader.indexOf('Sponsor(s)/Lead(s)')
+  const progOwnersIdx = mainHeader.indexOf('Reporting owner(s)')
+  const progQ1StatusIdx = mainHeader.indexOf('Q1 Status')
+  const progQ2StatusIdx = mainHeader.indexOf('Q2 Status')
+  const progQ3StatusIdx = mainHeader.indexOf('Q3 Status')
+  const progQ4StatusIdx = mainHeader.indexOf('Q4 Status')
+  const progQ1CommentsIdx = mainHeader.indexOf('Q1 Comments')
+  const progQ2CommentsIdx = mainHeader.indexOf('Q2 Comments')
+  const progQ3CommentsIdx = mainHeader.indexOf('Q3 Comments')
+  const progQ4CommentsIdx = mainHeader.indexOf('Q4 Comments')
+
+  let debugCount = 0;
   dataRows.forEach((row) => {
     const rowData = headers.reduce(
       (obj, header, index) => {
@@ -8226,35 +9110,23 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
     const goalText = rowData["Strategic Goal"] || "Unknown Goal"
     const programText = rowData["Strategic Program"] || "Unknown Program"
 
-    // Map status values to the app's expected format
-    const mapStatus = (status: string | null): "exceeded" | "on-track" | "delayed" | "missed" | undefined => {
-      if (!status) return undefined
-
-      switch (status.toLowerCase()) {
-        case "green":
-          return "on-track"
-        case "amber":
-          return "delayed"
-        case "red":
-          return "missed"
-        case "blue":
-          return "exceeded"
-        default:
-          return "on-track"
-      }
-    }
+    // Get IDs from the data
+    const pillarId = rowData["StrategicPillarID"] || "Unknown"
+    const categoryId = rowData["CategoryID"] || "Unknown"
+    const goalId = rowData["StrategicGoalID"] || "Unknown"
+    const programId = rowData["StrategicProgramID"] || "Unknown"
 
     // Create program
     const program: StrategicProgram = {
-      id: `pr${programId++}`,
-      text: programText,
+      id: programId,
+      text: programText || `Program ${programId}`,
+      strategicGoalId: goalId,
+      categoryId: categoryId,
+      strategicPillarId: pillarId,
       q1Objective: rowData["Q1 Objective"] || undefined,
       q2Objective: rowData["Q2 Objective"] || undefined,
       q3Objective: rowData["Q3 Objective"] || undefined,
       q4Objective: rowData["Q4 Objective"] || undefined,
-      ordLtSponsors: rowData["ORD LT Sponsor(s)"] || undefined,
-      sponsorsLeads: rowData["Sponsor(s)/Lead(s)"] || undefined,
-      reportingOwners: rowData["Reporting owner(s)"] || undefined,
       q1Status: mapStatus(rowData["Q1 Status"]),
       q2Status: mapStatus(rowData["Q2 Status"]),
       q3Status: mapStatus(rowData["Q3 Status"]),
@@ -8263,43 +9135,52 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
       q2Comments: rowData["Q2 Comments"] || undefined,
       q3Comments: rowData["Q3 Comments"] || undefined,
       q4Comments: rowData["Q4 Comments"] || undefined,
+      ordLtSponsors: rowData["ORD LT Sponsor(s)"] || undefined,
+      sponsorsLeads: rowData["Sponsor(s)/Lead(s)"] || undefined,
+      reportingOwners: rowData["Reporting owner(s)"] || undefined,
     }
 
     // Get or create pillar
-    let pillar = pillarsMap.get(pillarName)
+    let pillar = pillarsMap.get(pillarId)
     if (!pillar) {
       pillar = {
-        id: `p${pillarId++}`,
+        id: pillarId,
         name: pillarName,
         categories: [],
       }
-      pillarsMap.set(pillarName, pillar)
+      pillarsMap.set(pillarId, pillar)
     }
 
     // Get or create category
-    const categoryKey = `${pillarName}:${categoryName}`
-    let category = categoriesMap.get(categoryKey)
+    let category = categoriesMap.get(categoryId)
     if (!category) {
+      const catInfo = catMap.get(categoryName) || {}
       category = {
-        id: `c${categoryId++}`,
+        id: categoryId,
         name: categoryName,
-        pillar: pillarName,
+        status: mapStatus(catInfo.status || null),
+        comments: catInfo.comments,
         goals: [],
+        strategicPillarId: pillarId
       }
-      categoriesMap.set(categoryKey, category)
+      categoriesMap.set(categoryId, category)
       pillar.categories.push(category)
     }
 
     // Get or create goal
-    const goalKey = `${pillarName}:${categoryName}:${goalText}`
-    let goal = goalsMap.get(goalKey)
+    let goal = goalsMap.get(goalId)
     if (!goal) {
+      const goalInfo = goalMap.get(goalText) || {}
       goal = {
-        id: `g${goalId++}`,
+        id: goalId,
         text: goalText,
+        status: mapStatus(goalInfo.status || null),
+        comments: goalInfo.comments,
         programs: [],
+        categoryId: categoryId,
+        strategicPillarId: pillarId
       }
-      goalsMap.set(goalKey, goal)
+      goalsMap.set(goalId, goal)
       category.goals.push(goal)
     }
 
@@ -8307,11 +9188,171 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
     if (!goal.programs) {
       goal.programs = []
     }
+    if (debugCount < 5) {
+      console.log('BACKEND DEBUG - Program object:', program);
+      debugCount++;
+    }
     goal.programs.push(program)
   })
 
   return {
     pillars: Array.from(pillarsMap.values()),
+  }
+}
+
+// Function to load and merge data from all CSV files
+export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
+  console.log('CSV PARSER: loadAndMergeScorecardCSVs called');
+  try {
+    const [dummyData, strategicGoals, categoryStatus, strategicPillars] = await Promise.all([
+      parseCSV('data/DummyData.csv'),
+      parseCSV('data/Strategic-Goals.csv'),
+      parseCSV('data/Category-status-comments.csv'),
+      parseCSV('data/StrategicPillars.csv')
+    ]);
+
+    // --- Pillar Names Map ---
+    const pillarHeaders = dummyData[0].map(h => h.trim());
+    const pillarHeadersSP = strategicPillars[0].map(h => h.trim());
+    const pillarData = strategicPillars.slice(1);
+    const pillarNameMap = new Map<string, string>();
+    pillarData.forEach(row => {
+      const id = norm(row[colIdx(pillarHeadersSP, 'StrategicPillarID')]);
+      const name = trimText(row[colIdx(pillarHeadersSP, 'Strategic Pillar')]);
+      if (id && name) pillarNameMap.set(id, name);
+    });
+
+    // --- Strategic Goals Map ---
+    const goalHeaders = strategicGoals[0].map(h => h.trim());
+    const goalData = strategicGoals.slice(1);
+    const goalMap = new Map<string, any>();
+    goalData.forEach(row => {
+      const goalId = norm(row[colIdx(goalHeaders, 'StrategicGoalID')]);
+      if (!goalId) return;
+      goalMap.set(goalId, {
+        id: goalId,
+        text: trimText(row[colIdx(goalHeaders, 'Strategic Goal')]),
+        status: mapStatus(row[colIdx(goalHeaders, 'Status')]),
+        comments: trimText(row[colIdx(goalHeaders, 'Comments')]),
+        categoryId: norm(row[colIdx(goalHeaders, 'CategoryID')]),
+        strategicPillarId: norm(row[colIdx(goalHeaders, 'StrategicPillarID')])
+      });
+    });
+
+    // --- Category Map ---
+    const catHeaders = categoryStatus[0].map(h => h.trim());
+    const catData = categoryStatus.slice(1);
+    const catMap = new Map<string, any>();
+    catData.forEach(row => {
+      const catId = norm(row[colIdx(catHeaders, 'CategoryID')]);
+      if (!catId) return;
+      catMap.set(catId, {
+        id: catId,
+        name: trimText(row[colIdx(catHeaders, 'Category')]),
+        status: mapStatus(row[colIdx(catHeaders, 'Status')]),
+        comments: trimText(row[colIdx(catHeaders, 'Comments')]),
+        strategicPillarId: norm(row[colIdx(catHeaders, 'StrategicPillarID')])
+      });
+    });
+
+    // --- DummyData to build hierarchy ---
+    const dummyHeaders = dummyData[0].map(h => h.trim());
+    const dummyRows = dummyData.slice(1);
+    const pillarsMap = new Map<string, Pillar>();
+    const categoriesMap = new Map<string, Category>();
+    const goalsMap = new Map<string, StrategicGoal>();
+    const headers = dummyRows[0];
+    const dataRows = dummyRows.slice(1);
+    dataRows.forEach(row => {
+      const pillarId = norm(row[colIdx(dummyHeaders, 'StrategicPillarID')]);
+      const categoryId = norm(row[colIdx(dummyHeaders, 'CategoryID')]);
+      const goalId = norm(row[colIdx(dummyHeaders, 'StrategicGoalID')]);
+      const programId = norm(row[colIdx(dummyHeaders, 'StrategicProgramID')]);
+      const programText = trimText(row[colIdx(dummyHeaders, 'Strategic Program')]);
+      const q1Objective = trimText(row[colIdx(dummyHeaders, 'Q1 Objective')]);
+      const q2Objective = trimText(row[colIdx(dummyHeaders, 'Q2 Objective')]);
+      const q3Objective = trimText(row[colIdx(dummyHeaders, 'Q3 Objective')]);
+      const q4Objective = trimText(row[colIdx(dummyHeaders, 'Q4 Objective')]);
+      if (!pillarId || !categoryId || !goalId || !programId) return;
+
+      // --- Pillar ---
+      let pillar = pillarsMap.get(pillarId);
+      if (!pillar) {
+        const pillarName = pillarNameMap.get(pillarId);
+        pillar = {
+          id: pillarId,
+          name: trimText(pillarName) || `Pillar ${pillarId}`,
+          categories: []
+        };
+        pillarsMap.set(pillarId, pillar);
+      }
+
+      // --- Category ---
+      let category = categoriesMap.get(categoryId);
+      if (!category) {
+        const catInfo = catMap.get(categoryId) || {};
+        category = {
+          id: categoryId,
+          name: trimText(catInfo.name) || `Category ${categoryId}`,
+          status: catInfo.status,
+          comments: trimText(catInfo.comments),
+          goals: [],
+          strategicPillarId: pillarId
+        };
+        categoriesMap.set(categoryId, category);
+        pillar.categories.push(category);
+      }
+
+      // --- Goal ---
+      let goal = goalsMap.get(goalId);
+      if (!goal) {
+        const goalInfo = goalMap.get(goalId) || {};
+        goal = {
+          id: goalId,
+          text: trimText(goalInfo.text) || `Goal ${goalId}`,
+          status: goalInfo.status,
+          comments: trimText(goalInfo.comments),
+          programs: [],
+          categoryId: categoryId,
+          strategicPillarId: pillarId
+        };
+        goalsMap.set(goalId, goal);
+        category.goals.push(goal);
+      }
+
+      // --- Program ---
+      const program: StrategicProgram = {
+        id: programId,
+        text: programText || `Program ${programId}`,
+        strategicGoalId: goalId,
+        categoryId: categoryId,
+        strategicPillarId: pillarId,
+        q1Objective,
+        q2Objective,
+        q3Objective,
+        q4Objective,
+        q1Status: mapStatus(row[headers.indexOf('Q1 Status')]),
+        q2Status: mapStatus(row[headers.indexOf('Q2 Status')]),
+        q3Status: mapStatus(row[headers.indexOf('Q3 Status')]),
+        q4Status: mapStatus(row[headers.indexOf('Q4 Status')]),
+        q1Comments: trimText(row[headers.indexOf('Q1 Comments')]),
+        q2Comments: trimText(row[headers.indexOf('Q2 Comments')]),
+        q3Comments: trimText(row[headers.indexOf('Q3 Comments')]),
+        q4Comments: trimText(row[headers.indexOf('Q4 Comments')]),
+        ordLtSponsors: trimText(row[headers.indexOf('ORD LT Sponsor(s)')]),
+        sponsorsLeads: trimText(row[headers.indexOf('Sponsor(s)/Lead(s)')]),
+        reportingOwners: trimText(row[headers.indexOf('Reporting owner(s)')]),
+      };
+      if (!goal.programs) goal.programs = [];
+      goal.programs.push(program);
+    });
+
+    return {
+      pillars: Array.from(pillarsMap.values())
+    };
+  } catch (error) {
+    console.error('Error loading and merging CSV files:', error);
+    throw error;
   }
 }
 
