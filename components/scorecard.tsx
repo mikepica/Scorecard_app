@@ -237,6 +237,7 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
                       fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
                       newValue: newStatus,
                       type: 'program',
+                      quarter: selectedQuarter,
                     }),
                   })
                   if (!response.ok) throw new Error('Failed to update program status');
