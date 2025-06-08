@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       const [pillarId, categoryId, goalId, programId] = fieldPath
       idValue = programId
       updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
-        const textIdx = normalizedHeader.indexOf('StrategicProgram')
+        const textIdx = normalizedHeader.indexOf('Strategic Program')
         if (textIdx !== -1) row[textIdx] = newValue || ''
       }
     } else if (type === 'program-objective') {
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
       const [pillarId, categoryId, goalId] = fieldPath
       idValue = goalId
       updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
-        const textIdx = normalizedHeader.indexOf('StrategicGoal')
+        const textIdx = normalizedHeader.indexOf('Strategic Goal')
         if (textIdx !== -1) row[textIdx] = newValue || ''
       }
     } else {
