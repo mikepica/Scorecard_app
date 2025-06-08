@@ -12,10 +12,7 @@ export interface StrategicProgram {
   q2Status?: "exceeded" | "on-track" | "delayed" | "missed"
   q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
   q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q1Comments?: string
-  q2Comments?: string
-  q3Comments?: string
-  q4Comments?: string
+  progressUpdates?: string
   strategicGoalId: string
   categoryId: string
   strategicPillarId: string
@@ -35,10 +32,7 @@ export interface StrategicGoal {
   q2Status?: "exceeded" | "on-track" | "delayed" | "missed"
   q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
   q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q1Comments?: string
-  q2Comments?: string
-  q3Comments?: string
-  q4Comments?: string
+  progressUpdates?: string
   programs?: StrategicProgram[]
   status?: "exceeded" | "on-track" | "delayed" | "missed"
   comments?: string

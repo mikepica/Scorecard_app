@@ -523,13 +523,14 @@ export default function DetailsPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left w-1/5 text-base`}>
+              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left text-base`} style={{width: '12%'}}>
                 2024 proposed strategic programs
               </th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center w-1/5 text-base">Q1</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center w-1/5 text-base">Q2</th>
-              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center w-1/5 text-base">Q3</th>
-              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center w-1/5 text-base">Q4</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Progress Updates</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q1</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q2</th>
+              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q3</th>
+              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q4</th>
             </tr>
           </thead>
           <tbody>
@@ -540,10 +541,15 @@ export default function DetailsPage() {
                 }
                 return (
                   <tr key={program.id}>
-                    <td className="border border-gray-300 p-3">
+                    <td className="border border-gray-300 p-3" style={{width: '12%'}}>
                       <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative">
+                    <td className="border border-gray-300 p-3" style={{width: '17.6%'}}>
+                      <div className="text-base">
+                        {program.progressUpdates || ""}
+                      </div>
+                    </td>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
                       <div className="mb-2 text-base">
                         {program.q1Objective || ""}
                       </div>
@@ -554,7 +560,7 @@ export default function DetailsPage() {
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative">
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
                       <div className="mb-2 text-base">
                         {program.q2Objective || ""}
                       </div>
@@ -565,7 +571,7 @@ export default function DetailsPage() {
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative">
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
                       <div className="mb-2 text-base">
                         {program.q3Objective || ""}
                       </div>
@@ -576,7 +582,7 @@ export default function DetailsPage() {
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative">
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
                       <div className="mb-2 text-base">
                         {program.q4Objective || ""}
                       </div>
@@ -592,7 +598,7 @@ export default function DetailsPage() {
               })
             ) : (
               <tr>
-                <td colSpan={5} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
+                <td colSpan={6} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
                   No programs found with the current filter settings.
                 </td>
               </tr>

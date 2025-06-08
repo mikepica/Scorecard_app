@@ -146,10 +146,7 @@ export function transformSpreadsheetToScoreCardData(data: string[][]): ScoreCard
   const progQ2StatusIdx = mainHeader.indexOf('Q2 Status')
   const progQ3StatusIdx = mainHeader.indexOf('Q3 Status')
   const progQ4StatusIdx = mainHeader.indexOf('Q4 Status')
-  const progQ1CommentsIdx = mainHeader.indexOf('Q1 Comments')
-  const progQ2CommentsIdx = mainHeader.indexOf('Q2 Comments')
-  const progQ3CommentsIdx = mainHeader.indexOf('Q3 Comments')
-  const progQ4CommentsIdx = mainHeader.indexOf('Q4 Comments')
+  const progProgressUpdatesIdx = mainHeader.indexOf('Progress Updates')
 
   let debugCount = 0;
   dataRows.forEach((row) => {
@@ -187,10 +184,7 @@ export function transformSpreadsheetToScoreCardData(data: string[][]): ScoreCard
       q2Status: mapStatus(rowData["Q2 Status"]),
       q3Status: mapStatus(rowData["Q3 Status"]),
       q4Status: mapStatus(rowData["Q4 Status"]),
-      q1Comments: rowData["Q1 Comments"] || undefined,
-      q2Comments: rowData["Q2 Comments"] || undefined,
-      q3Comments: rowData["Q3 Comments"] || undefined,
-      q4Comments: rowData["Q4 Comments"] || undefined,
+      progressUpdates: rowData["Progress Updates"] || undefined,
       ordLtSponsors: rowData["ORD LT Sponsor(s)"] || undefined,
       sponsorsLeads: rowData["Sponsor(s)/Lead(s)"] || undefined,
       reportingOwners: rowData["Reporting owner(s)"] || undefined,
@@ -391,10 +385,7 @@ export async function loadAndMergeScorecardXLSXs(): Promise<ScoreCardData> {
         q2Status: mapStatus(row[dummyHeaders.indexOf('Q2 Status')]),
         q3Status: mapStatus(row[dummyHeaders.indexOf('Q3 Status')]),
         q4Status: mapStatus(row[dummyHeaders.indexOf('Q4 Status')]),
-        q1Comments: trimText(row[dummyHeaders.indexOf('Q1 Comments')]),
-        q2Comments: trimText(row[dummyHeaders.indexOf('Q2 Comments')]),
-        q3Comments: trimText(row[dummyHeaders.indexOf('Q3 Comments')]),
-        q4Comments: trimText(row[dummyHeaders.indexOf('Q4 Comments')]),
+        progressUpdates: trimText(row[dummyHeaders.indexOf('Progress Updates')]),
         ordLtSponsors: trimText(row[dummyHeaders.indexOf('ORD LT Sponsor(s)')]),
         sponsorsLeads: trimText(row[dummyHeaders.indexOf('Sponsor(s)/Lead(s)')]),
         reportingOwners: trimText(row[dummyHeaders.indexOf('Reporting owner(s)')]),
