@@ -545,7 +545,7 @@ export default function DetailsPage() {
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative">
                       <div className="mb-2 text-base">
-                        {program.q1Objective || "On target against year-to-date number"}
+                        {program.q1Objective || ""}
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
@@ -556,7 +556,7 @@ export default function DetailsPage() {
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative">
                       <div className="mb-2 text-base">
-                        {program.q2Objective || "On target against year-to-date number"}
+                        {program.q2Objective || ""}
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
@@ -567,7 +567,7 @@ export default function DetailsPage() {
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative">
                       <div className="mb-2 text-base">
-                        {program.q3Objective || "On target against year-to-date number"}
+                        {program.q3Objective || ""}
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
@@ -578,7 +578,7 @@ export default function DetailsPage() {
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative">
                       <div className="mb-2 text-base">
-                        {program.q4Objective || "On target against year-to-date number"}
+                        {program.q4Objective || ""}
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
