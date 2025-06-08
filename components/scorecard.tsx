@@ -93,6 +93,7 @@ function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar;
 function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
   // Handler for category status update
   const handleCategoryStatusChange = async (newStatus: string | undefined) => {
+    console.log('DEBUG: Category status update - pillar.id:', pillar.id, 'category.id:', category.id, 'newStatus:', newStatus);
     const response = await fetch('/api/scorecard/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,7 +103,11 @@ function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { 
         type: 'category',
       }),
     })
-    if (!response.ok) throw new Error('Failed to update category status');
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.log('DEBUG: Category update failed:', errorData);
+      throw new Error('Failed to update category status');
+    }
     const updatedData = await response.json();
     onDataUpdate(updatedData);
   }

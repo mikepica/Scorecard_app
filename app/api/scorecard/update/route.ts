@@ -91,11 +91,12 @@ export async function POST(request: Request) {
     if (idIdx === -1) {
       return NextResponse.json({ error: `${idColumn} column not found`, header: normalizedHeader }, { status: 404 })
     }
-    // Find the row by ID
+    // Find the row by ID (case-insensitive comparison)
     const allIds = rows.slice(1).map(row => row[idIdx])
-    const rowIdx = rows.findIndex((row, idx) => idx !== 0 && row[idIdx]?.trim() === idValue.trim())
+    const rowIdx = rows.findIndex((row, idx) => idx !== 0 && row[idIdx]?.trim().toLowerCase() === idValue.trim().toLowerCase())
     if (rowIdx === -1) {
-      return NextResponse.json({ error: `${type} not found`, allIds, idValue }, { status: 404 })
+      console.log(`DEBUG: ${type} not found. Looking for idValue: "${idValue}", available IDs:`, allIds, 'idColumn:', idColumn, 'csvPath:', csvPath)
+      return NextResponse.json({ error: `${type} not found`, allIds, idValue, idColumn, csvPath }, { status: 404 })
     }
     // Update the status
     updateRowFn(rows[rowIdx], header, normalizedHeader)
