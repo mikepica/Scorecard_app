@@ -22,7 +22,12 @@ export function EditableField({
   const [isEditing, setIsEditing] = useState(false)
   const [editValue, setEditValue] = useState(value)
   const [isSaving, setIsSaving] = useState(false)
+  const [previousValue, setPreviousValue] = useState(value)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setEditValue(value)
+  }, [value])
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -44,10 +49,22 @@ export function EditableField({
 
     setIsSaving(true)
     try {
+      setPreviousValue(value) // Store the previous value before saving
       await onSave(editValue)
       setIsEditing(false)
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleUndo = async () => {
+    if (previousValue !== value) {
+      setIsSaving(true)
+      try {
+        await onSave(previousValue)
+      } finally {
+        setIsSaving(false)
+      }
     }
   }
 
@@ -58,6 +75,9 @@ export function EditableField({
     } else if (e.key === "Escape") {
       setIsEditing(false)
       setEditValue(value)
+    } else if (e.key === "z" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault()
+      handleUndo()
     }
   }
 
@@ -80,14 +100,26 @@ export function EditableField({
   }
 
   return (
-    <div
-      ref={containerRef}
-      className={cn(
-        "cursor-pointer hover:bg-gray-50 rounded px-2 py-1",
-        className
+    <div className="flex items-center gap-2">
+      <div
+        ref={containerRef}
+        className={cn(
+          "cursor-pointer hover:bg-gray-50 rounded px-2 py-1 flex-1",
+          className
+        )}
+      >
+        {value || placeholder}
+      </div>
+      {previousValue !== value && (
+        <button
+          onClick={handleUndo}
+          disabled={isSaving}
+          className="text-xs text-blue-600 hover:text-blue-800 px-1 py-0.5 rounded border border-blue-300 hover:border-blue-500 disabled:opacity-50"
+          title="Undo last change (Ctrl+Z)"
+        >
+          ↶
+        </button>
       )}
-    >
-      {value || placeholder}
     </div>
   )
 } 

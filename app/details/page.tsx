@@ -9,6 +9,7 @@ import { BarChart2, Menu, Camera } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
+import { EditableField } from "@/components/ui/editable-field"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -431,6 +432,95 @@ export default function DetailsPage() {
     }
   }
 
+  // Handle program text update
+  const handleProgramTextUpdate = async (programId: string, newText: string) => {
+    try {
+      // Find the program to get its full path
+      const program = filteredPrograms.find(p => p.id === programId)
+      if (!program) {
+        throw new Error('Program not found')
+      }
+      
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, programId],
+          newValue: newText,
+          type: 'program-text',
+        }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update program text')
+      }
+      const updatedData = await response.json()
+      setData(updatedData)
+      setToast({ message: 'Program text updated successfully', type: 'success' })
+    } catch (error) {
+      console.error('Error updating program text:', error)
+      setToast({ message: 'Failed to update program text', type: 'error' })
+    }
+  }
+
+  // Handle progress update
+  const handleProgressUpdate = async (programId: string, newProgress: string) => {
+    try {
+      const program = filteredPrograms.find(p => p.id === programId)
+      if (!program) {
+        throw new Error('Program not found')
+      }
+      
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, programId],
+          newValue: newProgress,
+          type: 'program-progress',
+        }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update progress')
+      }
+      const updatedData = await response.json()
+      setData(updatedData)
+      setToast({ message: 'Progress updated successfully', type: 'success' })
+    } catch (error) {
+      console.error('Error updating progress:', error)
+      setToast({ message: 'Failed to update progress', type: 'error' })
+    }
+  }
+
+  // Handle quarterly objective update
+  const handleObjectiveUpdate = async (programId: string, quarter: string, newObjective: string) => {
+    try {
+      const program = filteredPrograms.find(p => p.id === programId)
+      if (!program) {
+        throw new Error('Program not found')
+      }
+      
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, programId],
+          newValue: newObjective,
+          type: 'program-objective',
+          quarter,
+        }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update objective')
+      }
+      const updatedData = await response.json()
+      setData(updatedData)
+      setToast({ message: 'Objective updated successfully', type: 'success' })
+    } catch (error) {
+      console.error('Error updating objective:', error)
+      setToast({ message: 'Failed to update objective', type: 'error' })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -542,16 +632,28 @@ export default function DetailsPage() {
                 return (
                   <tr key={program.id}>
                     <td className="border border-gray-300 p-3" style={{width: '12%'}}>
-                      <div className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}>{program.text}</div>
+                      <EditableField
+                        value={program.text}
+                        onSave={(newText) => handleProgramTextUpdate(program.id, newText)}
+                        className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}
+                      />
                     </td>
                     <td className="border border-gray-300 p-3" style={{width: '17.6%'}}>
-                      <div className="text-base">
-                        {program.progressUpdates || ""}
-                      </div>
+                      <EditableField
+                        value={program.progressUpdates || ""}
+                        onSave={(newProgress) => handleProgressUpdate(program.id, newProgress)}
+                        className="text-base"
+                        placeholder="Enter progress updates..."
+                      />
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
-                      <div className="mb-2 text-base">
-                        {program.q1Objective || ""}
+                      <div className="mb-2">
+                        <EditableField
+                          value={program.q1Objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q1", newObjective)}
+                          className="text-base"
+                          placeholder="Enter Q1 objective..."
+                        />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
@@ -561,8 +663,13 @@ export default function DetailsPage() {
                       </div>
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
-                      <div className="mb-2 text-base">
-                        {program.q2Objective || ""}
+                      <div className="mb-2">
+                        <EditableField
+                          value={program.q2Objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q2", newObjective)}
+                          className="text-base"
+                          placeholder="Enter Q2 objective..."
+                        />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
@@ -572,8 +679,13 @@ export default function DetailsPage() {
                       </div>
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
-                      <div className="mb-2 text-base">
-                        {program.q3Objective || ""}
+                      <div className="mb-2">
+                        <EditableField
+                          value={program.q3Objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q3", newObjective)}
+                          className="text-base"
+                          placeholder="Enter Q3 objective..."
+                        />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
@@ -583,8 +695,13 @@ export default function DetailsPage() {
                       </div>
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
-                      <div className="mb-2 text-base">
-                        {program.q4Objective || ""}
+                      <div className="mb-2">
+                        <EditableField
+                          value={program.q4Objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q4", newObjective)}
+                          className="text-base"
+                          placeholder="Enter Q4 objective..."
+                        />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle

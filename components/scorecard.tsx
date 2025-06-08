@@ -111,10 +111,31 @@ function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { 
     const updatedData = await response.json();
     onDataUpdate(updatedData);
   }
+
+  // Handler for category name update
+  const handleCategoryNameSave = async (newName: string) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id],
+        newValue: newName,
+        type: 'category-name',
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update category name');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+  }
+
   return (
     <div className="mb-4 last:mb-0">
       <div className="flex items-center mb-2 gap-2">
-        <h3 className={`text-base font-medium ${getCategoryColor(pillar.name)}`}>{category.name}</h3>
+        <EditableField
+          value={category.name}
+          onSave={handleCategoryNameSave}
+          className={`text-base font-medium ${getCategoryColor(pillar.name)}`}
+        />
         <StatusCircle
           status={category.status}
           onStatusChange={handleCategoryStatusChange}
@@ -152,22 +173,34 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
     onDataUpdate(updatedData);
   }
 
-  const { handleSave } = useEditableField({
-    fieldPath: [pillar.id, category.id, goal.id, "", "Strategic Goal"],
-    onDataUpdate,
-  })
-
-  // Local handler for program editing
-  const handleProgramSave = async (programText: string, newValue: string) => {
+  // Handler for goal text update
+  const handleGoalTextSave = async (newText: string) => {
     const response = await fetch('/api/scorecard/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        fieldPath: [pillar.id, category.id, goal.id, programText, "Strategic Program"],
-        newValue,
+        fieldPath: [pillar.id, category.id, goal.id],
+        newValue: newText,
+        type: 'goal-text',
       }),
     })
-    if (!response.ok) throw new Error('Failed to update field');
+    if (!response.ok) throw new Error('Failed to update goal text');
+    const updatedData = await response.json();
+    onDataUpdate(updatedData);
+  }
+
+  // Local handler for program text editing
+  const handleProgramTextSave = async (programId: string, newValue: string) => {
+    const response = await fetch('/api/scorecard/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fieldPath: [pillar.id, category.id, goal.id, programId],
+        newValue,
+        type: 'program-text',
+      }),
+    })
+    if (!response.ok) throw new Error('Failed to update program text');
     const updatedData = await response.json();
     onDataUpdate(updatedData);
   }
@@ -213,7 +246,7 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
           )}
           <EditableField
             value={goal.text}
-            onSave={handleSave}
+            onSave={handleGoalTextSave}
             className="text-base"
           />
         </div>
@@ -229,7 +262,7 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
             <li key={program.id} className="flex items-start justify-between gap-2">
               <EditableField
                 value={program.text}
-                onSave={async (newValue) => handleProgramSave(program.text, newValue)}
+                onSave={async (newValue) => handleProgramTextSave(program.id, newValue)}
                 className="text-sm"
               />
               <StatusCircle

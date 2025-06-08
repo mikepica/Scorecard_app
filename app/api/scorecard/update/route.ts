@@ -17,12 +17,19 @@ function parseXLSXSync(buffer: Buffer): string[][] {
 
 export async function POST(request: Request) {
   try {
-    const { fieldPath, newValue, type, quarter }: { fieldPath: string[], newValue: string, type: string, quarter?: 'q1' | 'q2' | 'q3' | 'q4' } = await request.json()
-    // type: 'program' | 'category' | 'goal'
+    const { fieldPath, newValue, type, quarter, field }: { 
+      fieldPath: string[], 
+      newValue: string, 
+      type: string, 
+      quarter?: 'q1' | 'q2' | 'q3' | 'q4',
+      field?: string 
+    } = await request.json()
+    // type: 'program' | 'category' | 'goal' | 'program-text' | 'program-objective' | 'program-progress' | 'goal-text' | 'category-name'
     // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
 
     let xlsxPath: string, idColumn: string, statusColumn: string, idValue: string, isProgram = false
     let updateRowFn: (row: string[], header: string[], normalizedHeader: string[]) => void
+    
     if (type === 'program') {
       // Program status update (DummyData.xlsx)
       xlsxPath = path.join(process.cwd(), 'data', 'DummyData.xlsx')
@@ -42,6 +49,43 @@ export async function POST(request: Request) {
         const statusIdx = normalizedHeader.indexOf(statusColumn)
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
+    } else if (type === 'program-text') {
+      // Program text update (DummyData.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'DummyData.xlsx')
+      idColumn = 'StrategicProgramID'
+      const [pillarId, categoryId, goalId, programId] = fieldPath
+      idValue = programId
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const textIdx = normalizedHeader.indexOf('StrategicProgram')
+        if (textIdx !== -1) row[textIdx] = newValue || ''
+      }
+    } else if (type === 'program-objective') {
+      // Program quarterly objective update (DummyData.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'DummyData.xlsx')
+      idColumn = 'StrategicProgramID'
+      const [pillarId, categoryId, goalId, programId] = fieldPath
+      idValue = programId
+      const quarterToObjectiveColumn = {
+        q1: 'Q1 Objective',
+        q2: 'Q2 Objective',
+        q3: 'Q3 Objective',
+        q4: 'Q4 Objective',
+      }
+      const objectiveColumn = quarter && quarterToObjectiveColumn[quarter] ? quarterToObjectiveColumn[quarter] : 'Q4 Objective'
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const objIdx = normalizedHeader.indexOf(objectiveColumn)
+        if (objIdx !== -1) row[objIdx] = newValue || ''
+      }
+    } else if (type === 'program-progress') {
+      // Program progress updates (DummyData.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'DummyData.xlsx')
+      idColumn = 'StrategicProgramID'
+      const [pillarId, categoryId, goalId, programId] = fieldPath
+      idValue = programId
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const progressIdx = normalizedHeader.indexOf('Progress Updates')
+        if (progressIdx !== -1) row[progressIdx] = newValue || ''
+      }
     } else if (type === 'category') {
       // Category status update (Category-status-comments.xlsx)
       xlsxPath = path.join(process.cwd(), 'data', 'Category-status-comments.xlsx')
@@ -53,6 +97,16 @@ export async function POST(request: Request) {
         const statusIdx = normalizedHeader.indexOf(statusColumn)
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
+    } else if (type === 'category-name') {
+      // Category name update (Category-status-comments.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'Category-status-comments.xlsx')
+      idColumn = 'CategoryID'
+      const [pillarId, categoryId] = fieldPath
+      idValue = categoryId
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const nameIdx = normalizedHeader.indexOf('Category')
+        if (nameIdx !== -1) row[nameIdx] = newValue || ''
+      }
     } else if (type === 'goal') {
       // Goal status update (Strategic-Goals.xlsx)
       xlsxPath = path.join(process.cwd(), 'data', 'Strategic-Goals.xlsx')
@@ -63,6 +117,16 @@ export async function POST(request: Request) {
       updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
         const statusIdx = normalizedHeader.indexOf(statusColumn)
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
+      }
+    } else if (type === 'goal-text') {
+      // Goal text update (Strategic-Goals.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'Strategic-Goals.xlsx')
+      idColumn = 'StrategicGoalID'
+      const [pillarId, categoryId, goalId] = fieldPath
+      idValue = goalId
+      updateRowFn = (row: string[], header: string[], normalizedHeader: string[]) => {
+        const textIdx = normalizedHeader.indexOf('StrategicGoal')
+        if (textIdx !== -1) row[textIdx] = newValue || ''
       }
     } else {
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
