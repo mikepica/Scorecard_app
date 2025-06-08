@@ -1,3 +1,3 @@
 export const config = {
-  csvFilePath: process.env.CSV_FILE_PATH || 'data/DummyData.csv'
+  xlsxFilePath: process.env.XLSX_FILE_PATH || 'data/DummyData.xlsx'
 } 

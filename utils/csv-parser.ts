@@ -1,6 +1,7 @@
 import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard";
 import { promises as fs } from 'fs';
 import path from 'path';
+import * as XLSX from 'xlsx';
 
 // Helper function to map status values
 function mapStatus(status: string | null | undefined): "exceeded" | "on-track" | "delayed" | "missed" | undefined {
@@ -36,15 +37,27 @@ function colIdx(headers: string[], col: string): number {
   return idx;
 }
 
-// Function to parse CSV data from file
-export async function parseCSV(filePath: string): Promise<string[][]> {
+// Function to parse XLSX data from file
+export async function parseXLSX(filePath: string): Promise<string[][]> {
   const fullPath = path.join(process.cwd(), filePath)
-  const csvText = await fs.readFile(fullPath, 'utf-8')
-  return parseCSVString(csvText)
+  const buffer = await fs.readFile(fullPath)
+  const workbook = XLSX.read(buffer, { type: 'buffer' })
+  const sheetName = workbook.SheetNames[0]
+  const worksheet = workbook.Sheets[sheetName]
+  return XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false })
 }
 
-// Helper: parse CSV string to array
+// Helper: parse XLSX string to array (for backwards compatibility)
+export function parseXLSXString(xlsxBuffer: Buffer): string[][] {
+  const workbook = XLSX.read(xlsxBuffer, { type: 'buffer' })
+  const sheetName = workbook.SheetNames[0]
+  const worksheet = workbook.Sheets[sheetName]
+  return XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false })
+}
+
+// Legacy function name for backwards compatibility
 export function parseCSVString(csvText: string): string[][] {
+  // This function is kept for backwards compatibility in case it's used elsewhere
   const rows = csvText.split('\n')
   return rows.map((row) => {
     const values: string[] = []
@@ -66,25 +79,25 @@ export function parseCSVString(csvText: string): string[][] {
   })
 }
 
-// Function to transform CSV data to ScoreCardData
-export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData {
-  const headers = csvData[0]
-  const dataRows = csvData.slice(1).filter((row) => row.length > 1) // Skip empty rows
+// Function to transform spreadsheet data to ScoreCardData
+export function transformSpreadsheetToScoreCardData(data: string[][]): ScoreCardData {
+  const headers = data[0]
+  const dataRows = data.slice(1).filter((row) => row.length > 1) // Skip empty rows
 
   const pillarsMap = new Map<string, Pillar>()
   const categoriesMap = new Map<string, Category>()
   const goalsMap = new Map<string, StrategicGoal>()
 
   // Build lookup maps for category and goal by ID
-  const catHeader = csvData[1]
+  const catHeader = data[1]
   const catIdIdx = catHeader.indexOf('CategoryID')
   const catPillarIdIdx = catHeader.indexOf('StrategicPillarID')
   const catNameIdx = catHeader.indexOf('Category')
   const catStatusIdx = catHeader.indexOf('Status')
   const catCommentsIdx = catHeader.indexOf('Comments')
   const catMap = new Map<string, { id?: string, pillarId?: string, status?: string, comments?: string, name?: string }>()
-  for (let i = 1; i < csvData[1].length; i++) {
-    const row = csvData[1][i]
+  for (let i = 1; i < data[1].length; i++) {
+    const row = data[1][i]
     if (!row[catIdIdx]) continue
     catMap.set(row[catNameIdx], {
       id: row[catIdIdx],
@@ -95,7 +108,7 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
     })
   }
 
-  const goalHeader = csvData[2]
+  const goalHeader = data[2]
   const goalIdIdx = goalHeader.indexOf('StrategicGoalID')
   const goalCatIdIdx = goalHeader.indexOf('CategoryID')
   const goalPillarIdIdx = goalHeader.indexOf('StrategicPillarID')
@@ -103,8 +116,8 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
   const goalStatusIdx = goalHeader.indexOf('Status')
   const goalCommentsIdx = goalHeader.indexOf('Comments')
   const goalMap = new Map<string, { id?: string, catId?: string, pillarId?: string, status?: string, comments?: string }>()
-  for (let i = 1; i < csvData[2].length; i++) {
-    const row = csvData[2][i]
+  for (let i = 1; i < data[2].length; i++) {
+    const row = data[2][i]
     if (!row[goalIdIdx]) continue
     goalMap.set(row[goalNameIdx], {
       id: row[goalIdIdx],
@@ -243,15 +256,15 @@ export function transformCSVToScoreCardData(csvData: string[][]): ScoreCardData 
   }
 }
 
-// Function to load and merge data from all CSV files
-export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
-  console.log('CSV PARSER: loadAndMergeScorecardCSVs called');
+// Function to load and merge data from all XLSX files
+export async function loadAndMergeScorecardXLSXs(): Promise<ScoreCardData> {
+  console.log('XLSX PARSER: loadAndMergeScorecardXLSXs called');
   try {
     const [dummyData, strategicGoals, categoryStatus, strategicPillars] = await Promise.all([
-      parseCSV('data/DummyData.csv'),
-      parseCSV('data/Strategic-Goals.csv'),
-      parseCSV('data/Category-status-comments.csv'),
-      parseCSV('data/StrategicPillars.csv')
+      parseXLSX('data/DummyData.xlsx'),
+      parseXLSX('data/Strategic-Goals.xlsx'),
+      parseXLSX('data/Category-status-comments.xlsx'),
+      parseXLSX('data/StrategicPillars.xlsx')
     ]);
 
     // --- Pillar Names Map ---
@@ -394,7 +407,22 @@ export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
       pillars: Array.from(pillarsMap.values())
     };
   } catch (error) {
-    console.error('Error loading and merging CSV files:', error);
+    console.error('Error loading and merging XLSX files:', error);
     throw error;
   }
+}
+
+// Legacy function for backwards compatibility
+export async function loadAndMergeScorecardCSVs(): Promise<ScoreCardData> {
+  return loadAndMergeScorecardXLSXs();
+}
+
+// Legacy function for backwards compatibility
+export function transformCSVToScoreCardData(data: string[][]): ScoreCardData {
+  return transformSpreadsheetToScoreCardData(data);
+}
+
+// Legacy function for backwards compatibility
+export async function parseCSV(filePath: string): Promise<string[][]> {
+  return parseXLSX(filePath.replace('.csv', '.xlsx'));
 }

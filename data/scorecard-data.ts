@@ -1,5 +1,5 @@
 import type { ScoreCardData } from "@/types/scorecard"
-import { parseCSV, transformCSVToScoreCardData } from "@/utils/csv-parser"
+import { parseXLSX, transformSpreadsheetToScoreCardData } from "@/utils/csv-parser"
 
 // Default data as fallback
 const defaultData: ScoreCardData = {

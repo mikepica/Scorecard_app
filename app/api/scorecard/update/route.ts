@@ -1,32 +1,18 @@
 import { NextResponse } from "next/server"
 import { promises as fs } from "fs"
 import path from "path"
-import { transformCSVToScoreCardData, loadAndMergeScorecardCSVs, parseCSVString } from "@/utils/csv-parser"
+import { transformSpreadsheetToScoreCardData, loadAndMergeScorecardXLSXs, parseXLSXString } from "@/utils/csv-parser"
+import * as XLSX from 'xlsx'
 
 // For best practice, consider using an environment variable for this path in production
-const CSV_FILE_PATH = path.join(process.cwd(), "data", "DummyData.csv")
+const XLSX_FILE_PATH = path.join(process.cwd(), "data", "DummyData.xlsx")
 
-// Synchronous CSV parser for local string content (handles quoted fields)
-function parseCSVSync(csvText: string): string[][] {
-  const rows = csvText.split("\n")
-  return rows.map((row) => {
-    const values: string[] = []
-    let inQuotes = false
-    let currentValue = ""
-    for (let i = 0; i < row.length; i++) {
-      const char = row[i]
-      if (char === '"') {
-        inQuotes = !inQuotes
-      } else if (char === "," && !inQuotes) {
-        values.push(currentValue)
-        currentValue = ""
-      } else {
-        currentValue += char
-      }
-    }
-    values.push(currentValue)
-    return values
-  })
+// Synchronous XLSX parser for local buffer content
+function parseXLSXSync(buffer: Buffer): string[][] {
+  const workbook = XLSX.read(buffer, { type: 'buffer' })
+  const sheetName = workbook.SheetNames[0]
+  const worksheet = workbook.Sheets[sheetName]
+  return XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false })
 }
 
 export async function POST(request: Request) {
@@ -35,11 +21,11 @@ export async function POST(request: Request) {
     // type: 'program' | 'category' | 'goal'
     // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
 
-    let csvPath: string, idColumn: string, statusColumn: string, idValue: string, isProgram = false
+    let xlsxPath: string, idColumn: string, statusColumn: string, idValue: string, isProgram = false
     let updateRowFn: (row: string[], header: string[], normalizedHeader: string[]) => void
     if (type === 'program') {
-      // Program status update (DummyData.csv)
-      csvPath = path.join(process.cwd(), 'data', 'DummyData.csv')
+      // Program status update (DummyData.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'DummyData.xlsx')
       idColumn = 'StrategicProgramID'
       isProgram = true
       const [pillarId, categoryId, goalId, programId] = fieldPath
@@ -57,8 +43,8 @@ export async function POST(request: Request) {
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
     } else if (type === 'category') {
-      // Category status update (Category-status-comments.csv)
-      csvPath = path.join(process.cwd(), 'data', 'Category-status-comments.csv')
+      // Category status update (Category-status-comments.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'Category-status-comments.xlsx')
       idColumn = 'CategoryID'
       const [pillarId, categoryId] = fieldPath
       idValue = categoryId
@@ -68,8 +54,8 @@ export async function POST(request: Request) {
         if (statusIdx !== -1) row[statusIdx] = newValue || ''
       }
     } else if (type === 'goal') {
-      // Goal status update (Strategic-Goals.csv)
-      csvPath = path.join(process.cwd(), 'data', 'Strategic-Goals.csv')
+      // Goal status update (Strategic-Goals.xlsx)
+      xlsxPath = path.join(process.cwd(), 'data', 'Strategic-Goals.xlsx')
       idColumn = 'StrategicGoalID'
       const [pillarId, categoryId, goalId] = fieldPath
       idValue = goalId
@@ -82,9 +68,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
     }
 
-    // Read and parse the CSV
-    const csvContent = await fs.readFile(csvPath, 'utf-8')
-    const rows = parseCSVString(csvContent)
+    // Read and parse the XLSX
+    const xlsxBuffer = await fs.readFile(xlsxPath)
+    const rows = parseXLSXSync(xlsxBuffer)
     const header = rows[0]
     const normalizedHeader = header.map(h => h.replace(/^\uFEFF/, '').replace(/\r/g, '').trim())
     const idIdx = normalizedHeader.indexOf(idColumn)
@@ -95,21 +81,24 @@ export async function POST(request: Request) {
     const allIds = rows.slice(1).map(row => row[idIdx])
     const rowIdx = rows.findIndex((row, idx) => idx !== 0 && row[idIdx]?.trim().toLowerCase() === idValue.trim().toLowerCase())
     if (rowIdx === -1) {
-      console.log(`DEBUG: ${type} not found. Looking for idValue: "${idValue}", available IDs:`, allIds, 'idColumn:', idColumn, 'csvPath:', csvPath)
-      return NextResponse.json({ error: `${type} not found`, allIds, idValue, idColumn, csvPath }, { status: 404 })
+      console.log(`DEBUG: ${type} not found. Looking for idValue: "${idValue}", available IDs:`, allIds, 'idColumn:', idColumn, 'xlsxPath:', xlsxPath)
+      return NextResponse.json({ error: `${type} not found`, allIds, idValue, idColumn, xlsxPath }, { status: 404 })
     }
     // Update the status
     updateRowFn(rows[rowIdx], header, normalizedHeader)
-    // Write back to CSV
-    const newCsvContent = rows.map(row => row.join(",")).join("\n")
+    // Write back to XLSX
+    const worksheet = XLSX.utils.aoa_to_sheet(rows)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Sheet1')
+    const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' })
     try {
-      await fs.writeFile(csvPath, newCsvContent)
+      await fs.writeFile(xlsxPath, buffer)
     } catch (writeError) {
-      return NextResponse.json({ error: 'Failed to write CSV file' }, { status: 500 })
+      return NextResponse.json({ error: 'Failed to write XLSX file' }, { status: 500 })
     }
 
     // Return the updated merged hierarchy
-    const mergedData = await loadAndMergeScorecardCSVs()
+    const mergedData = await loadAndMergeScorecardXLSXs()
     return NextResponse.json(mergedData)
   } catch (error) {
     return NextResponse.json({ error: "Failed to update status" }, { status: 500 })
