@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { Scorecard } from "@/components/scorecard"
 import { scorecardData, loadScorecardData } from "@/data/scorecard-data"
 import type { ScoreCardData } from "@/types/scorecard"
-import { Camera, BarChart2, Menu } from "lucide-react"
+import { Camera, BarChart2, Menu, FileText } from "lucide-react"
 import Link from "next/link"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
@@ -116,6 +116,14 @@ export default function Home() {
             <Camera size={20} />
             <span className="whitespace-nowrap">Capture Screen</span>
           </button>
+
+          <Link
+            href="/instructions"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+          >
+            <FileText size={20} />
+            <span className="whitespace-nowrap">Instructions</span>
+          </Link>
 
           <Link
             href="/details"

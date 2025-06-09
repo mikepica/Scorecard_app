@@ -5,7 +5,7 @@ import Link from "next/link"
 import { scorecardData, loadScorecardData } from "@/data/scorecard-data"
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera, Bot } from "lucide-react"
+import { BarChart2, Menu, Camera, Bot, FileText } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -581,6 +581,14 @@ export default function DetailsPage() {
             <Camera size={16} />
             <span>Capture Screen</span>
           </button>
+
+          <Link
+            href="/instructions"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+          >
+            <FileText size={16} />
+            <span>Instructions</span>
+          </Link>
 
           <Link
             href="/"
