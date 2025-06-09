@@ -11,6 +11,7 @@ import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData }
 import { Toast } from "@/components/toast"
 import { EditableField } from "@/components/ui/editable-field"
 import { GenerateUpdateModal } from "@/components/generate-update-modal"
+import { GenerateInsightsModal } from "@/components/generate-insights-modal"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -46,6 +47,10 @@ export default function DetailsPage() {
   // State for Generate Update modal
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
   const [currentProgram, setCurrentProgram] = useState<StrategicProgram | null>(null)
+
+  // State for Generate Insights modal
+  const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false)
+  const [currentInsightsProgram, setCurrentInsightsProgram] = useState<StrategicProgram | null>(null)
 
   // State for selected filters - default to "all"
   const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
@@ -539,6 +544,19 @@ export default function DetailsPage() {
     setToast({ message: 'Generate Update functionality will be implemented later', type: 'info' })
   }
 
+  // Handle opening the Generate Insights modal
+  const handleOpenInsightsModal = (program: StrategicProgram) => {
+    setCurrentInsightsProgram(program)
+    setIsInsightsModalOpen(true)
+  }
+
+  // Handle Generate Insights action (placeholder for now)
+  const handleGenerateInsights = (prompt: string, promptFlow: string, files: File[]) => {
+    // TODO: Implement actual insights generation logic
+    console.log('Generate insights called with:', { prompt, promptFlow, files })
+    setToast({ message: 'Generate Insights functionality will be implemented later', type: 'info' })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -649,12 +667,19 @@ export default function DetailsPage() {
                 }
                 return (
                   <tr key={program.id}>
-                    <td className="border border-gray-300 p-3" style={{width: '12%'}}>
+                    <td className="border border-gray-300 p-3 relative" style={{width: '12%'}}>
                       <EditableField
                         value={program.text}
                         onSave={(newText) => handleProgramTextUpdate(program.id, newText)}
-                        className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}
+                        className={`${getPillarTextColor(program.pillarName)} font-medium text-base pr-8`}
                       />
+                      <button
+                        onClick={() => handleOpenInsightsModal(program)}
+                        className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group"
+                        title="Generate Insights"
+                      >
+                        <Bot className="h-4 w-4 text-gray-500 group-hover:text-purple-600" />
+                      </button>
                     </td>
                     <td className="border border-gray-300 p-3 relative" style={{width: '17.6%'}}>
                       <EditableField
@@ -759,6 +784,18 @@ export default function DetailsPage() {
           }}
           initialContent={currentProgram.progressUpdates || ""}
           onGenerate={handleGenerateUpdate}
+        />
+      )}
+
+      {/* Generate Insights Modal */}
+      {currentInsightsProgram && (
+        <GenerateInsightsModal
+          isOpen={isInsightsModalOpen}
+          onClose={() => {
+            setIsInsightsModalOpen(false)
+            setCurrentInsightsProgram(null)
+          }}
+          onGenerate={handleGenerateInsights}
         />
       )}
       
