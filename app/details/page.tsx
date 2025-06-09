@@ -5,11 +5,12 @@ import Link from "next/link"
 import { scorecardData, loadScorecardData } from "@/data/scorecard-data"
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera } from "lucide-react"
+import { BarChart2, Menu, Camera, Bot } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
 import { EditableField } from "@/components/ui/editable-field"
+import { GenerateUpdateModal } from "@/components/generate-update-modal"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -41,6 +42,10 @@ export default function DetailsPage() {
 
   // State for toast notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
+
+  // State for Generate Update modal
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
+  const [currentProgram, setCurrentProgram] = useState<StrategicProgram | null>(null)
 
   // State for selected filters - default to "all"
   const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
@@ -521,6 +526,19 @@ export default function DetailsPage() {
     }
   }
 
+  // Handle opening the Generate Update modal
+  const handleOpenGenerateModal = (program: StrategicProgram) => {
+    setCurrentProgram(program)
+    setIsGenerateModalOpen(true)
+  }
+
+  // Handle Generate Update action (placeholder for now)
+  const handleGenerateUpdate = (content: string, instructions: string, files: File[]) => {
+    // TODO: Implement actual generation logic
+    console.log('Generate update called with:', { content, instructions, files })
+    setToast({ message: 'Generate Update functionality will be implemented later', type: 'info' })
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -638,13 +656,20 @@ export default function DetailsPage() {
                         className={`${getPillarTextColor(program.pillarName)} font-medium text-base`}
                       />
                     </td>
-                    <td className="border border-gray-300 p-3" style={{width: '17.6%'}}>
+                    <td className="border border-gray-300 p-3 relative" style={{width: '17.6%'}}>
                       <EditableField
                         value={program.progressUpdates || ""}
                         onSave={(newProgress) => handleProgressUpdate(program.id, newProgress)}
-                        className="text-base"
+                        className="text-base pr-8"
                         placeholder="Enter progress updates..."
                       />
+                      <button
+                        onClick={() => handleOpenGenerateModal(program)}
+                        className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group"
+                        title="Generate Update"
+                      >
+                        <Bot className="h-4 w-4 text-gray-500 group-hover:text-blue-600" />
+                      </button>
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
                       <div className="mb-2">
@@ -723,6 +748,20 @@ export default function DetailsPage() {
           </tbody>
         </table>
       </div>
+      
+      {/* Generate Update Modal */}
+      {currentProgram && (
+        <GenerateUpdateModal
+          isOpen={isGenerateModalOpen}
+          onClose={() => {
+            setIsGenerateModalOpen(false)
+            setCurrentProgram(null)
+          }}
+          initialContent={currentProgram.progressUpdates || ""}
+          onGenerate={handleGenerateUpdate}
+        />
+      )}
+      
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
