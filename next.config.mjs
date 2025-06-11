@@ -11,7 +11,6 @@ const nextConfig = {
   },
   env: {
     DATABASE_URL: process.env.DATABASE_URL,
-    FEATURE_FLAG_USE_DATABASE: process.env.FEATURE_FLAG_USE_DATABASE,
   },
 }
 

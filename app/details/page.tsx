@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react"
 import Link from "next/link"
-import { scorecardData, loadScorecardData } from "@/data/scorecard-data"
+// Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
 import { BarChart2, Menu, Camera, Bot, FileText } from "lucide-react"
@@ -18,7 +18,7 @@ const ALL_VALUE = "all"
 
 export default function DetailsPage() {
   // State for data loading
-  const [data, setData] = useState<ScoreCardData>(scorecardData)
+  const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Load data when the page loads
@@ -26,7 +26,11 @@ export default function DetailsPage() {
     async function loadData() {
       setLoading(true)
       try {
-        const loadedData = await loadScorecardData()
+        const response = await fetch('/api/scorecard')
+        if (!response.ok) {
+          throw new Error('Failed to load scorecard data')
+        }
+        const loadedData = await response.json()
         setData(loadedData)
       } catch (error) {
         console.error("Error loading data:", error)
@@ -66,6 +70,17 @@ export default function DetailsPage() {
     const categoryMap = new Map<string, Category>()
     const goalMap = new Map<string, StrategicGoal>()
 
+    if (!data) {
+      return {
+        goalToCategory: goalToCategoryMap,
+        goalToPillar: goalToPillarMap,
+        categoryToPillar: categoryToPillarMap,
+        pillars: pillarMap,
+        categories: categoryMap,
+        goals: goalMap,
+      }
+    }
+
     data.pillars.forEach((pillar) => {
       pillarMap.set(pillar.id, pillar)
 
@@ -93,6 +108,9 @@ export default function DetailsPage() {
 
   // Extract all options for dropdowns with "All" as the first option
   const pillarOptions = useMemo(() => {
+    if (!data) {
+      return [{ value: ALL_VALUE, label: "All" }]
+    }
     const options = data.pillars.map((pillar) => ({ value: pillar.id, label: pillar.name }))
     return [{ value: ALL_VALUE, label: "All" }, ...options]
   }, [data])
@@ -103,6 +121,10 @@ export default function DetailsPage() {
 
     // Add "All" option
     options.push({ value: ALL_VALUE, label: "All" })
+
+    if (!data) {
+      return options
+    }
 
     // If "All" pillars selected, include all categories
     if (selectedPillar === ALL_VALUE) {
@@ -136,6 +158,10 @@ export default function DetailsPage() {
 
     // Add "All" option
     options.push({ value: ALL_VALUE, label: "All" })
+
+    if (!data) {
+      return options
+    }
 
     // If "All" pillars and "All" categories selected, include all goals
     if (selectedPillar === ALL_VALUE && selectedCategory === ALL_VALUE) {
@@ -258,6 +284,10 @@ export default function DetailsPage() {
   // Get filtered programs based on selections
   const filteredPrograms = useMemo(() => {
     const programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }> = []
+
+    if (!data) {
+      return programs
+    }
 
     data.pillars.forEach((pillar) => {
       // Skip if specific pillar selected and doesn't match
@@ -563,6 +593,16 @@ export default function DetailsPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading scorecard data...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">No scorecard data available</p>
         </div>
       </div>
     )

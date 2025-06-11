@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Scorecard } from "@/components/scorecard"
-import { scorecardData, loadScorecardData } from "@/data/scorecard-data"
+// Database-only mode - load data from API
 import type { ScoreCardData } from "@/types/scorecard"
 import { Camera, BarChart2, Menu, FileText } from "lucide-react"
 import Link from "next/link"
@@ -11,7 +11,7 @@ import { AIChat } from "@/components/ai-chat"
 import { Dropdown } from "@/components/dropdown"
 
 export default function Home() {
-  const [data, setData] = useState<ScoreCardData>(scorecardData)
+  const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -28,10 +28,18 @@ export default function Home() {
     async function loadData() {
       setLoading(true)
       try {
-        const loadedData = await loadScorecardData()
+        const response = await fetch('/api/scorecard')
+        if (!response.ok) {
+          throw new Error('Failed to load scorecard data')
+        }
+        const loadedData = await response.json()
         setData(loadedData)
       } catch (error) {
-        // Remove all console.error statements
+        console.error('Error loading scorecard data:', error)
+        setToast({
+          message: "Failed to load scorecard data",
+          type: "error"
+        })
       } finally {
         setLoading(false)
       }
@@ -142,7 +150,7 @@ export default function Home() {
           </button>
         </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data} />
+        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data || { pillars: [] }} />
       </div>
 
       <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">
@@ -153,9 +161,15 @@ export default function Home() {
               <p className="text-gray-600">Loading scorecard data...</p>
             </div>
           </div>
-        ) : (
+        ) : data ? (
           <div className="flex-1 flex flex-col">
             <Scorecard data={data} onDataUpdate={handleDataUpdate} selectedQuarter={selectedQuarter} />
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <p className="text-gray-600">No scorecard data available</p>
+            </div>
           </div>
         )}
       </div>
