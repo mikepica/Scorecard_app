@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { promises as fs } from "fs"
 import path from "path"
 import { transformSpreadsheetToScoreCardData, loadAndMergeScorecardXLSXs, parseXLSXString } from "@/utils/csv-parser"
+import { DatabaseService } from "@/lib/database"
 import * as XLSX from 'xlsx'
 
 // For best practice, consider using an environment variable for this path in production
@@ -26,6 +27,25 @@ export async function POST(request: Request) {
     } = await request.json()
     // type: 'program' | 'category' | 'goal' | 'program-text' | 'program-objective' | 'program-progress' | 'goal-text' | 'category-name'
     // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
+
+    // Feature flag to switch between file and database mode
+    const useDatabaseMode = process.env.FEATURE_FLAG_USE_DATABASE === 'true'
+    
+    if (useDatabaseMode) {
+      console.log('🗄️  Using database mode for update operation:', type)
+      try {
+        const updatedData = await DatabaseService.performUpdate(type, fieldPath, newValue, quarter, field)
+        return NextResponse.json(updatedData)
+      } catch (dbError) {
+        console.error('Database update error:', dbError)
+        return NextResponse.json(
+          { error: `Database update failed: ${dbError.message}` },
+          { status: 500 }
+        )
+      }
+    }
+    
+    console.log('📁 Using file mode for update operation:', type)
 
     let xlsxPath: string, idColumn: string, statusColumn: string, idValue: string, isProgram = false
     let updateRowFn: (row: string[], header: string[], normalizedHeader: string[]) => void
