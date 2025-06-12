@@ -89,6 +89,16 @@ CREATE TABLE strategic_programs (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Progress Updates History table
+CREATE TABLE progress_updates_history (
+    id VARCHAR(255) PRIMARY KEY,
+    program_id VARCHAR(255) NOT NULL REFERENCES strategic_programs(id) ON DELETE CASCADE,
+    previous_value TEXT,
+    new_value TEXT,
+    changed_by VARCHAR(255) NOT NULL,
+    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Indexes for better query performance
 CREATE INDEX idx_categories_pillar_id ON categories(pillar_id);
 CREATE INDEX idx_strategic_goals_category_id ON strategic_goals(category_id);
@@ -96,6 +106,7 @@ CREATE INDEX idx_strategic_goals_pillar_id ON strategic_goals(pillar_id);
 CREATE INDEX idx_strategic_programs_goal_id ON strategic_programs(goal_id);
 CREATE INDEX idx_strategic_programs_category_id ON strategic_programs(category_id);
 CREATE INDEX idx_strategic_programs_pillar_id ON strategic_programs(pillar_id);
+CREATE INDEX idx_progress_updates_history_program_id ON progress_updates_history(program_id);
 
 -- Trigger to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -111,3 +122,32 @@ CREATE TRIGGER update_strategic_pillars_updated_at BEFORE UPDATE ON strategic_pi
 CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_strategic_goals_updated_at BEFORE UPDATE ON strategic_goals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_strategic_programs_updated_at BEFORE UPDATE ON strategic_programs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Trigger to automatically record changes to progress_updates
+CREATE OR REPLACE FUNCTION record_progress_update_change()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.progress_updates IS DISTINCT FROM NEW.progress_updates THEN
+        INSERT INTO progress_updates_history (
+            id,
+            program_id,
+            previous_value,
+            new_value,
+            changed_by
+        ) VALUES (
+            gen_random_uuid()::VARCHAR(255),
+            NEW.id,
+            OLD.progress_updates,
+            NEW.progress_updates,
+            current_user
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Apply the trigger to strategic_programs table
+CREATE TRIGGER track_progress_updates_changes
+    BEFORE UPDATE ON strategic_programs
+    FOR EACH ROW
+    EXECUTE FUNCTION record_progress_update_change();
