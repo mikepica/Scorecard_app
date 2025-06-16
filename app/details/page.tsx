@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera, Bot, FileText } from "lucide-react"
+import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -60,6 +60,9 @@ export default function DetailsPage() {
   const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
   const [selectedCategory, setSelectedCategory] = useState(ALL_VALUE)
   const [selectedGoal, setSelectedGoal] = useState(ALL_VALUE)
+
+  // State for filter visibility - default to show filters
+  const [filtersVisible, setFiltersVisible] = useState(true)
 
   // Create a map of relationships for quick lookups
   const relationshipMap = useMemo(() => {
@@ -614,14 +617,6 @@ export default function DetailsPage() {
         <h1 className="text-2xl font-bold">ORD 2024 Scorecard: {pillarName}</h1>
         <div className="bg-red-600 text-white px-4 py-1">Overall Status</div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
-          >
-            <Camera size={16} />
-            <span>Capture Screen</span>
-          </button>
-
           <Link
             href="/instructions"
             className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
@@ -629,6 +624,22 @@ export default function DetailsPage() {
             <FileText size={16} />
             <span>Instructions</span>
           </Link>
+
+          <button
+            onClick={() => setFiltersVisible(!filtersVisible)}
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+          >
+            {filtersVisible ? <Eye size={16} /> : <EyeOff size={16} />}
+            <span>Show/Hide Filters</span>
+          </button>
+
+          <button
+            onClick={captureScreen}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+          >
+            <Camera size={16} />
+            <span>Capture Screen</span>
+          </button>
 
           <Link
             href="/"
@@ -651,46 +662,48 @@ export default function DetailsPage() {
       </header>
 
       {/* Filter section */}
-      <div className="bg-lime-100 py-3 px-4">
-        <div className="flex items-center mb-3">
-          <div className="flex-1">
+      {filtersVisible && (
+        <div className="bg-lime-100 py-3 px-4">
+          <div className="flex items-center mb-3">
+            <div className="flex-1">
+              <Dropdown
+                options={pillarOptions}
+                value={selectedPillar}
+                onChange={handlePillarChange}
+                label="Strategic Pillar:"
+                placeholder="Select a pillar..."
+                labelWidth="w-36"
+              />
+            </div>
+            <div className="ml-4 flex items-center">
+              <span className="font-medium text-lg mr-2">ORD LT sponsor:</span>
+              <span>{sponsor}</span>
+            </div>
+          </div>
+
+          <div className="mb-3">
             <Dropdown
-              options={pillarOptions}
-              value={selectedPillar}
-              onChange={handlePillarChange}
-              label="Strategic Pillar:"
-              placeholder="Select a pillar..."
+              options={categoryOptions}
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              label="Category:"
+              placeholder="Select a category..."
               labelWidth="w-36"
             />
           </div>
-          <div className="ml-4 flex items-center">
-            <span className="font-medium text-lg mr-2">ORD LT sponsor:</span>
-            <span>{sponsor}</span>
+
+          <div>
+            <Dropdown
+              options={goalOptions}
+              value={selectedGoal}
+              onChange={handleGoalChange}
+              label="Strategic Goal:"
+              placeholder="Select a goal..."
+              labelWidth="w-36"
+            />
           </div>
         </div>
-
-        <div className="mb-3">
-          <Dropdown
-            options={categoryOptions}
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            label="Category:"
-            placeholder="Select a category..."
-            labelWidth="w-36"
-          />
-        </div>
-
-        <div>
-          <Dropdown
-            options={goalOptions}
-            value={selectedGoal}
-            onChange={handleGoalChange}
-            label="Strategic Goal:"
-            placeholder="Select a goal..."
-            labelWidth="w-36"
-          />
-        </div>
-      </div>
+      )}
 
       {/* Table section - make it fill the remaining space */}
       <div className="flex-1 p-4 overflow-auto">
