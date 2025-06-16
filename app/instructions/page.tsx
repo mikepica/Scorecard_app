@@ -7,7 +7,7 @@ export default function InstructionsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-lime-400 py-2 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">ORD 2024 Scorecard: Instructions</h1>
+        <h1 className="text-2xl font-bold">ORD Scorecard: Instructions</h1>
         
         <div className="flex items-center gap-2">
           <Link

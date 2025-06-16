@@ -6,7 +6,7 @@ import { AIChat } from "./ai-chat"
 import Link from "next/link"
 
 export function Header({
-  title = "ORD 2024 Scorecard",
+  title = "ORD Scorecard",
   onCaptureScreen,
 }: {
   title?: string

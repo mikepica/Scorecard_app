@@ -107,7 +107,7 @@ export default function Home() {
   return (
     <main className="min-h-screen flex flex-col">
       <div className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
-        <h1 className="text-2xl font-bold">ORD 2024 Scorecard</h1>
+        <h1 className="text-2xl font-bold">ORD Scorecard</h1>
 
         <div className="flex items-center gap-4">
           <Dropdown

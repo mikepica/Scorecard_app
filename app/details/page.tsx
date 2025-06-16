@@ -614,7 +614,7 @@ export default function DetailsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-lime-400 py-2 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">ORD 2024 Scorecard: {pillarName}</h1>
+        <h1 className="text-2xl font-bold">ORD Scorecard: {pillarName}</h1>
         <div className="flex items-center gap-2">
           <Link
             href="/instructions"
@@ -710,7 +710,7 @@ export default function DetailsPage() {
           <thead>
             <tr>
               <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left text-base`} style={{width: '12%'}}>
-                2024 proposed strategic programs
+                Strategic Programs
               </th>
               <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Progress Updates</th>
               <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q1</th>
