@@ -615,7 +615,6 @@ export default function DetailsPage() {
     <div className="min-h-screen flex flex-col">
       <header className="bg-lime-400 py-2 px-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold">ORD 2024 Scorecard: {pillarName}</h1>
-        <div className="bg-red-600 text-white px-4 py-1">Overall Status</div>
         <div className="flex items-center gap-2">
           <Link
             href="/instructions"
