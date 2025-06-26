@@ -5,13 +5,14 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff } from "lucide-react"
+import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff, ChevronDown } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
 import { EditableField } from "@/components/ui/editable-field"
 import { GenerateUpdateModal } from "@/components/generate-update-modal"
 import { ReprioritizeGoalsModal } from "@/components/reprioritize-goals-modal"
+import { AIFlowsModal } from "@/components/ai-flows-modal"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -56,6 +57,9 @@ export default function DetailsPage() {
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false)
   const [currentInsightsProgram, setCurrentInsightsProgram] = useState<StrategicProgram | null>(null)
   const [isReprioritizationMode, setIsReprioritizationMode] = useState(false)
+  const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
+  const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
+  const [aiFlowType, setAIFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
 
   // State for selected filters - default to "all"
   const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
@@ -701,6 +705,62 @@ export default function DetailsPage() {
     }
   }
 
+  const handleAIFlowSelection = (flowType: "goal-comparison" | "learnings-best-practices") => {
+    setAIFlowType(flowType)
+    setIsAIFlowsDropdownOpen(false)
+    setIsAIFlowsModalOpen(true)
+  }
+
+  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: any) => {
+    try {
+      setToast({ message: 'Analyzing selected data...', type: 'info' })
+      
+      // Reset chat
+      setMessages([])
+      setIsChatOpen(false)
+      
+      // Create FormData for AI Flows request
+      const formData = new FormData()
+      formData.append('prompt', prompt)
+      formData.append('flowType', flowType)
+      formData.append('selections', JSON.stringify(selections))
+      formData.append('scorecardData', JSON.stringify(data))
+      
+      // Add files
+      files.forEach(file => {
+        formData.append('files', file)
+      })
+      
+      // Send to chat API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const result = await response.json()
+      
+      if (result.response) {
+        // Add AI response to chat
+        const aiMessage = {
+          id: Date.now().toString(),
+          text: result.response,
+          sender: "ai" as const,
+          timestamp: new Date(),
+        }
+        setMessages([aiMessage])
+        
+        // Open AI Chat
+        setIsChatOpen(true)
+        setToast({ message: 'Analysis complete! Check AI Chat for results.', type: 'success' })
+      } else {
+        setToast({ message: 'Failed to analyze data', type: 'error' })
+      }
+    } catch (error) {
+      console.error('Error in AI Flows:', error)
+      setToast({ message: 'Error analyzing data', type: 'error' })
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -734,6 +794,34 @@ export default function DetailsPage() {
             <FileText size={16} />
             <span>Instructions</span>
           </Link>
+
+          <div className="relative">
+            <button
+              onClick={() => setIsAIFlowsDropdownOpen(!isAIFlowsDropdownOpen)}
+              className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            >
+              <Bot size={16} />
+              <span>AI Flows</span>
+              <ChevronDown size={12} />
+            </button>
+            
+            {isAIFlowsDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[180px]">
+                <button
+                  onClick={() => handleAIFlowSelection("goal-comparison")}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors text-gray-700 text-sm"
+                >
+                  Goal Comparison
+                </button>
+                <button
+                  onClick={() => handleAIFlowSelection("learnings-best-practices")}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors text-gray-700 text-sm"
+                >
+                  Learnings/Best Practices
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={() => setFiltersVisible(!filtersVisible)}
@@ -975,6 +1063,17 @@ export default function DetailsPage() {
             setCurrentInsightsProgram(null)
           }}
           onGenerate={handleReprioritization}
+        />
+      )}
+
+      {/* AI Flows Modal */}
+      {data && (
+        <AIFlowsModal
+          isOpen={isAIFlowsModalOpen}
+          onClose={() => setIsAIFlowsModalOpen(false)}
+          flowType={aiFlowType}
+          scorecardData={data}
+          onGenerate={handleAIFlowsGenerate}
         />
       )}
       

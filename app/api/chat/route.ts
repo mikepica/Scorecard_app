@@ -7,6 +7,32 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Filter scorecard data based on user selections
+function filterScorecardData(fullData: any, selections: any) {
+  const filtered = {
+    pillars: fullData.pillars.filter((pillar: any) => 
+      selections.pillars.includes(pillar.id)
+    ).map((pillar: any) => ({
+      ...pillar,
+      categories: pillar.categories.filter((category: any) => 
+        selections.categories.includes(category.id)
+      ).map((category: any) => ({
+        ...category,
+        strategicGoals: category.strategicGoals.filter((goal: any) => 
+          selections.goals.includes(goal.id)
+        ).map((goal: any) => ({
+          ...goal,
+          strategicPrograms: goal.strategicPrograms.filter((program: any) => 
+            selections.programs.includes(program.id)
+          )
+        }))
+      }))
+    }))
+  };
+  
+  return filtered;
+}
+
 export async function POST(req: Request) {
   try {
     const contentType = req.headers.get('content-type');
@@ -24,13 +50,20 @@ export async function POST(req: Request) {
         );
       }
     } else {
-      // Handle FormData for reprioritization requests
+      // Handle FormData for reprioritization or AI Flows requests
       const formData = await req.formData();
-      isReprioritization = true;
+      const flowType = formData.get('flowType') as string;
+      
+      if (flowType) {
+        // AI Flows request
+        isReprioritization = false;
+      } else {
+        // Reprioritization request
+        isReprioritization = true;
+      }
       
       // Extract form data
       const prompt = formData.get('prompt') as string;
-      const programContext = formData.get('programContext') as string;
       const files = formData.getAll('files') as File[];
       
       // Process file contents
@@ -44,29 +77,65 @@ export async function POST(req: Request) {
         );
         fileContents = fileTexts.join('\n');
       }
-      
-      // Construct user message for reprioritization
-      let userMessage = `Please analyze and reprioritize the quarterly objectives for this strategic program.\n\n`;
-      
-      if (prompt) {
-        userMessage += `User Request: ${prompt}\n\n`;
+
+      let userMessage = '';
+      let contextData = {};
+
+      if (flowType) {
+        // AI Flows request
+        const selections = formData.get('selections') as string;
+        const scorecardData = formData.get('scorecardData') as string;
+        
+        if (scorecardData && selections) {
+          const fullData = JSON.parse(scorecardData);
+          const filterSelections = JSON.parse(selections);
+          
+          // Filter data based on selections
+          const filteredData = filterScorecardData(fullData, filterSelections);
+          
+          userMessage = `Please analyze the selected strategic data for ${flowType.replace('-', ' ')}.\n\n`;
+          
+          if (prompt) {
+            userMessage += `User Instructions: ${prompt}\n\n`;
+          }
+          
+          userMessage += `Selected Data Context: ${JSON.stringify(filteredData, null, 2)}\n\n`;
+          
+          if (fileContents) {
+            userMessage += `Attached Documents:\n${fileContents}\n\n`;
+          }
+          
+          contextData = filteredData;
+        }
+      } else {
+        // Reprioritization request
+        const programContext = formData.get('programContext') as string;
+        
+        userMessage = `Please analyze and reprioritize the quarterly objectives for this strategic program.\n\n`;
+        
+        if (prompt) {
+          userMessage += `User Request: ${prompt}\n\n`;
+        }
+        
+        if (programContext) {
+          userMessage += `Strategic Program Context: ${programContext}\n\n`;
+        }
+        
+        if (fileContents) {
+          userMessage += `Attached Documents:\n${fileContents}\n\n`;
+        }
+        
+        contextData = programContext ? JSON.parse(programContext) : {};
       }
       
-      if (programContext) {
-        userMessage += `Strategic Program Context: ${programContext}\n\n`;
-      }
-      
-      if (fileContents) {
-        userMessage += `Attached Documents:\n${fileContents}\n\n`;
-      }
-      
-      // Create body structure for reprioritization
+      // Create body structure
       body = {
         messages: [{
           role: 'user',
           content: userMessage
         }],
-        context: programContext ? JSON.parse(programContext) : {}
+        context: contextData,
+        flowType: flowType || 'reprioritization'
       };
     }
 
@@ -74,8 +143,14 @@ export async function POST(req: Request) {
 
     // Load appropriate system prompt
     let promptPath;
+    const bodyFlowType = (body as any).flowType;
+    
     if (isReprioritization) {
       promptPath = path.join(process.cwd(), 'Prompts', 'reprioritize-goals-system-prompt.md');
+    } else if (bodyFlowType === 'goal-comparison') {
+      promptPath = path.join(process.cwd(), 'Prompts', 'goal-comparison-system-prompt.md');
+    } else if (bodyFlowType === 'learnings-best-practices') {
+      promptPath = path.join(process.cwd(), 'Prompts', 'learnings-best-practices-system-prompt.md');
     } else {
       promptPath = path.join(process.cwd(), 'Prompts', 'AI-chat-system-prompt.md');
     }
@@ -102,7 +177,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       response: completion.choices[0].message.content,
-      isReprioritization: isReprioritization
+      isReprioritization: isReprioritization,
+      flowType: bodyFlowType
     });
   } catch (error) {
     console.error('Error in chat API:', error);

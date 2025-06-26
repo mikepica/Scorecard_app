@@ -1,14 +1,15 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { Scorecard } from "@/components/scorecard"
 // Database-only mode - load data from API
 import type { ScoreCardData } from "@/types/scorecard"
-import { Camera, BarChart2, Menu, FileText } from "lucide-react"
+import { Camera, BarChart2, Menu, FileText, Bot, ChevronDown } from "lucide-react"
 import Link from "next/link"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
 import { Dropdown } from "@/components/dropdown"
+import { AIFlowsModal } from "@/components/ai-flows-modal"
 
 export default function Home() {
   const [data, setData] = useState<ScoreCardData | null>(null)
@@ -16,6 +17,10 @@ export default function Home() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [selectedQuarter, setSelectedQuarter] = useState("q1")
+  const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
+  const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
+  const [aiFlowType, setAIFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
+  const aiFlowsDropdownRef = useRef<HTMLDivElement>(null)
 
   const QUARTER_OPTIONS = [
     { value: "q1", label: "Q1" },
@@ -46,6 +51,20 @@ export default function Home() {
     }
 
     loadData()
+  }, [])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (aiFlowsDropdownRef.current && !aiFlowsDropdownRef.current.contains(event.target as Node)) {
+        setIsAIFlowsDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
 
   const handleDataUpdate = (newData: ScoreCardData) => {
@@ -104,6 +123,52 @@ export default function Home() {
     }
   }
 
+  const handleAIFlowSelection = (flowType: "goal-comparison" | "learnings-best-practices") => {
+    setAIFlowType(flowType)
+    setIsAIFlowsDropdownOpen(false)
+    setIsAIFlowsModalOpen(true)
+  }
+
+  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: any) => {
+    try {
+      setToast({ message: 'Analyzing selected data...', type: 'info' })
+      
+      // Reset chat
+      setIsChatOpen(false)
+      
+      // Create FormData for AI Flows request
+      const formData = new FormData()
+      formData.append('prompt', prompt)
+      formData.append('flowType', flowType)
+      formData.append('selections', JSON.stringify(selections))
+      formData.append('scorecardData', JSON.stringify(data))
+      
+      // Add files
+      files.forEach(file => {
+        formData.append('files', file)
+      })
+      
+      // Send to chat API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const result = await response.json()
+      
+      if (result.response) {
+        // Open AI Chat with results
+        setIsChatOpen(true)
+        setToast({ message: 'Analysis complete! Check AI Chat for results.', type: 'success' })
+      } else {
+        setToast({ message: 'Failed to analyze data', type: 'error' })
+      }
+    } catch (error) {
+      console.error('Error in AI Flows:', error)
+      setToast({ message: 'Error analyzing data', type: 'error' })
+    }
+  }
+
   return (
     <main className="min-h-screen flex flex-col">
       <div className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
@@ -132,6 +197,34 @@ export default function Home() {
             <FileText size={20} />
             <span className="whitespace-nowrap">Instructions</span>
           </Link>
+
+          <div className="relative" ref={aiFlowsDropdownRef}>
+            <button
+              onClick={() => setIsAIFlowsDropdownOpen(!isAIFlowsDropdownOpen)}
+              className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            >
+              <Bot size={20} />
+              <span className="whitespace-nowrap">AI Flows</span>
+              <ChevronDown size={16} />
+            </button>
+            
+            {isAIFlowsDropdownOpen && (
+              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px]">
+                <button
+                  onClick={() => handleAIFlowSelection("goal-comparison")}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  Goal Comparison
+                </button>
+                <button
+                  onClick={() => handleAIFlowSelection("learnings-best-practices")}
+                  className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-gray-700"
+                >
+                  Learnings/Best Practices
+                </button>
+              </div>
+            )}
+          </div>
 
           <Link
             href="/details"
@@ -173,6 +266,17 @@ export default function Home() {
           </div>
         )}
       </div>
+      {/* AI Flows Modal */}
+      {data && (
+        <AIFlowsModal
+          isOpen={isAIFlowsModalOpen}
+          onClose={() => setIsAIFlowsModalOpen(false)}
+          flowType={aiFlowType}
+          scorecardData={data}
+          onGenerate={handleAIFlowsGenerate}
+        />
+      )}
+
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </main>
