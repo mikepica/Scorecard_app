@@ -367,17 +367,66 @@ const programIds = (goal.programs || []).map(p => p.id)
     setExpandedNodes(new Set())
   }
 
-  const getCheckboxState = (nodeId: string, childIds: string[]) => {
-    const selectedChildren = childIds.filter(id => {
-      if (nodeId.startsWith('pillar-')) return selections.pillars.includes(id)
-      if (nodeId.startsWith('category-')) return selections.categories.includes(id)
-      if (nodeId.startsWith('goal-')) return selections.goals.includes(id)
-      return selections.programs.includes(id)
-    })
+  const getPillarCheckboxState = (pillar: Pillar) => {
+    // Check if pillar itself is selected
+    const isPillarSelected = selections.pillars.includes(pillar.id)
     
-    if (selectedChildren.length === 0) return false
-    if (selectedChildren.length === childIds.length) return true
-    return 'indeterminate'
+    if (!isPillarSelected) return false
+    
+    // If pillar is selected, check children state
+    const allCategoryIds = pillar.categories.map(c => c.id)
+    const allGoalIds = pillar.categories.flatMap(c => c.goals.map(g => g.id))
+    const allProgramIds = pillar.categories.flatMap(c => c.goals.flatMap(g => g.programs?.map(p => p.id) || []))
+    
+    const selectedCategories = allCategoryIds.filter(id => selections.categories.includes(id))
+    const selectedGoals = allGoalIds.filter(id => selections.goals.includes(id))
+    const selectedPrograms = allProgramIds.filter(id => selections.programs.includes(id))
+    
+    const totalChildren = allCategoryIds.length + allGoalIds.length + allProgramIds.length
+    const selectedChildren = selectedCategories.length + selectedGoals.length + selectedPrograms.length
+    
+    if (totalChildren === 0) return true // No children
+    if (selectedChildren === totalChildren) return true
+    if (selectedChildren > 0) return "indeterminate"
+    return false
+  }
+
+  const getCategoryCheckboxState = (category: Category) => {
+    // Check if category itself is selected
+    const isCategorySelected = selections.categories.includes(category.id)
+    
+    if (!isCategorySelected) return false
+    
+    // If category is selected, check children state
+    const allGoalIds = category.goals.map(g => g.id)
+    const allProgramIds = category.goals.flatMap(g => g.programs?.map(p => p.id) || [])
+    
+    const selectedGoals = allGoalIds.filter(id => selections.goals.includes(id))
+    const selectedPrograms = allProgramIds.filter(id => selections.programs.includes(id))
+    
+    const totalChildren = allGoalIds.length + allProgramIds.length
+    const selectedChildren = selectedGoals.length + selectedPrograms.length
+    
+    if (totalChildren === 0) return true // No children
+    if (selectedChildren === totalChildren) return true
+    if (selectedChildren > 0) return "indeterminate"
+    return false
+  }
+
+  const getGoalCheckboxState = (goal: StrategicGoal) => {
+    // Check if goal itself is selected
+    const isGoalSelected = selections.goals.includes(goal.id)
+    
+    if (!isGoalSelected) return false
+    
+    // If goal is selected, check children state
+    const allPrograms = goal.programs || []
+    const selectedPrograms = allPrograms.filter(p => selections.programs.includes(p.id))
+    
+    if (allPrograms.length === 0) return true // No children
+    if (selectedPrograms.length === allPrograms.length) return true
+    if (selectedPrograms.length > 0) return "indeterminate"
+    return false
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -453,7 +502,7 @@ const programIds = (goal.programs || []).map(p => p.id)
                     <ChevronDown className={`h-4 w-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-96 max-h-96 overflow-y-auto p-4">
+                <DropdownMenuContent className="w-[600px] max-h-[500px] overflow-y-auto p-4">
                   {/* Controls */}
                   <div className="space-y-3 mb-4">
                     {/* Search */}
@@ -519,7 +568,7 @@ const programIds = (goal.programs || []).map(p => p.id)
                               )}
                             </button>
                             <Checkbox
-                              checked={selections.pillars.includes(pillar.id)}
+                              checked={getPillarCheckboxState(pillar)}
                               onCheckedChange={(checked) => handlePillarToggle(pillar.id, checked as boolean)}
                             />
                             <Label className="text-sm font-medium cursor-pointer flex-1">
@@ -552,7 +601,7 @@ const programIds = (goal.programs || []).map(p => p.id)
                                     )}
                                   </button>
                                   <Checkbox
-                                    checked={selections.categories.includes(category.id)}
+                                    checked={getCategoryCheckboxState(category)}
                                     onCheckedChange={(checked) => handleCategoryToggle(category.id, checked as boolean)}
                                   />
                                   <Label className="text-sm cursor-pointer flex-1">
@@ -584,7 +633,7 @@ const goalPrograms = goal.programs || []
                                           )}
                                         </button>
                                         <Checkbox
-                                          checked={selections.goals.includes(goal.id)}
+                                          checked={getGoalCheckboxState(goal)}
                                           onCheckedChange={(checked) => handleGoalToggle(goal.id, checked as boolean)}
                                         />
                                         <Label className="text-xs cursor-pointer flex-1">
