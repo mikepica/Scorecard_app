@@ -19,9 +19,11 @@ type AIChatProps = {
   isOpen: boolean
   onClose: () => void
   context: ScoreCardData
+  isReprioritizationMode?: boolean
+  onReset?: () => void
 }
 
-export function AIChat({ isOpen, onClose, context }: AIChatProps) {
+export function AIChat({ isOpen, onClose, context, isReprioritizationMode = false, onReset }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -58,6 +60,10 @@ export function AIChat({ isOpen, onClose, context }: AIChatProps) {
     setMessages([])
     setInput("")
     setIsLoading(false)
+    // Notify parent component of reset
+    if (onReset) {
+      onReset()
+    }
   }
 
   // Handle sending a message
@@ -157,7 +163,14 @@ export function AIChat({ isOpen, onClose, context }: AIChatProps) {
       >
         {/* Header */}
         <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white">
-          <h2 className="text-lg font-semibold">AI Chat</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">AI Chat</h2>
+            {isReprioritizationMode && (
+              <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                Reprioritization Mode
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={handleReset} 

@@ -21,7 +21,6 @@ interface ReprioritizeGoalsModalProps {
 
 export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: ReprioritizeGoalsModalProps) {
   const [prompt, setPrompt] = useState("")
-  const [response, setResponse] = useState("")
   const [files, setFiles] = useState<File[]>([])
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,7 +39,6 @@ export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: Repriori
 
   const handleClose = () => {
     setPrompt("")
-    setResponse("")
     setFiles([])
     onClose()
   }
@@ -72,17 +70,10 @@ export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: Repriori
             />
           </div>
 
-          <div>
-            <label htmlFor="response" className="block text-sm font-medium mb-2">
-              Response
-            </label>
-            <Textarea
-              id="response"
-              value={response}
-              readOnly
-              placeholder="Generated response will appear here..."
-              className="min-h-[120px] bg-gray-50 cursor-not-allowed"
-            />
+          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+            <p className="text-sm text-blue-800">
+              📝 Responses will open in the AI Chat thread, resetting any open thread
+            </p>
           </div>
 
           <div>

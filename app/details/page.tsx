@@ -55,6 +55,7 @@ export default function DetailsPage() {
   // State for Generate Insights modal
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false)
   const [currentInsightsProgram, setCurrentInsightsProgram] = useState<StrategicProgram | null>(null)
+  const [isReprioritizationMode, setIsReprioritizationMode] = useState(false)
 
   // State for selected filters - default to "all"
   const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
@@ -623,17 +624,81 @@ export default function DetailsPage() {
     }
   }
 
-  // Handle opening the Generate Insights modal
-  const handleOpenInsightsModal = (program: StrategicProgram) => {
+  // Handle opening the Reprioritize Goals modal
+  const handleOpenReprioritizeModal = (program: StrategicProgram) => {
     setCurrentInsightsProgram(program)
     setIsInsightsModalOpen(true)
   }
 
-  // Handle Generate Insights action (placeholder for now)
-  const handleGenerateInsights = (prompt: string, files: File[]) => {
-    // TODO: Implement actual insights generation logic
-    console.log('Generate insights called with:', { prompt, files })
-    setToast({ message: 'Reprioritize Goals functionality will be implemented later', type: 'info' })
+  // Handle Reprioritize Goals action
+  const handleReprioritization = async (prompt: string, files: File[]) => {
+    try {
+      setToast({ message: 'Analyzing goals for reprioritization...', type: 'info' })
+      
+      // Reset chat and close modal
+      setMessages([])
+      setIsInsightsModalOpen(false)
+      setCurrentInsightsProgram(null)
+      
+      // Create FormData for reprioritization request
+      const formData = new FormData()
+      formData.append('prompt', prompt)
+      
+      // Add program context
+      if (currentInsightsProgram) {
+        const programContext = JSON.stringify({
+          id: currentInsightsProgram.id,
+          text: currentInsightsProgram.text,
+          pillarName: currentInsightsProgram.pillarName,
+          categoryName: currentInsightsProgram.categoryName,
+          strategicGoalText: currentInsightsProgram.strategicGoalText,
+          q1Objective: currentInsightsProgram.q1Objective || '',
+          q2Objective: currentInsightsProgram.q2Objective || '',
+          q3Objective: currentInsightsProgram.q3Objective || '',
+          q4Objective: currentInsightsProgram.q4Objective || '',
+          q1Status: currentInsightsProgram.q1Status || '',
+          q2Status: currentInsightsProgram.q2Status || '',
+          q3Status: currentInsightsProgram.q3Status || '',
+          q4Status: currentInsightsProgram.q4Status || '',
+          progressUpdates: currentInsightsProgram.progressUpdates || ''
+        })
+        formData.append('programContext', programContext)
+      }
+      
+      // Add files
+      files.forEach(file => {
+        formData.append('files', file)
+      })
+      
+      // Send to chat API
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const result = await response.json()
+      
+      if (result.response) {
+        // Add AI response to chat
+        const aiMessage = {
+          id: Date.now().toString(),
+          text: result.response,
+          sender: "ai" as const,
+          timestamp: new Date(),
+        }
+        setMessages([aiMessage])
+        
+        // Set reprioritization mode and open AI Chat
+        setIsReprioritizationMode(true)
+        setIsChatOpen(true)
+        setToast({ message: 'Goals analysis complete! Check AI Chat for results.', type: 'success' })
+      } else {
+        setToast({ message: 'Failed to analyze goals for reprioritization', type: 'error' })
+      }
+    } catch (error) {
+      console.error('Error in reprioritization:', error)
+      setToast({ message: 'Error analyzing goals for reprioritization', type: 'error' })
+    }
   }
 
   if (loading) {
@@ -703,7 +768,13 @@ export default function DetailsPage() {
           </button>
         </div>
 
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data} />
+        <AIChat 
+          isOpen={isChatOpen} 
+          onClose={() => setIsChatOpen(false)} 
+          context={data} 
+          isReprioritizationMode={isReprioritizationMode}
+          onReset={() => setIsReprioritizationMode(false)}
+        />
       </header>
 
       {/* Filter section */}
@@ -788,7 +859,7 @@ export default function DetailsPage() {
                         placeholder="Enter progress updates..."
                       />
                       <button
-                        onClick={() => handleOpenInsightsModal(program)}
+                        onClick={() => handleOpenReprioritizeModal(program)}
                         className="absolute bottom-2 right-32 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
                         title="Reprioritize Goals"
                       >
@@ -903,7 +974,7 @@ export default function DetailsPage() {
             setIsInsightsModalOpen(false)
             setCurrentInsightsProgram(null)
           }}
-          onGenerate={handleGenerateInsights}
+          onGenerate={handleReprioritization}
         />
       )}
       
