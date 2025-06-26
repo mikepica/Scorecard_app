@@ -570,11 +570,57 @@ export default function DetailsPage() {
     setIsGenerateModalOpen(true)
   }
 
-  // Handle Generate Update action (placeholder for now)
-  const handleGenerateUpdate = (content: string, instructions: string, files: File[]) => {
-    // TODO: Implement actual generation logic
-    console.log('Generate update called with:', { content, instructions, files })
-    setToast({ message: 'Generate Update functionality will be implemented later', type: 'info' })
+  // Handle Generate Update action
+  const handleGenerateUpdate = async (content: string, instructions: string, files: File[]) => {
+    try {
+      setToast({ message: 'Generating update...', type: 'info' })
+      
+      // Create FormData for file upload
+      const formData = new FormData()
+      formData.append('content', content)
+      formData.append('instructions', instructions)
+      
+      // Add program context
+      if (currentProgram) {
+        const programContext = JSON.stringify({
+          id: currentProgram.id,
+          text: currentProgram.text,
+          pillarName: currentProgram.pillarName,
+          categoryName: currentProgram.categoryName,
+          strategicGoalText: currentProgram.strategicGoalText,
+          q1Objective: currentProgram.q1Objective,
+          q2Objective: currentProgram.q2Objective,
+          q3Objective: currentProgram.q3Objective,
+          q4Objective: currentProgram.q4Objective
+        })
+        formData.append('programContext', programContext)
+      }
+      
+      // Add files
+      files.forEach(file => {
+        formData.append('files', file)
+      })
+      
+      const response = await fetch('/api/generate-update', {
+        method: 'POST',
+        body: formData
+      })
+      
+      const result = await response.json()
+      
+      if (result.success) {
+        // Update the program's progress updates with the generated content
+        if (currentProgram) {
+          await handleProgressUpdate(currentProgram.id, result.update)
+        }
+        setToast({ message: 'Update generated successfully!', type: 'success' })
+      } else {
+        setToast({ message: 'Failed to generate update', type: 'error' })
+      }
+    } catch (error) {
+      console.error('Error generating update:', error)
+      setToast({ message: 'Error generating update', type: 'error' })
+    }
   }
 
   // Handle opening the Generate Insights modal
@@ -584,10 +630,10 @@ export default function DetailsPage() {
   }
 
   // Handle Generate Insights action (placeholder for now)
-  const handleGenerateInsights = (prompt: string, promptFlow: string, files: File[]) => {
+  const handleGenerateInsights = (prompt: string, files: File[]) => {
     // TODO: Implement actual insights generation logic
-    console.log('Generate insights called with:', { prompt, promptFlow, files })
-    setToast({ message: 'Generate Insights functionality will be implemented later', type: 'info' })
+    console.log('Generate insights called with:', { prompt, files })
+    setToast({ message: 'Reprioritize Goals functionality will be implemented later', type: 'info' })
   }
 
   if (loading) {

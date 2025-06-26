@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const { messages, context } = body;
 
     // Load system prompt from file
-    const promptPath = path.join(process.cwd(), 'llm-system-prompt.md');
+    const promptPath = path.join(process.cwd(), 'Prompts', 'AI-chat-system-prompt.md');
     const systemPrompt = await fs.readFile(promptPath, 'utf-8');
 
     // Limit context size to prevent token overflow

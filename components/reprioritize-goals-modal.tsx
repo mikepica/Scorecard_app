@@ -12,24 +12,16 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
 
 interface ReprioritizeGoalsModalProps {
   isOpen: boolean
   onClose: () => void
-  onGenerate: (prompt: string, promptFlow: string, files: File[]) => void
+  onGenerate: (prompt: string, files: File[]) => void
 }
 
 export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: ReprioritizeGoalsModalProps) {
   const [prompt, setPrompt] = useState("")
   const [response, setResponse] = useState("")
-  const [promptFlow, setPromptFlow] = useState("none")
   const [files, setFiles] = useState<File[]>([])
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,14 +34,13 @@ export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: Repriori
   }
 
   const handleGenerate = () => {
-    onGenerate(prompt, promptFlow, files)
+    onGenerate(prompt, files)
     onClose()
   }
 
   const handleClose = () => {
     setPrompt("")
     setResponse("")
-    setPromptFlow("none")
     setFiles([])
     onClose()
   }
@@ -94,46 +85,28 @@ export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: Repriori
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="file-upload" className="block text-sm font-medium mb-2">
-                Attach Documents
-              </label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => document.getElementById('file-upload')?.click()}
-                  className="flex items-center gap-2"
-                >
-                  <Upload className="h-4 w-4" />
-                  Choose Files
-                </Button>
-                <input
-                  id="file-upload"
-                  type="file"
-                  multiple
-                  accept=".ppt,.pptx,.doc,.docx,.pdf,.txt,.xlsx,.xls"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="prompt-flow" className="block text-sm font-medium mb-2">
-                Pre-made Prompt Flows
-              </label>
-              <Select value={promptFlow} onValueChange={setPromptFlow}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select prompt flow" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None</SelectItem>
-                  <SelectItem value="similar-projects">Similar Projects</SelectItem>
-                  <SelectItem value="learnings-best-practices">Learnings/Best Practices</SelectItem>
-                </SelectContent>
-              </Select>
+          <div>
+            <label htmlFor="file-upload" className="block text-sm font-medium mb-2">
+              Attach Documents
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => document.getElementById('file-upload')?.click()}
+                className="flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Choose Files
+              </Button>
+              <input
+                id="file-upload"
+                type="file"
+                multiple
+                accept=".ppt,.pptx,.doc,.docx,.pdf,.txt,.xlsx,.xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
             </div>
           </div>
 
