@@ -11,7 +11,7 @@ import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData }
 import { Toast } from "@/components/toast"
 import { EditableField } from "@/components/ui/editable-field"
 import { GenerateUpdateModal } from "@/components/generate-update-modal"
-import { GenerateInsightsModal } from "@/components/generate-insights-modal"
+import { ReprioritizeGoalsModal } from "@/components/reprioritize-goals-modal"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -733,27 +733,29 @@ export default function DetailsPage() {
                         onSave={(newText) => handleProgramTextUpdate(program.id, newText)}
                         className={`${getPillarTextColor(program.pillarName)} font-medium text-base pr-8`}
                       />
-                      <button
-                        onClick={() => handleOpenInsightsModal(program)}
-                        className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group"
-                        title="Generate Insights"
-                      >
-                        <Bot className="h-4 w-4 text-gray-500 group-hover:text-purple-600" />
-                      </button>
                     </td>
                     <td className="border border-gray-300 p-3 relative" style={{width: '17.6%'}}>
                       <EditableField
                         value={program.progressUpdates || ""}
                         onSave={(newProgress) => handleProgressUpdate(program.id, newProgress)}
-                        className="text-base pr-8"
+                        className="text-base pr-32"
                         placeholder="Enter progress updates..."
                       />
                       <button
+                        onClick={() => handleOpenInsightsModal(program)}
+                        className="absolute bottom-2 right-32 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
+                        title="Reprioritize Goals"
+                      >
+                        <Bot className="h-4 w-4 text-gray-500 group-hover:text-purple-600" />
+                        <span className="text-xs text-gray-500 group-hover:text-purple-600">Reprioritize Goals</span>
+                      </button>
+                      <button
                         onClick={() => handleOpenGenerateModal(program)}
-                        className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group"
+                        className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
                         title="Generate Update"
                       >
                         <Bot className="h-4 w-4 text-gray-500 group-hover:text-blue-600" />
+                        <span className="text-xs text-gray-500 group-hover:text-blue-600">Generate Update</span>
                       </button>
                     </td>
                     <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
@@ -847,9 +849,9 @@ export default function DetailsPage() {
         />
       )}
 
-      {/* Generate Insights Modal */}
+      {/* Reprioritize Goals Modal */}
       {currentInsightsProgram && (
-        <GenerateInsightsModal
+        <ReprioritizeGoalsModal
           isOpen={isInsightsModalOpen}
           onClose={() => {
             setIsInsightsModalOpen(false)

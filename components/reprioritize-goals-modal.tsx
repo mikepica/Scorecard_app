@@ -20,13 +20,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-interface GenerateInsightsModalProps {
+interface ReprioritizeGoalsModalProps {
   isOpen: boolean
   onClose: () => void
   onGenerate: (prompt: string, promptFlow: string, files: File[]) => void
 }
 
-export function GenerateInsightsModal({ isOpen, onClose, onGenerate }: GenerateInsightsModalProps) {
+export function ReprioritizeGoalsModal({ isOpen, onClose, onGenerate }: ReprioritizeGoalsModalProps) {
   const [prompt, setPrompt] = useState("")
   const [response, setResponse] = useState("")
   const [promptFlow, setPromptFlow] = useState("none")
@@ -60,10 +60,10 @@ export function GenerateInsightsModal({ isOpen, onClose, onGenerate }: GenerateI
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Bot className="h-5 w-5" />
-            Generate Insights
+            Reprioritize Goals
           </DialogTitle>
           <DialogDescription>
-            Add prompts and attach documents to generate insights for this strategic program.
+            Add prompts and attach documents to reprioritize goals for this strategic program.
           </DialogDescription>
         </DialogHeader>
 
@@ -164,7 +164,7 @@ export function GenerateInsightsModal({ isOpen, onClose, onGenerate }: GenerateI
           </Button>
           <Button onClick={handleGenerate} className="flex items-center gap-2">
             <Bot className="h-4 w-4" />
-            Generate Insight
+            Reprioritize Goals
           </Button>
         </DialogFooter>
       </DialogContent>

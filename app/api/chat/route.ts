@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 
     // Limit context size to prevent token overflow
     const contextString = JSON.stringify(context);
-    const maxContextLength = 20000; // Adjust based on needs
+    const maxContextLength = 50000; // Adjust based on needs
     const truncatedContext = contextString.length > maxContextLength 
       ? contextString.substring(0, maxContextLength) + '...[truncated]'
       : contextString;
