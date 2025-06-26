@@ -4,9 +4,7 @@ import "./globals.css"
 import "react-day-picker/dist/style.css"
 
 export const metadata: Metadata = {
-  title: "ORD Scorecards",
-  description: "Created with v0",
-  generator: "v0.dev",
+  title: "ORD Scorecard",
 }
 
 export default function RootLayout({
