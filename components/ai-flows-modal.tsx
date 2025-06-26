@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bot, Upload, RotateCcw } from "lucide-react"
+import { Bot, Upload, ChevronRight, ChevronDown } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,11 @@ import {
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
@@ -37,12 +42,9 @@ interface AIFlowsModalProps {
 export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGenerate }: AIFlowsModalProps) {
   const [prompt, setPrompt] = useState("")
   const [files, setFiles] = useState<File[]>([])
-  const [searchTerms, setSearchTerms] = useState({
-    pillars: "",
-    categories: "",
-    goals: "",
-    programs: ""
-  })
+  const [searchTerm, setSearchTerm] = useState("")
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
   // Selection states - start with all selected
   const [selections, setSelections] = useState<FilterSelections>({
@@ -61,13 +63,13 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       )
       const allGoalIds = scorecardData.pillars.flatMap(p => 
         (p.categories || []).flatMap(c => 
-          (c.strategicGoals || []).map(g => g.id)
+  (c.goals || []).map(g => g.id)
         )
       )
       const allProgramIds = scorecardData.pillars.flatMap(p => 
         (p.categories || []).flatMap(c => 
-          (c.strategicGoals || []).flatMap(g => 
-            (g.strategicPrograms || []).map(prog => prog.id)
+  (c.goals || []).flatMap(g => 
+  (g.programs || []).map(prog => prog.id)
           )
         )
       )
@@ -78,43 +80,79 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
         goals: allGoalIds,
         programs: allProgramIds
       })
+      
+      // Initialize with pillars expanded so users can see categories immediately
+      const initialExpandedNodes = new Set(allPillarIds)
+      setExpandedNodes(initialExpandedNodes)
     }
   }, [isOpen, scorecardData])
 
-  const getFilteredData = () => {
-    if (!scorecardData || !scorecardData.pillars) return { pillars: [], categories: [], goals: [], programs: [] }
+  const matchesSearch = (text: string) => {
+    return searchTerm === "" || text.toLowerCase().includes(searchTerm.toLowerCase())
+  }
 
-    // Filter pillars
-    const filteredPillars = scorecardData.pillars.filter(p => 
-      selections.pillars.includes(p.id) &&
-      (searchTerms.pillars === "" || p.name.toLowerCase().includes(searchTerms.pillars.toLowerCase()))
-    )
-
-    // Filter categories based on selected pillars
-    const filteredCategories = filteredPillars.flatMap(p => 
-      (p.categories || []).filter(c => 
-        selections.categories.includes(c.id) &&
-        (searchTerms.categories === "" || c.name.toLowerCase().includes(searchTerms.categories.toLowerCase()))
+  const getFilteredPillars = () => {
+    if (!scorecardData || !scorecardData.pillars) return []
+    
+    // Auto-expand nodes that have matching children when searching
+    if (searchTerm) {
+      const nodesToExpand = new Set(expandedNodes)
+      
+      scorecardData.pillars.forEach(pillar => {
+        pillar.categories?.forEach(category => {
+          // Expand category if it has matching goals or programs
+const hasMatchingGoals = category.goals?.some(goal => 
+            matchesSearch(goal.text) || 
+goal.programs?.some(prog => matchesSearch(prog.text))
+          )
+          if (hasMatchingGoals) {
+            nodesToExpand.add(pillar.id) // Expand pillar
+            nodesToExpand.add(category.id) // Expand category
+          }
+          
+          // Expand goal if it has matching programs
+category.goals?.forEach(goal => {
+if (goal.programs?.some(prog => matchesSearch(prog.text))) {
+              nodesToExpand.add(pillar.id) // Expand pillar
+              nodesToExpand.add(category.id) // Expand category
+              nodesToExpand.add(goal.id) // Expand goal
+            }
+          })
+        })
+      })
+      
+      // Update expanded nodes if new nodes need to be expanded
+      if (nodesToExpand.size !== expandedNodes.size) {
+        setExpandedNodes(nodesToExpand)
+      }
+    }
+    
+    return scorecardData.pillars.filter(pillar => {
+      const pillarMatches = matchesSearch(pillar.name)
+      const categoryMatches = (pillar.categories || []).some(cat => 
+        matchesSearch(cat.name) || 
+(cat.goals || []).some(goal => 
+          matchesSearch(goal.text) || 
+(goal.programs || []).some(prog => matchesSearch(prog.text))
+        )
       )
-    )
+      return pillarMatches || categoryMatches
+    })
+  }
 
-    // Filter goals based on selected categories
-    const filteredGoals = filteredCategories.flatMap(c => 
-      (c.strategicGoals || []).filter(g => 
-        selections.goals.includes(g.id) &&
-        (searchTerms.goals === "" || g.text.toLowerCase().includes(searchTerms.goals.toLowerCase()))
-      )
-    )
+  const getTotalProgramCount = () => {
+    if (!scorecardData || !scorecardData.pillars) return 0
+    return scorecardData.pillars.reduce((total, pillar) => {
+      return total + (pillar.categories || []).reduce((catTotal, category) => {
+        return catTotal + (category.strategicGoals || []).reduce((goalTotal, goal) => {
+          return goalTotal + (goal.strategicPrograms || []).length
+        }, 0)
+      }, 0)
+    }, 0)
+  }
 
-    // Filter programs based on selected goals
-    const filteredPrograms = filteredGoals.flatMap(g => 
-      (g.strategicPrograms || []).filter(p => 
-        selections.programs.includes(p.id) &&
-        (searchTerms.programs === "" || p.text.toLowerCase().includes(searchTerms.programs.toLowerCase()))
-      )
-    )
-
-    return { pillars: filteredPillars, categories: filteredCategories, goals: filteredGoals, programs: filteredPrograms }
+  const getSelectedProgramCount = () => {
+    return selections.programs.length
   }
 
   const handlePillarToggle = (pillarId: string, checked: boolean) => {
@@ -125,11 +163,11 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       // Add pillar and all its children
       const categoryIds = (pillar.categories || []).map(c => c.id)
       const goalIds = (pillar.categories || []).flatMap(c => 
-        (c.strategicGoals || []).map(g => g.id)
+(c.goals || []).map(g => g.id)
       )
       const programIds = (pillar.categories || []).flatMap(c => 
-        (c.strategicGoals || []).flatMap(g => 
-          (g.strategicPrograms || []).map(p => p.id)
+(c.goals || []).flatMap(g => 
+(g.programs || []).map(p => p.id)
         )
       )
 
@@ -143,11 +181,11 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       // Remove pillar and all its children
       const categoryIds = (pillar.categories || []).map(c => c.id)
       const goalIds = (pillar.categories || []).flatMap(c => 
-        (c.strategicGoals || []).map(g => g.id)
+(c.goals || []).map(g => g.id)
       )
       const programIds = (pillar.categories || []).flatMap(c => 
-        (c.strategicGoals || []).flatMap(g => 
-          (g.strategicPrograms || []).map(p => p.id)
+(c.goals || []).flatMap(g => 
+(g.programs || []).map(p => p.id)
         )
       )
 
@@ -168,9 +206,9 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
 
     if (checked) {
       // Add category and all its children
-      const goalIds = (category.strategicGoals || []).map(g => g.id)
-      const programIds = (category.strategicGoals || []).flatMap(g => 
-        (g.strategicPrograms || []).map(p => p.id)
+const goalIds = (category.goals || []).map(g => g.id)
+const programIds = (category.goals || []).flatMap(g => 
+(g.programs || []).map(p => p.id)
       )
 
       setSelections(prev => ({
@@ -181,9 +219,9 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       }))
     } else {
       // Remove category and all its children
-      const goalIds = (category.strategicGoals || []).map(g => g.id)
-      const programIds = (category.strategicGoals || []).flatMap(g => 
-        (g.strategicPrograms || []).map(p => p.id)
+const goalIds = (category.goals || []).map(g => g.id)
+const programIds = (category.goals || []).flatMap(g => 
+(g.programs || []).map(p => p.id)
       )
 
       setSelections(prev => ({
@@ -197,13 +235,13 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
 
   const handleGoalToggle = (goalId: string, checked: boolean) => {
     const goal = (scorecardData?.pillars || []).flatMap(p => 
-      (p.categories || []).flatMap(c => (c.strategicGoals || []))
-    ).find(g => g.id === goalId)
+(p.categories || []).flatMap(c => (c.goals || []))
+).find(g => g.id === goalId)
     if (!goal) return
 
     if (checked) {
       // Add goal and all its children
-      const programIds = (goal.strategicPrograms || []).map(p => p.id)
+const programIds = (goal.programs || []).map(p => p.id)
 
       setSelections(prev => ({
         ...prev,
@@ -212,7 +250,7 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       }))
     } else {
       // Remove goal and all its children
-      const programIds = (goal.strategicPrograms || []).map(p => p.id)
+const programIds = (goal.programs || []).map(p => p.id)
 
       setSelections(prev => ({
         ...prev,
@@ -244,13 +282,13 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       )
       const allGoalIds = (scorecardData?.pillars || []).flatMap(p => 
         (p.categories || []).flatMap(c => 
-          (c.strategicGoals || []).map(g => g.id)
+  (c.goals || []).map(g => g.id)
         )
       )
       const allProgramIds = (scorecardData?.pillars || []).flatMap(p => 
         (p.categories || []).flatMap(c => 
-          (c.strategicGoals || []).flatMap(g => 
-            (g.strategicPrograms || []).map(prog => prog.id)
+  (c.goals || []).flatMap(g => 
+  (g.programs || []).map(prog => prog.id)
           )
         )
       )
@@ -278,13 +316,13 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
     )
     const allGoalIds = (scorecardData?.pillars || []).flatMap(p => 
       (p.categories || []).flatMap(c => 
-        (c.strategicGoals || []).map(g => g.id)
+(c.goals || []).map(g => g.id)
       )
     )
     const allProgramIds = (scorecardData?.pillars || []).flatMap(p => 
       (p.categories || []).flatMap(c => 
-        (c.strategicGoals || []).flatMap(g => 
-          (g.strategicPrograms || []).map(prog => prog.id)
+(c.goals || []).flatMap(g => 
+(g.programs || []).map(prog => prog.id)
         )
       )
     )
@@ -296,12 +334,50 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       programs: allProgramIds
     })
     
-    setSearchTerms({
-      pillars: "",
-      categories: "",
-      goals: "",
-      programs: ""
+    setSearchTerm("")
+  }
+
+  const toggleNode = (nodeId: string) => {
+    setExpandedNodes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(nodeId)) {
+        newSet.delete(nodeId)
+      } else {
+        newSet.add(nodeId)
+      }
+      return newSet
     })
+  }
+
+  const expandAll = () => {
+    const allNodeIds = new Set<string>()
+    scorecardData?.pillars?.forEach(pillar => {
+      allNodeIds.add(pillar.id)
+      pillar.categories?.forEach(category => {
+        allNodeIds.add(category.id)
+        category.strategicGoals?.forEach(goal => {
+          allNodeIds.add(goal.id)
+        })
+      })
+    })
+    setExpandedNodes(allNodeIds)
+  }
+
+  const collapseAll = () => {
+    setExpandedNodes(new Set())
+  }
+
+  const getCheckboxState = (nodeId: string, childIds: string[]) => {
+    const selectedChildren = childIds.filter(id => {
+      if (nodeId.startsWith('pillar-')) return selections.pillars.includes(id)
+      if (nodeId.startsWith('category-')) return selections.categories.includes(id)
+      if (nodeId.startsWith('goal-')) return selections.goals.includes(id)
+      return selections.programs.includes(id)
+    })
+    
+    if (selectedChildren.length === 0) return false
+    if (selectedChildren.length === childIds.length) return true
+    return 'indeterminate'
   }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -321,6 +397,9 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
   const handleClose = () => {
     setPrompt("")
     setFiles([])
+    setSearchTerm("")
+    setExpandedNodes(new Set())
+    setIsDropdownOpen(false)
     resetFilters()
     onClose()
   }
@@ -335,9 +414,9 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
       : "Extract learnings and best practices from selected strategic initiatives."
   }
 
-  const filteredData = getFilteredData()
-  const allPillarsSelected = (scorecardData?.pillars?.length || 0) > 0 && 
-    selections.pillars.length === (scorecardData?.pillars?.length || 0)
+  const filteredPillars = getFilteredPillars()
+  const totalPrograms = getTotalProgramCount()
+  const selectedPrograms = getSelectedProgramCount()
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -353,19 +432,10 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Hierarchical Filters */}
+          {/* Hierarchical Dropdown Filter */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-medium">Filter Selection</h3>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={resetFilters}
-                className="flex items-center gap-1"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Reset Filters
-              </Button>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
@@ -374,118 +444,185 @@ export function AIFlowsModal({ isOpen, onClose, flowType, scorecardData, onGener
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              {/* Strategic Pillars */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium">Strategic Pillars</Label>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="select-all-pillars"
-                      checked={allPillarsSelected}
-                      onCheckedChange={handleSelectAllPillars}
+            {/* Single Hierarchical Dropdown */}
+            <div className="space-y-2">
+              <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between">
+                    Select Context
+                    <ChevronDown className={`h-4 w-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-96 max-h-96 overflow-y-auto p-4">
+                  {/* Controls */}
+                  <div className="space-y-3 mb-4">
+                    {/* Search */}
+                    <Input
+                      placeholder="Search across all levels..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="text-sm"
                     />
-                    <Label htmlFor="select-all-pillars" className="text-xs">Select All</Label>
+                    
+                    {/* Expand/Collapse All */}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={expandAll}
+                        className="flex-1 text-xs"
+                      >
+                        Expand All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={collapseAll}
+                        className="flex-1 text-xs"
+                      >
+                        Collapse All
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={resetFilters}
+                        className="flex-1 text-xs"
+                      >
+                        Reset
+                      </Button>
+                    </div>
                   </div>
-                </div>
-                <Input
-                  placeholder="Search pillars..."
-                  value={searchTerms.pillars}
-                  onChange={(e) => setSearchTerms(prev => ({ ...prev, pillars: e.target.value }))}
-                  className="text-sm"
-                />
-                <div className="max-h-32 overflow-y-auto space-y-1 border rounded p-2">
-                  {scorecardData?.pillars
-                    ?.filter(p => searchTerms.pillars === "" || 
-                      p.name.toLowerCase().includes(searchTerms.pillars.toLowerCase()))
-                    ?.map(pillar => (
-                    <div key={pillar.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`pillar-${pillar.id}`}
-                        checked={selections.pillars.includes(pillar.id)}
-                        onCheckedChange={(checked) => handlePillarToggle(pillar.id, checked as boolean)}
-                      />
-                      <Label htmlFor={`pillar-${pillar.id}`} className="text-xs flex-1 cursor-pointer">
-                        {pillar.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Categories */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Categories</Label>
-                <Input
-                  placeholder="Search categories..."
-                  value={searchTerms.categories}
-                  onChange={(e) => setSearchTerms(prev => ({ ...prev, categories: e.target.value }))}
-                  className="text-sm"
-                />
-                <div className="max-h-32 overflow-y-auto space-y-1 border rounded p-2">
-                  {filteredData.categories.map(category => (
-                    <div key={category.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`category-${category.id}`}
-                        checked={selections.categories.includes(category.id)}
-                        onCheckedChange={(checked) => handleCategoryToggle(category.id, checked as boolean)}
-                      />
-                      <Label htmlFor={`category-${category.id}`} className="text-xs flex-1 cursor-pointer">
-                        {category.name}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Strategic Goals */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Strategic Goals</Label>
-                <Input
-                  placeholder="Search goals..."
-                  value={searchTerms.goals}
-                  onChange={(e) => setSearchTerms(prev => ({ ...prev, goals: e.target.value }))}
-                  className="text-sm"
-                />
-                <div className="max-h-32 overflow-y-auto space-y-1 border rounded p-2">
-                  {filteredData.goals.map(goal => (
-                    <div key={goal.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`goal-${goal.id}`}
-                        checked={selections.goals.includes(goal.id)}
-                        onCheckedChange={(checked) => handleGoalToggle(goal.id, checked as boolean)}
-                      />
-                      <Label htmlFor={`goal-${goal.id}`} className="text-xs flex-1 cursor-pointer">
-                        {goal.text}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Strategic Programs */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">Strategic Programs</Label>
-                <Input
-                  placeholder="Search programs..."
-                  value={searchTerms.programs}
-                  onChange={(e) => setSearchTerms(prev => ({ ...prev, programs: e.target.value }))}
-                  className="text-sm"
-                />
-                <div className="max-h-32 overflow-y-auto space-y-1 border rounded p-2">
-                  {filteredData.programs.map(program => (
-                    <div key={program.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`program-${program.id}`}
-                        checked={selections.programs.includes(program.id)}
-                        onCheckedChange={(checked) => handleProgramToggle(program.id, checked as boolean)}
-                      />
-                      <Label htmlFor={`program-${program.id}`} className="text-xs flex-1 cursor-pointer">
-                        {program.text}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
+                  {/* Hierarchical Tree */}
+                  <div className="space-y-1">
+                    {filteredPillars.map(pillar => {
+                      const pillarExpanded = expandedNodes.has(pillar.id)
+                      const pillarCategories = pillar.categories || []
+                      const pillarCategoryIds = pillarCategories.map(c => c.id)
+                      
+                      return (
+                        <div key={pillar.id} className="space-y-1">
+                          {/* Pillar */}
+                          <div className="flex items-center space-x-2 py-1">
+                            <button
+                              onClick={() => toggleNode(pillar.id)}
+                              className="p-0.5 hover:bg-gray-100 rounded"
+                            >
+                              {pillarCategories.length > 0 ? (
+                                pillarExpanded ? (
+                                  <ChevronDown className="h-3 w-3" />
+                                ) : (
+                                  <ChevronRight className="h-3 w-3" />
+                                )
+                              ) : (
+                                <div className="h-3 w-3" />
+                              )}
+                            </button>
+                            <Checkbox
+                              checked={selections.pillars.includes(pillar.id)}
+                              onCheckedChange={(checked) => handlePillarToggle(pillar.id, checked as boolean)}
+                            />
+                            <Label className="text-sm font-medium cursor-pointer flex-1">
+                              {pillar.name}
+                            </Label>
+                          </div>
+                          
+                          {/* Categories */}
+                          {pillarExpanded && pillarCategories.map(category => {
+                            const categoryExpanded = expandedNodes.has(category.id)
+                const categoryGoals = category.goals || []
+                            const categoryGoalIds = categoryGoals.map(g => g.id)
+                            
+                            return (
+                              <div key={category.id} className="ml-6 space-y-1">
+                                {/* Category */}
+                                <div className="flex items-center space-x-2 py-1">
+                                  <button
+                                    onClick={() => toggleNode(category.id)}
+                                    className="p-0.5 hover:bg-gray-100 rounded"
+                                  >
+                                    {categoryGoals.length > 0 ? (
+                                      categoryExpanded ? (
+                                        <ChevronDown className="h-3 w-3" />
+                                      ) : (
+                                        <ChevronRight className="h-3 w-3" />
+                                      )
+                                    ) : (
+                                      <div className="h-3 w-3" />
+                                    )}
+                                  </button>
+                                  <Checkbox
+                                    checked={selections.categories.includes(category.id)}
+                                    onCheckedChange={(checked) => handleCategoryToggle(category.id, checked as boolean)}
+                                  />
+                                  <Label className="text-sm cursor-pointer flex-1">
+                                    {category.name}
+                                  </Label>
+                                </div>
+                                
+                                {/* Goals */}
+                                {categoryExpanded && categoryGoals.map(goal => {
+                                  const goalExpanded = expandedNodes.has(goal.id)
+const goalPrograms = goal.programs || []
+                                  
+                                  return (
+                                    <div key={goal.id} className="ml-6 space-y-1">
+                                      {/* Goal */}
+                                      <div className="flex items-center space-x-2 py-1">
+                                        <button
+                                          onClick={() => toggleNode(goal.id)}
+                                          className="p-0.5 hover:bg-gray-100 rounded"
+                                        >
+                                          {goalPrograms.length > 0 ? (
+                                            goalExpanded ? (
+                                              <ChevronDown className="h-3 w-3" />
+                                            ) : (
+                                              <ChevronRight className="h-3 w-3" />
+                                            )
+                                          ) : (
+                                            <div className="h-3 w-3" />
+                                          )}
+                                        </button>
+                                        <Checkbox
+                                          checked={selections.goals.includes(goal.id)}
+                                          onCheckedChange={(checked) => handleGoalToggle(goal.id, checked as boolean)}
+                                        />
+                                        <Label className="text-xs cursor-pointer flex-1">
+                                          {goal.text}
+                                        </Label>
+                                      </div>
+                                      
+                                      {/* Programs */}
+                                      {goalExpanded && goalPrograms.map(program => (
+                                        <div key={program.id} className="ml-6">
+                                          <div className="flex items-center space-x-2 py-1">
+                                            <div className="h-3 w-3" />
+                                            <Checkbox
+                                              checked={selections.programs.includes(program.id)}
+                                              onCheckedChange={(checked) => handleProgramToggle(program.id, checked as boolean)}
+                                            />
+                                            <Label className="text-xs cursor-pointer flex-1">
+                                              {program.text}
+                                            </Label>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Selection Status */}
+              <div className="text-sm text-gray-600">
+                {selectedPrograms} of {totalPrograms} strategic programs selected
               </div>
             </div>
           </div>
