@@ -90,20 +90,23 @@ export default function InstructionsPage() {
               </div>
 
               {/* Bottom Right - OODA Loop Diagram */}
-              <div className="bg-white rounded-lg shadow-lg p-4 flex flex-col items-center justify-center">
-                <h3 className="text-lg font-bold mb-4 text-center">OODA Loop</h3>
-                <div 
-                  className="relative cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => setShowModal(true)}
-                  title="Click to view full size"
-                >
-                  <Image
-                    src="/OODA-loop-words.jpg"
-                    alt="OODA Loop Diagram"
-                    width={200}
-                    height={200}
-                    className="rounded-lg shadow-md"
-                  />
+              <div className="bg-white rounded-lg shadow-lg p-2 flex flex-col">
+                <h3 className="text-lg font-bold mb-2 text-center">OODA Loop</h3>
+                <div className="flex-1 flex items-center justify-center">
+                  <div 
+                    className="relative cursor-pointer hover:opacity-80 transition-opacity w-full h-full flex items-center justify-center"
+                    onClick={() => setShowModal(true)}
+                    title="Click to view full size"
+                  >
+                    <Image
+                      src="/OODA-loop-words.jpg"
+                      alt="OODA Loop Diagram"
+                      width={300}
+                      height={300}
+                      className="rounded-lg shadow-md object-contain max-w-full max-h-full"
+                      style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -113,23 +116,25 @@ export default function InstructionsPage() {
 
       {/* Modal for full-size OODA diagram */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-4xl max-h-full">
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
+          <div className="relative max-w-5xl max-h-full bg-white rounded-lg p-4">
             <button
               onClick={() => setShowModal(false)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 z-10"
+              className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 z-10 shadow-lg"
               aria-label="Close modal"
             >
-              <X size={32} />
+              <X size={24} />
             </button>
-            <Image
-              src="/OODA.Boyd.svg"
-              alt="OODA Loop - Full Diagram"
-              width={800}
-              height={600}
-              className="rounded-lg shadow-xl"
-              style={{ maxWidth: '100%', height: 'auto' }}
-            />
+            <div className="bg-white p-4 rounded-lg">
+              <Image
+                src="/OODA.Boyd.svg"
+                alt="OODA Loop - Full Diagram"
+                width={900}
+                height={700}
+                className="rounded-lg shadow-xl"
+                style={{ maxWidth: '100%', height: 'auto' }}
+              />
+            </div>
           </div>
         </div>
       )}

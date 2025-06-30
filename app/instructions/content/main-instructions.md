@@ -1,10 +1,5 @@
+### Using the ORD Scorecards App
 
-
-### Status Indicators
-- **Blue (Exceeded)** - Performance surpassed expectations
-- **Green (On-Track)** - Meeting planned objectives
-- **Amber (Delayed)** - Behind schedule but recoverable
-- **Red (Missed)** - Objectives not achieved
 
 ### Main Scorecard (Home)
 - **Goal-level view** displaying strategic pillars and their categories
@@ -17,9 +12,10 @@
 - **Editable fields** for program updates and modifications
 - **Bulk operations** for efficient data management
 
-### Status Updates
-Update quarterly status indicators by:
-1. Locating the relevant program or goal
-2. Selecting the appropriate status color
-3. Adding supporting comments and context
-4. Confirming the update is reflected in the main scorecard view
+### Editing Statuses and Content
+The text for Goals can be edited by right clicking. And status updates can be adjsuted directly via a popout modal.
+- **Blue (Exceeded)** - Performance surpassed expectations
+- **Green (On-Track)** - Meeting planned objectives
+- **Amber (Delayed)** - Behind schedule but recoverable
+- **Red (Missed)** - Objectives not achieved
+- **Grey (Not Set)** - No Status has been selected
