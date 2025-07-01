@@ -13,6 +13,7 @@ import { EditableField } from "@/components/ui/editable-field"
 import { GenerateUpdateModal } from "@/components/generate-update-modal"
 import { ReprioritizeGoalsModal } from "@/components/reprioritize-goals-modal"
 import { AIFlowsModal } from "@/components/ai-flows-modal"
+import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -68,6 +69,10 @@ export default function DetailsPage() {
 
   // State for filter visibility - default to show filters
   const [filtersVisible, setFiltersVisible] = useState(true)
+
+  // State for tooltip
+  const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
 
   // Create a map of relationships for quick lookups
   const relationshipMap = useMemo(() => {
@@ -327,15 +332,6 @@ export default function DetailsPage() {
     return programs
   }, [selectedPillar, selectedCategory, selectedGoal, data])
 
-  // Get sponsor information
-  const sponsor = useMemo(() => {
-    if (selectedGoal === ALL_VALUE) {
-      return "Multiple"
-    }
-
-    const goal = relationshipMap.goals.get(selectedGoal)
-    return goal?.ordLtSponsors || ""
-  }, [selectedGoal, relationshipMap.goals])
 
   // Get selected pillar name
   const pillarName = useMemo(() => {
@@ -879,10 +875,6 @@ export default function DetailsPage() {
                 labelWidth="w-36"
               />
             </div>
-            <div className="ml-4 flex items-center">
-              <span className="font-medium text-lg mr-2">ORD LT sponsor:</span>
-              <span>{sponsor}</span>
-            </div>
           </div>
 
           <div className="mb-3">
@@ -932,7 +924,22 @@ export default function DetailsPage() {
                 }
                 return (
                   <tr key={program.id}>
-                    <td className="border border-gray-300 p-3 relative" style={{width: '12%'}}>
+                    <td 
+                      className="border border-gray-300 p-3 relative hover:bg-gray-50" 
+                      style={{width: '12%'}}
+                      onMouseEnter={(e) => {
+                        setHoveredProgram(program.id)
+                        setTooltipPosition({ x: e.clientX, y: e.clientY })
+                      }}
+                      onMouseMove={(e) => {
+                        if (hoveredProgram === program.id) {
+                          setTooltipPosition({ x: e.clientX, y: e.clientY })
+                        }
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredProgram(null)
+                      }}
+                    >
                       <EditableField
                         value={program.text}
                         onSave={(newText) => handleProgramTextUpdate(program.id, newText)}
@@ -1074,6 +1081,15 @@ export default function DetailsPage() {
           flowType={aiFlowType}
           scorecardData={data}
           onGenerate={handleAIFlowsGenerate}
+        />
+      )}
+      
+      {/* Strategic Program Tooltip */}
+      {hoveredProgram && (
+        <StrategicProgramTooltip
+          program={filteredPrograms.find(p => p.id === hoveredProgram)!}
+          isVisible={hoveredProgram !== null}
+          position={tooltipPosition}
         />
       )}
       

@@ -135,6 +135,7 @@ export class DatabaseService {
         sponsorsLeads: row.sponsors_leads,
         reportingOwners: row.reporting_owners,
         progressUpdates: row.progress_updates,
+        updatedAt: row.updated_at,
         strategicGoalId: row.goal_id,
         categoryId: row.category_id,
         strategicPillarId: row.pillar_id

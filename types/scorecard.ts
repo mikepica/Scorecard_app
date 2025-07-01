@@ -13,6 +13,7 @@ export interface StrategicProgram {
   q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
   q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
   progressUpdates?: string
+  updatedAt?: string
   strategicGoalId: string
   categoryId: string
   strategicPillarId: string
