@@ -108,7 +108,11 @@ export function EditableField({
           className
         )}
       >
-        {value || placeholder}
+{value ? (
+          <span>{value}</span>
+        ) : (
+          <span className="text-gray-400 italic">{placeholder}</span>
+        )}
       </div>
       {previousValue !== value && (
         <button
