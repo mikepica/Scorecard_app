@@ -571,11 +571,9 @@ export default function DetailsPage() {
     setIsGenerateModalOpen(true)
   }
 
-  // Handle Generate Update action
-  const handleGenerateUpdate = async (content: string, instructions: string, files: File[]) => {
+  // Handle Generate Update action - now returns the generated content instead of saving directly
+  const handleGenerateUpdate = async (content: string, instructions: string, files: File[]): Promise<string> => {
     try {
-      setToast({ message: 'Generating update...', type: 'info' })
-      
       // Create FormData for file upload
       const formData = new FormData()
       formData.append('content', content)
@@ -610,17 +608,28 @@ export default function DetailsPage() {
       const result = await response.json()
       
       if (result.success) {
-        // Update the program's progress updates with the generated content
-        if (currentProgram) {
-          await handleProgressUpdate(currentProgram.id, result.update)
-        }
-        setToast({ message: 'Update generated successfully!', type: 'success' })
+        return result.update
       } else {
-        setToast({ message: 'Failed to generate update', type: 'error' })
+        throw new Error('Failed to generate update')
       }
     } catch (error) {
       console.error('Error generating update:', error)
-      setToast({ message: 'Error generating update', type: 'error' })
+      throw error
+    }
+  }
+
+  // Handle Apply Update action - saves the final content to database
+  const handleApplyUpdate = async (content: string) => {
+    try {
+      if (currentProgram) {
+        await handleProgressUpdate(currentProgram.id, content)
+        setToast({ message: 'Update applied successfully!', type: 'success' })
+        setIsGenerateModalOpen(false)
+        setCurrentProgram(null)
+      }
+    } catch (error) {
+      console.error('Error applying update:', error)
+      setToast({ message: 'Error applying update', type: 'error' })
     }
   }
 
@@ -1058,6 +1067,7 @@ export default function DetailsPage() {
           }}
           initialContent={currentProgram.progressUpdates || ""}
           onGenerate={handleGenerateUpdate}
+          onApply={handleApplyUpdate}
         />
       )}
 
