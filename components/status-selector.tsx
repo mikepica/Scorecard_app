@@ -36,12 +36,53 @@ export function StatusSelector({ currentStatus, onStatusChange, onClose, anchorR
   // Position the dropdown near the triggering element
   useEffect(() => {
     if (anchorRect) {
-      setDropdownPos({ top: anchorRect.bottom + window.scrollY, left: anchorRect.left + window.scrollX })
+      // Since we're using createPortal to document.body,
+      // getBoundingClientRect already gives us viewport coordinates
+      const modalHeight = 200; // approximate height of modal
+      const modalWidth = 192; // w-48 = 12rem = 192px
+      
+      // Start with the basic position below the anchor
+      let finalTop = anchorRect.bottom;
+      let finalLeft = anchorRect.left;
+      
+      // Add boundary checking to ensure modal stays within viewport
+      if (finalTop + modalHeight > window.innerHeight) {
+        // If modal would go below viewport, position it above the anchor
+        finalTop = anchorRect.top - modalHeight;
+      }
+      
+      if (finalLeft + modalWidth > window.innerWidth) {
+        // If modal would go beyond right edge, align it to the right edge
+        finalLeft = window.innerWidth - modalWidth;
+      }
+      
+      // Ensure modal doesn't go off the left or top edges
+      finalTop = Math.max(0, finalTop);
+      finalLeft = Math.max(0, finalLeft);
+      
+      setDropdownPos({ top: finalTop, left: finalLeft });
     } else {
       const parent = dropdownRef.current?.parentElement
       if (parent) {
         const rect = parent.getBoundingClientRect()
-        setDropdownPos({ top: rect.bottom + window.scrollY, left: rect.left + window.scrollX })
+        const modalHeight = 200;
+        const modalWidth = 192;
+        
+        let finalTop = rect.bottom;
+        let finalLeft = rect.left;
+        
+        if (finalTop + modalHeight > window.innerHeight) {
+          finalTop = rect.top - modalHeight;
+        }
+        
+        if (finalLeft + modalWidth > window.innerWidth) {
+          finalLeft = window.innerWidth - modalWidth;
+        }
+        
+        finalTop = Math.max(0, finalTop);
+        finalLeft = Math.max(0, finalLeft);
+        
+        setDropdownPos({ top: finalTop, left: finalLeft });
       }
     }
   }, [anchorRect])
