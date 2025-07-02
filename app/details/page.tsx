@@ -915,14 +915,14 @@ export default function DetailsPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left text-base`} style={{width: '12%'}}>
+              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left text-base`} style={{width: '15%'}}>
                 Strategic Programs
               </th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Progress Updates</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q1</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q2</th>
-              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q3</th>
-              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center text-base" style={{width: '17.6%'}}>Q4</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Progress Updates</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q1</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q2</th>
+              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q3</th>
+              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q4</th>
             </tr>
           </thead>
           <tbody>
@@ -935,7 +935,7 @@ export default function DetailsPage() {
                   <tr key={program.id}>
                     <td 
                       className="border border-gray-300 p-3 relative hover:bg-gray-50" 
-                      style={{width: '12%'}}
+                      style={{width: '15%'}}
                       onMouseEnter={(e) => {
                         setHoveredProgram(program.id)
                         setTooltipPosition({ x: e.clientX, y: e.clientY })
@@ -955,16 +955,18 @@ export default function DetailsPage() {
                         className={`${getPillarTextColor(program.pillarName)} font-medium text-base pr-8`}
                       />
                     </td>
-                    <td className="border border-gray-300 p-3 relative" style={{width: '17.6%'}}>
-                      <EditableField
-                        value={program.progressUpdates || ""}
-                        onSave={(newProgress) => handleProgressUpdate(program.id, newProgress)}
-                        className="text-base pr-32"
-                        placeholder="Enter progress updates..."
-                      />
+                    <td className="border border-gray-300 p-3 relative" style={{width: '17%'}}>
+                      <div className="pb-8">
+                        <EditableField
+                          value={program.progressUpdates || ""}
+                          onSave={(newProgress) => handleProgressUpdate(program.id, newProgress)}
+                          className="text-base"
+                          placeholder="Enter progress updates..."
+                        />
+                      </div>
                       <button
                         onClick={() => handleOpenReprioritizeModal(program)}
-                        className="absolute bottom-2 right-32 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
+                        className="absolute bottom-2 left-2 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
                         title="Reprioritize Goals"
                       >
                         <Bot className="h-4 w-4 text-gray-500 group-hover:text-purple-600" />
@@ -979,7 +981,7 @@ export default function DetailsPage() {
                         <span className="text-xs text-gray-500 group-hover:text-blue-600">Generate Update</span>
                       </button>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
                       <div className="mb-2">
                         <EditableField
                           value={program.q1Objective || ""}
@@ -995,7 +997,7 @@ export default function DetailsPage() {
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
                       <div className="mb-2">
                         <EditableField
                           value={program.q2Objective || ""}
@@ -1011,7 +1013,7 @@ export default function DetailsPage() {
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
                       <div className="mb-2">
                         <EditableField
                           value={program.q3Objective || ""}
@@ -1027,7 +1029,7 @@ export default function DetailsPage() {
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17.6%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
                       <div className="mb-2">
                         <EditableField
                           value={program.q4Objective || ""}
