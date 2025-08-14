@@ -8,6 +8,8 @@ import { EditableField } from "@/components/ui/editable-field"
 import { useEditableField } from "@/hooks/use-editable-field"
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
+import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
+import { getPillarConfig } from "@/config/pillar-config"
 
 const STATUS_OPTIONS = [
   { value: "exceeded", label: "Exceeded" },
@@ -32,49 +34,12 @@ export function Scorecard({ data, onDataUpdate, selectedQuarter = "q4" }: { data
 }
 
 function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
-  const getBgColor = (name: string) => {
-    switch (name.toLowerCase()) {
-      case "science & innovation":
-        return "bg-cyan-200"
-      case "growth & ta leadership":
-        return "bg-pink-500 text-white"
-      case "people & sustainability":
-        return "bg-pillar-lime"
-      case "precision medicine":
-        return "bg-pillar-light-blue"
-      case "pipeline acceleration":
-        return "bg-pillar-magenta text-white"
-      case "patient engagement":
-        return "bg-pillar-lime"
-      default:
-        return "bg-gray-200"
-    }
-  }
-
-  const getLineColor = (name: string) => {
-    switch (name.toLowerCase()) {
-      case "science & innovation":
-        return "bg-cyan-500"
-      case "growth & ta leadership":
-        return "bg-pink-600"
-      case "people & sustainability":
-        return "bg-pillar-lime"
-      case "precision medicine":
-        return "bg-pillar-light-blue"
-      case "pipeline acceleration":
-        return "bg-pillar-magenta"
-      case "patient engagement":
-        return "bg-pillar-lime"
-      default:
-        return "bg-gray-400"
-    }
-  }
 
   return (
     <div className="border rounded-md overflow-hidden h-full flex flex-col relative">
-      <div className={`p-3 ${getBgColor(pillar.name)}`}>
+      <div className={`p-3 ${getPillarColorWithText(pillar)}`}>
         <div className="flex items-center gap-2">
-          <PillarIcon name={pillar.name} />
+          <PillarIcon pillar={pillar} />
           <h2 className="text-xl font-bold">{pillar.name}</h2>
         </div>
       </div>
@@ -85,7 +50,7 @@ function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar;
           ))}
       </div>
       {/* Bottom line positioned slightly above the bottom */}
-      <div className={`h-1 w-full ${getLineColor(pillar.name)} absolute bottom-1`}></div>
+      <div className={`h-1 w-full ${getPillarColor(pillar)} absolute bottom-1`}></div>
     </div>
   )
 }
@@ -134,7 +99,7 @@ function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { 
         <EditableField
           value={category.name}
           onSave={handleCategoryNameSave}
-          className={`text-base font-medium ${getCategoryColor(pillar.name)}`}
+          className={`text-base font-medium ${getCategoryColor(pillar)}`}
         />
         <StatusCircle
           status={category.status}
@@ -291,23 +256,7 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
   )
 }
 
-function getCategoryColor(pillarName: string) {
-  if (!pillarName) return "text-gray-500"
-
-  switch (pillarName.toLowerCase()) {
-    case "science & innovation":
-      return "text-cyan-500"
-    case "growth & ta leadership":
-      return "text-pink-500"
-    case "people & sustainability":
-      return "text-pillar-lime"
-    case "precision medicine":
-      return "text-pillar-light-blue"
-    case "pipeline acceleration":
-      return "text-pillar-magenta"
-    case "patient engagement":
-      return "text-pillar-lime"
-    default:
-      return "text-gray-500"
-  }
+function getCategoryColor(pillar: Pillar) {
+  const config = getPillarConfig(pillar)
+  return config ? config.textClass : "text-gray-500"
 }

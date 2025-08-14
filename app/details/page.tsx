@@ -13,6 +13,8 @@ import { EditableField } from "@/components/ui/editable-field"
 import { GenerateUpdateModal } from "@/components/generate-update-modal"
 import { ReprioritizeGoalsModal } from "@/components/reprioritize-goals-modal"
 import { AIFlowsModal } from "@/components/ai-flows-modal"
+import { getPillarColorById } from "@/lib/pillar-utils"
+import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 
 // Special value to represent "All" selection
@@ -401,47 +403,18 @@ export default function DetailsPage() {
     }
   }
 
-  const getPillarHeaderColor = (pillarName: string) => {
+  const getPillarHeaderColor = (pillarId: string) => {
     // If showing all pillars, use a neutral color
-    if (pillarName.toLowerCase().includes("all")) {
+    if (pillarId === ALL_VALUE) {
       return "bg-gray-600"
     }
     
-    switch (pillarName.toLowerCase()) {
-      case "science & innovation":
-        return "bg-cyan-500"
-      case "growth & ta leadership":
-        return "bg-pink-600"
-      case "people & sustainability":
-        return "bg-pillar-lime"
-      case "precision medicine":
-        return "bg-pillar-light-blue"
-      case "pipeline acceleration":
-        return "bg-pillar-magenta"
-      case "patient engagement":
-        return "bg-pillar-lime"
-      default:
-        return "bg-purple-800"
-    }
+    return getPillarColorById(pillarId)
   }
 
-  const getPillarTextColor = (pillarName: string) => {
-    switch (pillarName.toLowerCase()) {
-      case "science & innovation":
-        return "text-cyan-500"
-      case "growth & ta leadership":
-        return "text-pink-600"
-      case "people & sustainability":
-        return "text-pillar-lime"
-      case "precision medicine":
-        return "text-pillar-light-blue"
-      case "pipeline acceleration":
-        return "text-pillar-magenta"
-      case "patient engagement":
-        return "text-pillar-lime"
-      default:
-        return "text-purple-800"
-    }
+  const getPillarTextColor = (pillarId: string) => {
+    const config = getPillarConfigById(pillarId)
+    return config ? config.textClass : "text-gray-600"
   }
 
   // Handle status update
@@ -915,7 +888,7 @@ export default function DetailsPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(pillarName)} text-white p-3 text-left text-base`} style={{width: '15%'}}>
+              <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base`} style={{width: '15%'}}>
                 Strategic Programs
               </th>
               <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Progress Updates</th>
@@ -952,7 +925,7 @@ export default function DetailsPage() {
                       <EditableField
                         value={program.text}
                         onSave={(newText) => handleProgramTextUpdate(program.id, newText)}
-                        className={`${getPillarTextColor(program.pillarName)} font-medium text-base pr-8`}
+                        className={`${getPillarTextColor(program.strategicPillarId)} font-medium text-base pr-8`}
                       />
                     </td>
                     <td className="border border-gray-300 p-3 relative" style={{width: '17%'}}>
