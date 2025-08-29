@@ -991,11 +991,24 @@ export default function DetailsPage() {
       <div className="flex-1 p-4 overflow-auto">
         <table className="w-full border-collapse">
           <thead>
+            {/* Section title row */}
             <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base`} style={{width: '14.3%'}}>
+              <th className="border border-gray-300 bg-gray-50 text-black text-base p-2 border-r-2 border-gray-400" style={{width: '14.3%'}}>
+                {/* Empty cell to keep Strategic Programs separate */}
+              </th>
+              <th className="border border-gray-300 bg-gray-50 text-black text-base p-2 text-center border-r-2 border-gray-400" colSpan={2} style={{width: '28.6%'}}>
+                Progress Updates
+              </th>
+              <th className="border border-gray-300 bg-gray-50 text-black text-base p-2 text-center" colSpan={4} style={{width: '57.2%'}}>
+                Quarterly Objectives
+              </th>
+            </tr>
+            {/* Column headers row */}
+            <tr>
+              <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base border-r-2 border-gray-400`} style={{width: '14.3%'}}>
                 Strategic Programs
               </th>
-              <th className="border border-gray-300 bg-blue-500 text-white p-3 text-center text-base relative" style={{width: '14.3%'}}>
+              <th className="border border-gray-300 bg-gray-200 text-black p-3 text-center text-base relative border-r-2 border-gray-400" style={{width: '14.3%'}}>
                 <div className="flex items-center justify-center gap-1">
                   <select 
                     value={selectedComparisonQuarter.columnName}
@@ -1005,7 +1018,7 @@ export default function DetailsPage() {
                         setSelectedComparisonQuarter(selectedQuarter)
                       }
                     }}
-                    className="bg-transparent text-white border-0 text-center text-base cursor-pointer focus:outline-none focus:ring-0"
+                    className="bg-transparent text-black border-0 text-center text-base cursor-pointer focus:outline-none focus:ring-0"
                   >
                     {quarterOptions.map(option => (
                       <option key={option.value} value={option.value} className="text-black">
@@ -1014,7 +1027,7 @@ export default function DetailsPage() {
                     ))}
                   </select>
                   <div className="relative group">
-                    <Info size={14} className="text-white opacity-70 hover:opacity-100 cursor-help" />
+                    <Info size={14} className="text-gray-600 opacity-70 hover:opacity-100 cursor-help" />
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       Select a different Quarterly update to view
                       <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
@@ -1022,13 +1035,13 @@ export default function DetailsPage() {
                   </div>
                 </div>
               </th>
-              <th className="border border-gray-300 bg-purple-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>{currentQuarter.label}</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base relative" style={{width: '14.3%'}}>
+              <th className="border border-gray-300 bg-gray-200 text-black p-3 text-center text-base border-r-2 border-gray-400" style={{width: '14.3%'}}>{currentQuarter.label}</th>
+              <th className="border border-gray-300 bg-gray-200 text-black p-3 text-center text-base relative" style={{width: '14.3%'}}>
                 <div className="flex items-center justify-center gap-1">
                   <select 
                     value={startingQuarter}
                     onChange={(e) => handleStartingQuarterChange(e.target.value)}
-                    className="bg-transparent text-white border-0 text-center text-base cursor-pointer focus:outline-none focus:ring-0"
+                    className="bg-transparent text-black border-0 text-center text-base cursor-pointer focus:outline-none focus:ring-0"
                   >
                     {startingQuarterOptions.map(option => (
                       <option key={option.value} value={option.value} className="text-black">
@@ -1037,7 +1050,7 @@ export default function DetailsPage() {
                     ))}
                   </select>
                   <div className="relative group">
-                    <Info size={14} className="text-white opacity-70 hover:opacity-100 cursor-help" />
+                    <Info size={14} className="text-gray-600 opacity-70 hover:opacity-100 cursor-help" />
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       Select the Starting Quarter Objectives
                       <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
@@ -1046,7 +1059,7 @@ export default function DetailsPage() {
                 </div>
               </th>
               {displayQuarters.slice(1).map((quarter, index) => (
-                <th key={quarter.columnName} className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>
+                <th key={quarter.columnName} className="border border-gray-300 bg-gray-200 text-black p-3 text-center text-base" style={{width: '14.3%'}}>
                   {quarter.label}
                 </th>
               ))}
@@ -1061,7 +1074,7 @@ export default function DetailsPage() {
                 return (
                   <tr key={program.id}>
                     <td 
-                      className="border border-gray-300 p-3 relative hover:bg-gray-50" 
+                      className="border border-gray-300 p-3 relative hover:bg-gray-50 border-r-2 border-gray-400" 
                       style={{width: '14.3%'}}
                       onMouseEnter={(e) => {
                         setHoveredProgram(program.id)
@@ -1082,7 +1095,7 @@ export default function DetailsPage() {
                         className={`${getPillarTextColor(program.strategicPillarId)} font-medium text-base pr-8`}
                       />
                     </td>
-                    <td className="border border-gray-300 p-3" style={{width: '14.3%'}}>
+                    <td className="border border-gray-300 p-3 border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <EditableField
                         value={(program as any)[selectedComparisonQuarter.columnName] || ""}
                         onSave={(newProgress) => handleQuarterProgressUpdate(program.id, selectedComparisonQuarter.columnName, newProgress)}
@@ -1090,7 +1103,7 @@ export default function DetailsPage() {
                         placeholder={`Enter ${selectedComparisonQuarter.label} progress...`}
                       />
                     </td>
-                    <td className="border border-gray-300 p-3 relative" style={{width: '14.3%'}}>
+                    <td className="border border-gray-300 p-3 relative border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <div className="pb-8">
                         <EditableField
                           value={(program as any)[currentQuarter.columnName] || ""}
