@@ -296,22 +296,7 @@ export class DatabaseService {
     }
   }
 
-  // Update category status
-  static async updateCategoryStatus(categoryId: string, status: string | null): Promise<void> {
-    const client = await getDbConnection();
-    try {
-      const result = await client.query(
-        'UPDATE categories SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [status, categoryId]
-      );
-      
-      if (result.rowCount === 0) {
-        throw new Error(`Category with ID ${categoryId} not found`);
-      }
-    } finally {
-      client.release();
-    }
-  }
+  // Note: updateCategoryStatus removed - categories no longer have status column
 
   // Update category name
   static async updateCategoryName(categoryId: string, name: string): Promise<void> {
@@ -330,22 +315,7 @@ export class DatabaseService {
     }
   }
 
-  // Update goal status
-  static async updateGoalStatus(goalId: string, status: string | null): Promise<void> {
-    const client = await getDbConnection();
-    try {
-      const result = await client.query(
-        'UPDATE strategic_goals SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-        [status, goalId]
-      );
-      
-      if (result.rowCount === 0) {
-        throw new Error(`Goal with ID ${goalId} not found`);
-      }
-    } finally {
-      client.release();
-    }
-  }
+  // Note: updateGoalStatus removed - goals no longer have general status column, only year-specific ones
 
   // Update goal text
   static async updateGoalText(goalId: string, text: string): Promise<void> {
@@ -389,7 +359,6 @@ export class DatabaseService {
           
           // Validate column name for year-specific formats
           const validStatusColumns = [
-            'q1_status', 'q2_status', 'q3_status', 'q4_status', // legacy
             'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
             'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
           ];
@@ -423,7 +392,6 @@ export class DatabaseService {
           
           // Validate column name for year-specific formats
           const validObjectiveColumns = [
-            'q1_objective', 'q2_objective', 'q3_objective', 'q4_objective', // legacy
             'q1_2025_objective', 'q2_2025_objective', 'q3_2025_objective', 'q4_2025_objective',
             'q1_2026_objective', 'q2_2026_objective', 'q3_2026_objective', 'q4_2026_objective'
           ];
@@ -479,14 +447,7 @@ export class DatabaseService {
           if (result.rowCount === 0) throw new Error(`Category with ID ${categoryNameId} not found`);
           break;
           
-        case 'goal':
-          const [,, goalId] = fieldPath;
-          result = await client.query(
-            'UPDATE strategic_goals SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-            [newValue, goalId]
-          );
-          if (result.rowCount === 0) throw new Error(`Goal with ID ${goalId} not found`);
-          break;
+        // Note: 'goal' case removed - goals no longer have general status column, use 'goal-quarter' instead
           
         case 'goal-text':
           const [,, goalTextId] = fieldPath;
