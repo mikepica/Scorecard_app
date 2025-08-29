@@ -99,7 +99,6 @@ export class DatabaseService {
       const goals: StrategicGoal[] = goalsResult.rows.map(row => ({
         id: row.id,
         text: row.text,
-        status: row.status,
         comments: row.comments,
         
         // 2025 Objectives and Statuses
@@ -122,15 +121,6 @@ export class DatabaseService {
         q3_2026_status: row.q3_2026_status,
         q4_2026_status: row.q4_2026_status,
         
-        // Legacy fields (for backward compatibility)
-        q1Objective: row.q1_objective,
-        q2Objective: row.q2_objective,
-        q3Objective: row.q3_objective,
-        q4Objective: row.q4_objective,
-        q1Status: row.q1_status,
-        q2Status: row.q2_status,
-        q3Status: row.q3_status,
-        q4Status: row.q4_status,
         ordLtSponsors: row.ord_lt_sponsors,
         sponsorsLeads: row.sponsors_leads,
         reportingOwners: row.reporting_owners,
@@ -164,15 +154,6 @@ export class DatabaseService {
         q3_2026_status: row.q3_2026_status,
         q4_2026_status: row.q4_2026_status,
         
-        // Legacy fields (for backward compatibility)
-        q1Objective: row.q1_objective,
-        q2Objective: row.q2_objective,
-        q3Objective: row.q3_objective,
-        q4Objective: row.q4_objective,
-        q1Status: row.q1_status,
-        q2Status: row.q2_status,
-        q3Status: row.q3_status,
-        q4Status: row.q4_status,
         ordLtSponsors: row.ord_lt_sponsors,
         sponsorsLeads: row.sponsors_leads,
         reportingOwners: row.reporting_owners,
@@ -514,6 +495,30 @@ export class DatabaseService {
             [newValue, goalTextId]
           );
           if (result.rowCount === 0) throw new Error(`Goal with ID ${goalTextId} not found`);
+          break;
+
+        case 'goal-quarter':
+          if (!quarter) throw new Error('Quarter is required for goal quarter status updates');
+          const [,, goalQuarterId] = fieldPath;
+          
+          // Support year-specific formats
+          const goalColumn = quarter.includes('_') ? `${quarter}_status` : `${quarter}_status`;
+          
+          // Validate column name for year-specific formats
+          const validGoalStatusColumns = [
+            'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
+            'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
+          ];
+          
+          if (!validGoalStatusColumns.includes(goalColumn.replace('_status', '') + '_status')) {
+            throw new Error(`Invalid quarter status column for goals: ${goalColumn}`);
+          }
+          
+          result = await client.query(
+            `UPDATE strategic_goals SET ${goalColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [newValue, goalQuarterId]
+          );
+          if (result.rowCount === 0) throw new Error(`Goal with ID ${goalQuarterId} not found`);
           break;
           
         default:

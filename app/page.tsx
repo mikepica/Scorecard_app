@@ -16,17 +16,33 @@ export default function Home() {
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
-  const [selectedQuarter, setSelectedQuarter] = useState("q1")
+  // Function to get current quarter based on today's date
+  const getCurrentQuarter = () => {
+    const today = new Date()
+    const month = today.getMonth() + 1 // getMonth() returns 0-11, we want 1-12
+    const year = today.getFullYear()
+    
+    if (month >= 1 && month <= 3) return `q1_${year}`
+    if (month >= 4 && month <= 6) return `q2_${year}`
+    if (month >= 7 && month <= 9) return `q3_${year}`
+    return `q4_${year}`
+  }
+
+  const [selectedQuarter, setSelectedQuarter] = useState(getCurrentQuarter())
   // const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
   const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
   const aiFlowsDropdownRef = useRef<HTMLDivElement>(null)
 
   const QUARTER_OPTIONS = [
-    { value: "q1", label: "Q1" },
-    { value: "q2", label: "Q2" },
-    { value: "q3", label: "Q3" },
-    { value: "q4", label: "Q4" },
+    { value: "q1_2025", label: "Q1 2025" },
+    { value: "q2_2025", label: "Q2 2025" },
+    { value: "q3_2025", label: "Q3 2025" },
+    { value: "q4_2025", label: "Q4 2025" },
+    { value: "q1_2026", label: "Q1 2026" },
+    { value: "q2_2026", label: "Q2 2026" },
+    { value: "q3_2026", label: "Q3 2026" },
+    { value: "q4_2026", label: "Q4 2026" },
   ]
 
   useEffect(() => {

@@ -665,10 +665,10 @@ export default function DetailsPage() {
           pillarName: currentProgram.pillarName,
           categoryName: currentProgram.categoryName,
           strategicGoalText: currentProgram.strategicGoalText,
-          q1Objective: currentProgram.q1Objective,
-          q2Objective: currentProgram.q2Objective,
-          q3Objective: currentProgram.q3Objective,
-          q4Objective: currentProgram.q4Objective
+          q1Objective: currentProgram.q1_2025_objective,
+          q2Objective: currentProgram.q2_2025_objective,
+          q3Objective: currentProgram.q3_2025_objective,
+          q4Objective: currentProgram.q4_2025_objective
         })
         formData.append('programContext', programContext)
       }
@@ -742,14 +742,14 @@ export default function DetailsPage() {
           pillarName: currentInsightsProgram.pillarName,
           categoryName: currentInsightsProgram.categoryName,
           strategicGoalText: currentInsightsProgram.strategicGoalText,
-          q1Objective: currentInsightsProgram.q1Objective || '',
-          q2Objective: currentInsightsProgram.q2Objective || '',
-          q3Objective: currentInsightsProgram.q3Objective || '',
-          q4Objective: currentInsightsProgram.q4Objective || '',
-          q1Status: currentInsightsProgram.q1Status || '',
-          q2Status: currentInsightsProgram.q2Status || '',
-          q3Status: currentInsightsProgram.q3Status || '',
-          q4Status: currentInsightsProgram.q4Status || '',
+          q1Objective: currentInsightsProgram.q1_2025_objective || '',
+          q2Objective: currentInsightsProgram.q2_2025_objective || '',
+          q3Objective: currentInsightsProgram.q3_2025_objective || '',
+          q4Objective: currentInsightsProgram.q4_2025_objective || '',
+          q1Status: currentInsightsProgram.q1_2025_status || '',
+          q2Status: currentInsightsProgram.q2_2025_status || '',
+          q3Status: currentInsightsProgram.q3_2025_status || '',
+          q4Status: currentInsightsProgram.q4_2025_status || '',
           progressUpdates: currentInsightsProgram.progressUpdates || ''
         })
         formData.append('programContext', programContext)

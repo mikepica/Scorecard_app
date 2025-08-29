@@ -18,7 +18,7 @@ import { getPillarConfig } from "@/config/pillar-config"
 //   { value: "missed", label: "Missed" },
 // ]
 
-export function Scorecard({ data, onDataUpdate, selectedQuarter = "q4" }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter?: string }) {
+export function Scorecard({ data, onDataUpdate, selectedQuarter = "q3_2025" }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter?: string }) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
     return <div className="w-full p-4 text-center">No scorecard data available</div>
@@ -95,8 +95,22 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
   const [expanded, setExpanded] = useState(false)
   const hasPrograms = goal.programs && goal.programs.length > 0
 
-  // Use Q4 status for display, fallback to other quarters if not available
-  const displayStatus = goal.status || goal.q4Status || goal.q3Status || goal.q2Status || goal.q1Status
+  // Get the status for the selected quarter
+  const getGoalStatus = (selectedQuarter: string) => {
+    switch (selectedQuarter) {
+      case "q1_2025": return goal.q1_2025_status;
+      case "q2_2025": return goal.q2_2025_status;
+      case "q3_2025": return goal.q3_2025_status;
+      case "q4_2025": return goal.q4_2025_status;
+      case "q1_2026": return goal.q1_2026_status;
+      case "q2_2026": return goal.q2_2026_status;
+      case "q3_2026": return goal.q3_2026_status;
+      case "q4_2026": return goal.q4_2026_status;
+      default: return goal.q3_2025_status; // Default to current quarter
+    }
+  }
+  
+  const displayStatus = getGoalStatus(selectedQuarter)
 
   // Handler for goal status update
   const handleGoalStatusChange = async (newStatus: string | undefined) => {
@@ -106,7 +120,8 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
       body: JSON.stringify({
         fieldPath: [pillar.id, category.id, goal.id],
         newValue: newStatus,
-        type: 'goal',
+        type: 'goal-quarter',
+        quarter: selectedQuarter,
       }),
     })
     if (!response.ok) throw new Error('Failed to update goal status');
@@ -168,11 +183,15 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
   // Helper to get the correct status for the selected quarter
   const getProgramStatus = (program: StrategicProgram) => {
     switch (selectedQuarter) {
-      case "q1": return program.q1Status;
-      case "q2": return program.q2Status;
-      case "q3": return program.q3Status;
-      case "q4": return program.q4Status;
-      default: return program.q4Status;
+      case "q1_2025": return program.q1_2025_status;
+      case "q2_2025": return program.q2_2025_status;
+      case "q3_2025": return program.q3_2025_status;
+      case "q4_2025": return program.q4_2025_status;
+      case "q1_2026": return program.q1_2026_status;
+      case "q2_2026": return program.q2_2026_status;
+      case "q3_2026": return program.q3_2026_status;
+      case "q4_2026": return program.q4_2026_status;
+      default: return program.q3_2025_status; // Default to current quarter
     }
   }
 

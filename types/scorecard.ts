@@ -22,15 +22,6 @@ export interface StrategicProgram {
   q3_2026_status?: "exceeded" | "on-track" | "delayed" | "missed"
   q4_2026_status?: "exceeded" | "on-track" | "delayed" | "missed"
   
-  // Legacy fields (for backward compatibility during transition)
-  q1Objective?: string
-  q2Objective?: string
-  q3Objective?: string
-  q4Objective?: string
-  q1Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q2Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
   
   ordLtSponsors?: string
   sponsorsLeads?: string
@@ -77,22 +68,12 @@ export interface StrategicGoal {
   q3_2026_status?: "exceeded" | "on-track" | "delayed" | "missed"
   q4_2026_status?: "exceeded" | "on-track" | "delayed" | "missed"
   
-  // Legacy fields (for backward compatibility during transition)
-  q1Objective?: string
-  q2Objective?: string
-  q3Objective?: string
-  q4Objective?: string
-  q1Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q2Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q3Status?: "exceeded" | "on-track" | "delayed" | "missed"
-  q4Status?: "exceeded" | "on-track" | "delayed" | "missed"
   
   ordLtSponsors?: string
   sponsorsLeads?: string
   reportingOwners?: string
   progressUpdates?: string
   programs?: StrategicProgram[]
-  status?: "exceeded" | "on-track" | "delayed" | "missed"
   comments?: string
   categoryId: string
   strategicPillarId: string
