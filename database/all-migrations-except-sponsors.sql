@@ -12,10 +12,10 @@ ADD COLUMN IF NOT EXISTS q1_2025_objective TEXT,
 ADD COLUMN IF NOT EXISTS q2_2025_objective TEXT,
 ADD COLUMN IF NOT EXISTS q3_2025_objective TEXT,
 ADD COLUMN IF NOT EXISTS q4_2025_objective TEXT,
-ADD COLUMN IF NOT EXISTS q1_2025_status VARCHAR(20) CHECK (q1_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-ADD COLUMN IF NOT EXISTS q2_2025_status VARCHAR(20) CHECK (q2_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-ADD COLUMN IF NOT EXISTS q3_2025_status VARCHAR(20) CHECK (q3_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-ADD COLUMN IF NOT EXISTS q4_2025_status VARCHAR(20) CHECK (q4_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
+ADD COLUMN IF NOT EXISTS q1_2025_status VARCHAR(20),
+ADD COLUMN IF NOT EXISTS q2_2025_status VARCHAR(20),
+ADD COLUMN IF NOT EXISTS q3_2025_status VARCHAR(20),
+ADD COLUMN IF NOT EXISTS q4_2025_status VARCHAR(20);
 
 -- Add new 2026 columns for objectives and statuses
 ALTER TABLE strategic_programs 
@@ -23,38 +23,45 @@ ADD COLUMN IF NOT EXISTS q1_2026_objective TEXT,
 ADD COLUMN IF NOT EXISTS q2_2026_objective TEXT,
 ADD COLUMN IF NOT EXISTS q3_2026_objective TEXT,
 ADD COLUMN IF NOT EXISTS q4_2026_objective TEXT,
-ADD COLUMN IF NOT EXISTS q1_2026_status VARCHAR(20) CHECK (q1_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-ADD COLUMN IF NOT EXISTS q2_2026_status VARCHAR(20) CHECK (q2_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-ADD COLUMN IF NOT EXISTS q3_2026_status VARCHAR(20) CHECK (q3_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-ADD COLUMN IF NOT EXISTS q4_2026_status VARCHAR(20) CHECK (q4_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
+ADD COLUMN IF NOT EXISTS q1_2026_status VARCHAR(20),
+ADD COLUMN IF NOT EXISTS q2_2026_status VARCHAR(20),
+ADD COLUMN IF NOT EXISTS q3_2026_status VARCHAR(20),
+ADD COLUMN IF NOT EXISTS q4_2026_status VARCHAR(20);
 
--- Copy existing data from generic columns to 2025-specific columns
-UPDATE strategic_programs SET 
-    q1_2025_objective = q1_objective,
-    q2_2025_objective = q2_objective,
-    q3_2025_objective = q3_objective,
-    q4_2025_objective = q4_objective,
-    q1_2025_status = q1_status,
-    q2_2025_status = q2_status,
-    q3_2025_status = q3_status,
-    q4_2025_status = q4_status
-WHERE q1_2025_objective IS NULL; -- Only update if not already migrated
+-- Copy existing data from generic columns to 2025-specific columns (if they exist)
+-- This is safe to run even if the source columns don't exist - UPDATE will just not match any rows
+DO $$
+BEGIN
+    -- Check if legacy columns exist before attempting to migrate data
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'strategic_programs' AND column_name = 'q1_objective') THEN
+        UPDATE strategic_programs SET 
+            q1_2025_objective = q1_objective,
+            q2_2025_objective = q2_objective,
+            q3_2025_objective = q3_objective,
+            q4_2025_objective = q4_objective,
+            q1_2025_status = q1_status,
+            q2_2025_status = q2_status,
+            q3_2025_status = q3_status,
+            q4_2025_status = q4_status
+        WHERE q1_2025_objective IS NULL; -- Only update if not already migrated
+    END IF;
+END $$;
 
 -- ==================================================
 -- STEP 2: ADD YEAR-SPECIFIC COLUMNS TO STRATEGIC_GOALS
 -- ==================================================
 
 -- Add year-specific status columns for 2025
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q1_2025_status VARCHAR(20) CHECK (q1_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q2_2025_status VARCHAR(20) CHECK (q2_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q3_2025_status VARCHAR(20) CHECK (q3_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q4_2025_status VARCHAR(20) CHECK (q4_2025_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q1_2025_status VARCHAR(20);
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q2_2025_status VARCHAR(20);
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q3_2025_status VARCHAR(20);
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q4_2025_status VARCHAR(20);
 
 -- Add year-specific status columns for 2026
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q1_2026_status VARCHAR(20) CHECK (q1_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q2_2026_status VARCHAR(20) CHECK (q2_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q3_2026_status VARCHAR(20) CHECK (q3_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q4_2026_status VARCHAR(20) CHECK (q4_2026_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q1_2026_status VARCHAR(20);
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q2_2026_status VARCHAR(20);
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q3_2026_status VARCHAR(20);
+ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q4_2026_status VARCHAR(20);
 
 -- Add year-specific objective columns for 2025
 ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q1_2025_objective TEXT;
@@ -69,7 +76,14 @@ ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q3_2026_objective TEXT;
 ALTER TABLE strategic_goals ADD COLUMN IF NOT EXISTS q4_2026_objective TEXT;
 
 -- Migrate existing general status data to Q3 2025 (current quarter based on August 29, 2025)
-UPDATE strategic_goals SET q3_2025_status = status WHERE status IS NOT NULL;
+-- This is safe to run even if the source column doesn't exist
+DO $$
+BEGIN
+    -- Check if status column exists before attempting to migrate data
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'strategic_goals' AND column_name = 'status') THEN
+        UPDATE strategic_goals SET q3_2025_status = status WHERE status IS NOT NULL;
+    END IF;
+END $$;
 
 -- Drop the general status column
 ALTER TABLE strategic_goals DROP COLUMN IF EXISTS status;
@@ -105,10 +119,11 @@ ADD COLUMN IF NOT EXISTS q4_2026_progress TEXT;
 DROP TRIGGER IF EXISTS track_progress_updates_changes ON strategic_programs;
 
 -- Updated trigger function to track changes to any of the quarter progress columns
+-- Note: This assumes progress_updates_history table exists (should be created by schema.sql)
 CREATE OR REPLACE FUNCTION record_progress_update_change()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Track changes to the original progress_updates column
+    -- Track changes to the original progress_updates column (if it exists)
     IF OLD.progress_updates IS DISTINCT FROM NEW.progress_updates THEN
         INSERT INTO progress_updates_history (
             id,
@@ -268,49 +283,8 @@ CREATE TRIGGER track_progress_updates_changes
 -- STEP 4: FIX STATUS NULL CONSTRAINTS
 -- ==================================================
 
--- Remove CHECK constraints and allow NULL values for category status
-ALTER TABLE categories DROP CONSTRAINT IF EXISTS categories_status_check;
-ALTER TABLE categories ADD CONSTRAINT categories_status_check 
-  CHECK (status IS NULL OR status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
--- Remove CHECK constraints and allow NULL values for goal status
-ALTER TABLE strategic_goals DROP CONSTRAINT IF EXISTS strategic_goals_status_check;
-ALTER TABLE strategic_goals ADD CONSTRAINT strategic_goals_status_check 
-  CHECK (status IS NULL OR status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
--- Remove CHECK constraints and allow NULL values for goal quarterly status
-ALTER TABLE strategic_goals DROP CONSTRAINT IF EXISTS strategic_goals_q1_status_check;
-ALTER TABLE strategic_goals ADD CONSTRAINT strategic_goals_q1_status_check 
-  CHECK (q1_status IS NULL OR q1_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
-ALTER TABLE strategic_goals DROP CONSTRAINT IF EXISTS strategic_goals_q2_status_check;
-ALTER TABLE strategic_goals ADD CONSTRAINT strategic_goals_q2_status_check 
-  CHECK (q2_status IS NULL OR q2_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
-ALTER TABLE strategic_goals DROP CONSTRAINT IF EXISTS strategic_goals_q3_status_check;
-ALTER TABLE strategic_goals ADD CONSTRAINT strategic_goals_q3_status_check 
-  CHECK (q3_status IS NULL OR q3_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
-ALTER TABLE strategic_goals DROP CONSTRAINT IF EXISTS strategic_goals_q4_status_check;
-ALTER TABLE strategic_goals ADD CONSTRAINT strategic_goals_q4_status_check 
-  CHECK (q4_status IS NULL OR q4_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
--- Remove CHECK constraints and allow NULL values for program quarterly status (legacy)
-ALTER TABLE strategic_programs DROP CONSTRAINT IF EXISTS strategic_programs_q1_status_check;
-ALTER TABLE strategic_programs ADD CONSTRAINT strategic_programs_q1_status_check 
-  CHECK (q1_status IS NULL OR q1_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
-ALTER TABLE strategic_programs DROP CONSTRAINT IF EXISTS strategic_programs_q2_status_check;
-ALTER TABLE strategic_programs ADD CONSTRAINT strategic_programs_q2_status_check 
-  CHECK (q2_status IS NULL OR q2_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
-ALTER TABLE strategic_programs DROP CONSTRAINT IF EXISTS strategic_programs_q3_status_check;
-ALTER TABLE strategic_programs ADD CONSTRAINT strategic_programs_q3_status_check 
-  CHECK (q3_status IS NULL OR q3_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
-
-ALTER TABLE strategic_programs DROP CONSTRAINT IF EXISTS strategic_programs_q4_status_check;
-ALTER TABLE strategic_programs ADD CONSTRAINT strategic_programs_q4_status_check 
-  CHECK (q4_status IS NULL OR q4_status IN ('exceeded', 'on-track', 'delayed', 'missed'));
+-- Note: Skipping constraint fixes for columns that will be dropped (status, q1_status, q2_status, etc.)
+-- Only fixing constraints for columns that will remain (year-specific columns)
 
 -- Fix year-specific quarterly status constraints (2025)
 ALTER TABLE strategic_programs DROP CONSTRAINT IF EXISTS strategic_programs_q1_2025_status_check;
@@ -409,5 +383,31 @@ ALTER TABLE categories DROP COLUMN IF EXISTS comments;
 -- ==================================================
 -- MIGRATION COMPLETED
 -- ==================================================
+
+-- Verify that key tables and columns exist
+DO $$
+BEGIN
+    -- Check that required tables exist
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'strategic_programs') THEN
+        RAISE EXCEPTION 'strategic_programs table does not exist - schema may not be loaded';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'strategic_goals') THEN
+        RAISE EXCEPTION 'strategic_goals table does not exist - schema may not be loaded';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'progress_updates_history') THEN
+        RAISE WARNING 'progress_updates_history table does not exist - trigger may fail';
+    END IF;
+    
+    -- Verify that new columns were created
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'strategic_programs' AND column_name = 'q1_2025_status') THEN
+        RAISE EXCEPTION 'Year-specific columns were not created properly in strategic_programs';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'strategic_goals' AND column_name = 'q1_2025_status') THEN
+        RAISE EXCEPTION 'Year-specific columns were not created properly in strategic_goals';
+    END IF;
+END $$;
 
 SELECT 'Consolidated migration completed successfully! All migrations applied except sponsor fields to arrays.' AS status;
