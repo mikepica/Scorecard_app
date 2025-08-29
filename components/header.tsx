@@ -15,34 +15,34 @@ export function Header({
   const [isChatOpen, setIsChatOpen] = useState(false)
 
   return (
-    <header className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
-      <h1 className="text-2xl font-bold">{title}</h1>
+    <header className="relative py-2 bg-gray-200 flex justify-between items-center px-4">
+      <h1 className="text-2xl font-bold text-black">{title}</h1>
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
         <Link
           href="/details"
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
         >
-          <BarChart2 size={16} />
-          <span>Program View</span>
+          <BarChart2 size={20} />
+          <span className="whitespace-nowrap">Program View</span>
         </Link>
 
         {onCaptureScreen && (
           <button
             onClick={onCaptureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Camera size={16} />
-            <span>Capture Screen</span>
+            <Camera size={20} />
+            <span className="whitespace-nowrap">Capture Screen</span>
           </button>
         )}
 
         <button
           onClick={() => setIsChatOpen(!isChatOpen)}
-          className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
         >
-          <Menu size={16} />
-          <span>AI Chat</span>
+          <Menu size={20} />
+          <span className="whitespace-nowrap">AI Chat</span>
         </button>
       </div>
 

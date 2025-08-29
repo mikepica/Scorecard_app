@@ -866,75 +866,61 @@ export default function DetailsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-lime-400 py-2 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">ORD Scorecard: {pillarName}</h1>
-        <div className="flex items-center gap-2">
+      <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-black">ORD Scorecard: {pillarName}</h1>
+        <div className="flex items-center gap-4">
           <Link
             href="/instructions"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <FileText size={16} />
-            <span>Instructions</span>
+            <FileText size={20} />
+            <span className="whitespace-nowrap">Instructions</span>
           </Link>
 
-          <div className="relative">
+          <div className="relative group">
             <button
-              onClick={() => setIsAIFlowsDropdownOpen(!isAIFlowsDropdownOpen)}
-              className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px] cursor-not-allowed opacity-75"
+              disabled
             >
-              <Bot size={16} />
-              <span>AI Flows</span>
-              <ChevronDown size={12} />
+              <Bot size={20} />
+              <span className="whitespace-nowrap">AI Flows</span>
             </button>
-            
-            {isAIFlowsDropdownOpen && (
-              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[180px]">
-                <button
-                  onClick={() => handleAIFlowSelection("goal-comparison")}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors text-gray-700 text-sm"
-                >
-                  Goal Comparison
-                </button>
-                <button
-                  onClick={() => handleAIFlowSelection("learnings-best-practices")}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-100 transition-colors text-gray-700 text-sm"
-                >
-                  Learnings/Best Practices
-                </button>
-              </div>
-            )}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-800 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              Functionality released in future update after determining how users interact with this application
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+            </div>
           </div>
 
           <button
             onClick={() => setFiltersVisible(!filtersVisible)}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            {filtersVisible ? <Eye size={16} /> : <EyeOff size={16} />}
-            <span>Show/Hide Filters</span>
+            {filtersVisible ? <Eye size={20} /> : <EyeOff size={20} />}
+            <span className="whitespace-nowrap">Show/Hide Filters</span>
           </button>
 
           <button
             onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Camera size={16} />
-            <span>Capture Screen</span>
+            <Camera size={20} />
+            <span className="whitespace-nowrap">Capture Screen</span>
           </button>
 
           <Link
             href="/"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <BarChart2 size={16} />
-            <span>Goal-level view</span>
+            <BarChart2 size={20} />
+            <span className="whitespace-nowrap">Goal-level view</span>
           </Link>
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <Menu size={16} />
-            <span>AI Chat</span>
+            <Menu size={20} />
+            <span className="whitespace-nowrap">AI Chat</span>
           </button>
         </div>
 
@@ -949,7 +935,7 @@ export default function DetailsPage() {
 
       {/* Filter section */}
       {filtersVisible && (
-        <div className="bg-lime-100 py-3 px-4">
+        <div className="bg-gray-200 py-3 px-4">
           <div className="flex items-center mb-3">
             <div className="flex-1">
               <Dropdown

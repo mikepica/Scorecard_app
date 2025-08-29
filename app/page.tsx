@@ -171,8 +171,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col">
-      <div className="relative py-2 bg-lime-400 flex justify-between items-center px-4">
-        <h1 className="text-2xl font-bold">ORD Scorecard</h1>
+      <div className="relative py-2 bg-gray-200 flex justify-between items-center px-4">
+        <h1 className="text-2xl font-bold text-black">ORD Scorecard</h1>
 
         <div className="flex items-center gap-4">
           <Dropdown
@@ -184,7 +184,7 @@ export default function Home() {
           />
           <button
             onClick={captureScreen}
-            className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <Camera size={20} />
             <span className="whitespace-nowrap">Capture Screen</span>
@@ -192,43 +192,29 @@ export default function Home() {
 
           <Link
             href="/instructions"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <FileText size={20} />
             <span className="whitespace-nowrap">Instructions</span>
           </Link>
 
-          <div className="relative" ref={aiFlowsDropdownRef}>
+          <div className="relative group">
             <button
-              onClick={() => setIsAIFlowsDropdownOpen(!isAIFlowsDropdownOpen)}
-              className="flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px] cursor-not-allowed opacity-75"
+              disabled
             >
               <Bot size={20} />
               <span className="whitespace-nowrap">AI Flows</span>
-              <ChevronDown size={16} />
             </button>
-            
-            {isAIFlowsDropdownOpen && (
-              <div className="absolute top-full right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-50 min-w-[200px]">
-                <button
-                  onClick={() => handleAIFlowSelection("goal-comparison")}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-gray-700"
-                >
-                  Goal Comparison
-                </button>
-                <button
-                  onClick={() => handleAIFlowSelection("learnings-best-practices")}
-                  className="w-full text-left px-4 py-2 hover:bg-gray-100 transition-colors text-gray-700"
-                >
-                  Learnings/Best Practices
-                </button>
-              </div>
-            )}
+            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-800 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+              Functionality released in future update after determining how users interact with this application
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
+            </div>
           </div>
 
           <Link
             href="/details"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <BarChart2 size={20} />
             <span className="whitespace-nowrap">Program View</span>
@@ -236,7 +222,7 @@ export default function Home() {
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <Menu size={20} />
             <span className="whitespace-nowrap">AI Chat</span>

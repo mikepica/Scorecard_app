@@ -40,24 +40,24 @@ export default function InstructionsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="bg-lime-400 py-2 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold">ORD Scorecard: Instructions</h1>
+      <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-black">ORD Scorecard: Instructions</h1>
         
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           <Link
             href="/"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <BarChart2 size={16} />
-            <span>Goal-level view</span>
+            <BarChart2 size={20} />
+            <span className="whitespace-nowrap">Goal-level view</span>
           </Link>
 
           <Link
             href="/details"
-            className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md transition-colors text-sm"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
-            <BarChart2 size={16} />
-            <span>Program View</span>
+            <BarChart2 size={20} />
+            <span className="whitespace-nowrap">Program View</span>
           </Link>
         </div>
       </header>
