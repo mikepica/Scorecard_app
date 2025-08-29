@@ -16,7 +16,7 @@ import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { getPillarColorById } from "@/lib/pillar-utils"
 import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
-import { getCurrentQuarter, getPreviousQuarter } from "@/lib/quarter-utils"
+import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters, getQuarterInfo } from "@/lib/quarter-utils"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -81,6 +81,9 @@ export default function DetailsPage() {
   // State for tooltip
   const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  // State for selected comparison quarter - defaults to previous quarter
+  const [selectedComparisonQuarter, setSelectedComparisonQuarter] = useState(previousQuarter)
 
   // Create a map of relationships for quick lookups
   const relationshipMap = useMemo(() => {
@@ -238,6 +241,17 @@ export default function DetailsPage() {
 
     return options
   }, [selectedPillar, selectedCategory, data])
+
+  // Quarter options for comparison dropdown - exclude current quarter
+  const quarterOptions = useMemo(() => {
+    const availableQuarters = getAvailableQuarters()
+    return availableQuarters
+      .filter(quarter => quarter.columnName !== currentQuarter.columnName) // Exclude current quarter
+      .map(quarter => ({
+        value: quarter.columnName,
+        label: quarter.label
+      }))
+  }, [currentQuarter.columnName])
 
   // Handle pillar selection
   const handlePillarChange = (value: string) => {
@@ -928,7 +942,26 @@ export default function DetailsPage() {
               <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base`} style={{width: '14.3%'}}>
                 Strategic Programs
               </th>
-              <th className="border border-gray-300 bg-blue-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>{previousQuarter.label}</th>
+              <th className="border border-gray-300 bg-blue-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>
+                <div className="flex items-center justify-center">
+                  <select 
+                    value={selectedComparisonQuarter.columnName}
+                    onChange={(e) => {
+                      const selectedQuarter = getAvailableQuarters().find(q => q.columnName === e.target.value)
+                      if (selectedQuarter) {
+                        setSelectedComparisonQuarter(selectedQuarter)
+                      }
+                    }}
+                    className="bg-transparent text-white border-0 text-center text-base cursor-pointer focus:outline-none focus:ring-0"
+                  >
+                    {quarterOptions.map(option => (
+                      <option key={option.value} value={option.value} className="text-black">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </th>
               <th className="border border-gray-300 bg-purple-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>{currentQuarter.label}</th>
               <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q1-2025</th>
               <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q2-2025</th>
@@ -968,10 +1001,10 @@ export default function DetailsPage() {
                     </td>
                     <td className="border border-gray-300 p-3" style={{width: '14.3%'}}>
                       <EditableField
-                        value={(program as any)[previousQuarter.columnName] || ""}
-                        onSave={(newProgress) => handleQuarterProgressUpdate(program.id, previousQuarter.columnName, newProgress)}
+                        value={(program as any)[selectedComparisonQuarter.columnName] || ""}
+                        onSave={(newProgress) => handleQuarterProgressUpdate(program.id, selectedComparisonQuarter.columnName, newProgress)}
                         className="text-base"
-                        placeholder={`Enter ${previousQuarter.label} progress...`}
+                        placeholder={`Enter ${selectedComparisonQuarter.label} progress...`}
                       />
                     </td>
                     <td className="border border-gray-300 p-3 relative" style={{width: '14.3%'}}>
