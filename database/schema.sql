@@ -39,10 +39,10 @@ CREATE TABLE strategic_goals (
     q3_status VARCHAR(20) CHECK (q3_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
     q4_status VARCHAR(20) CHECK (q4_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
     
-    -- Personnel fields
-    ord_lt_sponsors TEXT,
-    sponsors_leads TEXT,
-    reporting_owners TEXT,
+    -- Personnel fields (arrays)
+    ord_lt_sponsors TEXT[],
+    sponsors_leads TEXT[],
+    reporting_owners TEXT[],
     
     -- Progress updates
     progress_updates TEXT,
@@ -72,10 +72,10 @@ CREATE TABLE strategic_programs (
     q3_status VARCHAR(20) CHECK (q3_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
     q4_status VARCHAR(20) CHECK (q4_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
     
-    -- Personnel fields
-    ord_lt_sponsors TEXT,
-    sponsors_leads TEXT,
-    reporting_owners TEXT,
+    -- Personnel fields (arrays)
+    ord_lt_sponsors TEXT[],
+    sponsors_leads TEXT[],
+    reporting_owners TEXT[],
     
     -- Progress updates
     progress_updates TEXT,

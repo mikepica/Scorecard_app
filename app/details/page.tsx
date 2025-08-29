@@ -7,19 +7,30 @@ import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
 import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
-import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
+import type { StrategicProgram, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
 import { EditableField } from "@/components/ui/editable-field"
 import { GenerateUpdateModal } from "@/components/generate-update-modal"
 import { ReprioritizeGoalsModal } from "@/components/reprioritize-goals-modal"
 import { AIFlowsModal } from "@/components/ai-flows-modal"
-import { getPillarColorById } from "@/lib/pillar-utils"
 import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
+
+// Utility function to get unique values from all programs for a sponsor field
+const getUniqueSponsorValues = (programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }>, fieldName: 'ordLtSponsors' | 'sponsorsLeads' | 'reportingOwners'): string[] => {
+  const allValues = new Set<string>()
+  
+  programs.forEach(program => {
+    const fieldValue = program[fieldName] || ['(Not Specified)']
+    fieldValue.forEach(value => allValues.add(value))
+  })
+  
+  return Array.from(allValues).sort()
+}
 
 export default function DetailsPage() {
   // State for data loading
@@ -71,8 +82,9 @@ export default function DetailsPage() {
   const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
 
   // State for selected filters - default to "all"
-  const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
-  const [selectedCategory, setSelectedCategory] = useState(ALL_VALUE)
+  const [selectedOrdLtSponsor, setSelectedOrdLtSponsor] = useState(ALL_VALUE)
+  const [selectedSponsorsLead, setSelectedSponsorsLead] = useState(ALL_VALUE)
+  const [selectedReportingOwner, setSelectedReportingOwner] = useState(ALL_VALUE)
   const [selectedGoal, setSelectedGoal] = useState(ALL_VALUE)
 
   // State for filter visibility - default to show filters
@@ -94,162 +106,121 @@ export default function DetailsPage() {
     return 'q1_2025'
   })
 
-  // Create a map of relationships for quick lookups
-  const relationshipMap = useMemo(() => {
-    const goalToCategoryMap = new Map<string, string>()
-    const goalToPillarMap = new Map<string, string>()
-    const categoryToPillarMap = new Map<string, string>()
-    const pillarMap = new Map<string, Pillar>()
-    const categoryMap = new Map<string, Category>()
-    const goalMap = new Map<string, StrategicGoal>()
+  // Note: Removed relationship map as it's no longer needed with sponsor-based filtering
+
+  // Extract all programs for filter processing
+  const allPrograms = useMemo(() => {
+    const programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }> = []
 
     if (!data) {
-      return {
-        goalToCategory: goalToCategoryMap,
-        goalToPillar: goalToPillarMap,
-        categoryToPillar: categoryToPillarMap,
-        pillars: pillarMap,
-        categories: categoryMap,
-        goals: goalMap,
-      }
+      return programs
     }
 
     data.pillars.forEach((pillar) => {
-      pillarMap.set(pillar.id, pillar)
-
       pillar.categories.forEach((category) => {
-        categoryMap.set(category.id, category)
-        categoryToPillarMap.set(category.id, pillar.id)
-
         category.goals.forEach((goal) => {
-          goalMap.set(goal.id, goal)
-          goalToCategoryMap.set(goal.id, category.id)
-          goalToPillarMap.set(goal.id, pillar.id)
-        })
-      })
-    })
-
-    return {
-      goalToCategory: goalToCategoryMap,
-      goalToPillar: goalToPillarMap,
-      categoryToPillar: categoryToPillarMap,
-      pillars: pillarMap,
-      categories: categoryMap,
-      goals: goalMap,
-    }
-  }, [data])
-
-  // Extract all options for dropdowns with "All" as the first option
-  const pillarOptions = useMemo(() => {
-    if (!data) {
-      return [{ value: ALL_VALUE, label: "All" }]
-    }
-    const options = data.pillars.map((pillar) => ({ value: pillar.id, label: pillar.name }))
-    return [{ value: ALL_VALUE, label: "All" }, ...options]
-  }, [data])
-
-  // Category options depend on selected pillar
-  const categoryOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = []
-
-    // Add "All" option
-    options.push({ value: ALL_VALUE, label: "All" })
-
-    if (!data) {
-      return options
-    }
-
-    // If "All" pillars selected, include all categories
-    if (selectedPillar === ALL_VALUE) {
-      const uniqueCategories = new Map<string, string>()
-
-      data.pillars.forEach((pillar) => {
-        pillar.categories.forEach((category) => {
-          // Use category name as key to avoid duplicates
-          if (!uniqueCategories.has(category.name)) {
-            uniqueCategories.set(category.name, category.id)
-            options.push({ value: category.id, label: category.name })
-          }
-        })
-      })
-    } else {
-      // Otherwise, only include categories from the selected pillar
-      const pillar = data.pillars.find((p) => p.id === selectedPillar)
-      if (pillar) {
-        pillar.categories.forEach((category) => {
-          options.push({ value: category.id, label: category.name })
-        })
-      }
-    }
-
-    return options
-  }, [selectedPillar, data])
-
-  // Goal options depend on selected category and pillar
-  const goalOptions = useMemo(() => {
-    const options: { value: string; label: string }[] = []
-
-    // Add "All" option
-    options.push({ value: ALL_VALUE, label: "All" })
-
-    if (!data) {
-      return options
-    }
-
-    // If "All" pillars and "All" categories selected, include all goals
-    if (selectedPillar === ALL_VALUE && selectedCategory === ALL_VALUE) {
-      const uniqueGoals = new Map<string, string>()
-
-      data.pillars.forEach((pillar) => {
-        pillar.categories.forEach((category) => {
-          category.goals.forEach((goal) => {
-            // Use goal text as key to avoid duplicates
-            if (!uniqueGoals.has(goal.text)) {
-              uniqueGoals.set(goal.text, goal.id)
-              options.push({ value: goal.id, label: goal.text })
-            }
-          })
-        })
-      })
-    }
-    // If "All" pillars but specific category selected
-    else if (selectedPillar === ALL_VALUE) {
-      data.pillars.forEach((pillar) => {
-        pillar.categories.forEach((category) => {
-          if (category.id === selectedCategory) {
-            category.goals.forEach((goal) => {
-              options.push({ value: goal.id, label: goal.text })
+          if (goal.programs && goal.programs.length > 0) {
+            goal.programs.forEach((program) => {
+              programs.push({
+                ...program,
+                goalText: goal.text,
+                categoryName: category.name,
+                pillarName: pillar.name,
+              })
             })
           }
         })
       })
-    }
-    // If specific pillar but "All" categories selected
-    else if (selectedCategory === ALL_VALUE) {
-      const pillar = data.pillars.find((p) => p.id === selectedPillar)
-      if (pillar) {
-        pillar.categories.forEach((category) => {
-          category.goals.forEach((goal) => {
-            options.push({ value: goal.id, label: goal.text })
-          })
-        })
-      }
-    }
-    // If specific pillar and specific category selected
-    else {
-      const pillar = data.pillars.find((p) => p.id === selectedPillar)
-      if (pillar) {
-        const category = pillar.categories.find((c) => c.id === selectedCategory)
-        if (category) {
-          category.goals.forEach((goal) => {
-            options.push({ value: goal.id, label: goal.text })
-          })
-        }
-      }
-    }
+    })
 
-    return options
-  }, [selectedPillar, selectedCategory, data])
+    return programs
+  }, [data])
+
+  // ORD LT Sponsor options - all unique values
+  const ordLtSponsorOptions = useMemo(() => {
+    const uniqueValues = getUniqueSponsorValues(allPrograms, 'ordLtSponsors')
+    return [{ value: ALL_VALUE, label: "All" }, ...uniqueValues.map(value => ({ value, label: value }))]
+  }, [allPrograms])
+
+  // Sponsors Lead options - filtered by selected ORD LT Sponsor
+  const sponsorsLeadOptions = useMemo(() => {
+    if (selectedOrdLtSponsor === ALL_VALUE) {
+      // If all ORD LT Sponsors selected, show all Sponsors Leads
+      const uniqueValues = getUniqueSponsorValues(allPrograms, 'sponsorsLeads')
+      return [{ value: ALL_VALUE, label: "All" }, ...uniqueValues.map(value => ({ value, label: value }))]
+    } else {
+      // Filter programs by selected ORD LT Sponsor and get their Sponsors Leads
+      const filteredPrograms = allPrograms.filter(program => {
+        const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+        return ordLtSponsors.includes(selectedOrdLtSponsor)
+      })
+      
+      const uniqueValues = getUniqueSponsorValues(filteredPrograms, 'sponsorsLeads')
+      return [{ value: ALL_VALUE, label: "All" }, ...uniqueValues.map(value => ({ value, label: value }))]
+    }
+  }, [selectedOrdLtSponsor, allPrograms])
+
+  // Reporting Owner options - filtered by selected Sponsors Lead
+  const reportingOwnerOptions = useMemo(() => {
+    if (selectedOrdLtSponsor === ALL_VALUE && selectedSponsorsLead === ALL_VALUE) {
+      // If all previous filters selected, show all Reporting Owners
+      const uniqueValues = getUniqueSponsorValues(allPrograms, 'reportingOwners')
+      return [{ value: ALL_VALUE, label: "All" }, ...uniqueValues.map(value => ({ value, label: value }))]
+    } else {
+      // Filter programs by selected ORD LT Sponsor and Sponsors Lead
+      const filteredPrograms = allPrograms.filter(program => {
+        const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+        const sponsorsLeads = program.sponsorsLeads || ['(Not Specified)']
+        
+        const ordLtMatch = selectedOrdLtSponsor === ALL_VALUE || ordLtSponsors.includes(selectedOrdLtSponsor)
+        const sponsorsLeadMatch = selectedSponsorsLead === ALL_VALUE || sponsorsLeads.includes(selectedSponsorsLead)
+        
+        return ordLtMatch && sponsorsLeadMatch
+      })
+      
+      const uniqueValues = getUniqueSponsorValues(filteredPrograms, 'reportingOwners')
+      return [{ value: ALL_VALUE, label: "All" }, ...uniqueValues.map(value => ({ value, label: value }))]
+    }
+  }, [selectedOrdLtSponsor, selectedSponsorsLead, allPrograms])
+
+  // Goal options - filtered by all selected sponsors
+  const goalOptions = useMemo(() => {
+    if (selectedOrdLtSponsor === ALL_VALUE && selectedSponsorsLead === ALL_VALUE && selectedReportingOwner === ALL_VALUE) {
+      // If all sponsor filters are "All", show all goals
+      const uniqueGoals = new Map<string, string>()
+      allPrograms.forEach(program => {
+        if (!uniqueGoals.has(program.goalText)) {
+          uniqueGoals.set(program.goalText, program.strategicGoalId)
+        }
+      })
+      
+      const options = Array.from(uniqueGoals.entries()).map(([text, id]) => ({ value: id, label: text }))
+      return [{ value: ALL_VALUE, label: "All" }, ...options.sort((a, b) => a.label.localeCompare(b.label))]
+    } else {
+      // Filter programs by all selected sponsor filters
+      const filteredPrograms = allPrograms.filter(program => {
+        const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+        const sponsorsLeads = program.sponsorsLeads || ['(Not Specified)']
+        const reportingOwners = program.reportingOwners || ['(Not Specified)']
+        
+        const ordLtMatch = selectedOrdLtSponsor === ALL_VALUE || ordLtSponsors.includes(selectedOrdLtSponsor)
+        const sponsorsLeadMatch = selectedSponsorsLead === ALL_VALUE || sponsorsLeads.includes(selectedSponsorsLead)
+        const reportingOwnerMatch = selectedReportingOwner === ALL_VALUE || reportingOwners.includes(selectedReportingOwner)
+        
+        return ordLtMatch && sponsorsLeadMatch && reportingOwnerMatch
+      })
+      
+      const uniqueGoals = new Map<string, string>()
+      filteredPrograms.forEach(program => {
+        if (!uniqueGoals.has(program.goalText)) {
+          uniqueGoals.set(program.goalText, program.strategicGoalId)
+        }
+      })
+      
+      const options = Array.from(uniqueGoals.entries()).map(([text, id]) => ({ value: id, label: text }))
+      return [{ value: ALL_VALUE, label: "All" }, ...options.sort((a, b) => a.label.localeCompare(b.label))]
+    }
+  }, [selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, allPrograms])
 
   // Quarter options for comparison dropdown - exclude current quarter
   const quarterOptions = useMemo(() => {
@@ -306,120 +277,83 @@ export default function DetailsPage() {
     return validStartingQuarters
   }, [])
 
-  // Handle pillar selection
-  const handlePillarChange = (value: string) => {
-    setSelectedPillar(value)
-
-    // If "All" is selected, reset other filters
-    if (value === ALL_VALUE) {
-      setSelectedCategory(ALL_VALUE)
-      setSelectedGoal(ALL_VALUE)
-    }
-    // If a specific pillar is selected but the current category doesn't belong to it, reset category
-    else if (selectedCategory !== ALL_VALUE && relationshipMap.categoryToPillar.get(selectedCategory) !== value) {
-      setSelectedCategory(ALL_VALUE)
-      setSelectedGoal(ALL_VALUE)
-    }
-    // If category is valid but goal doesn't belong to this pillar, reset goal
-    else if (selectedGoal !== ALL_VALUE && relationshipMap.goalToPillar.get(selectedGoal) !== value) {
-      setSelectedGoal(ALL_VALUE)
-    }
+  // Handle ORD LT Sponsor selection
+  const handleOrdLtSponsorChange = (value: string) => {
+    setSelectedOrdLtSponsor(value)
+    
+    // Reset downstream filters
+    setSelectedSponsorsLead(ALL_VALUE)
+    setSelectedReportingOwner(ALL_VALUE)
+    setSelectedGoal(ALL_VALUE)
   }
 
-  // Handle category selection
-  const handleCategoryChange = (value: string) => {
-    setSelectedCategory(value)
+  // Handle Sponsors Lead selection
+  const handleSponsorsLeadChange = (value: string) => {
+    setSelectedSponsorsLead(value)
+    
+    // Reset downstream filters
+    setSelectedReportingOwner(ALL_VALUE)
+    setSelectedGoal(ALL_VALUE)
+  }
 
-    // If "All" is selected, reset goal filter
-    if (value === ALL_VALUE) {
-      setSelectedGoal(ALL_VALUE)
-    }
-    // If a specific category is selected
-    else {
-      // Update pillar to match the category's parent pillar
-      const pillarId = relationshipMap.categoryToPillar.get(value)
-      if (pillarId) {
-        setSelectedPillar(pillarId)
-      }
-
-      // If goal doesn't belong to this category, reset it
-      if (selectedGoal !== ALL_VALUE && relationshipMap.goalToCategory.get(selectedGoal) !== value) {
-        setSelectedGoal(ALL_VALUE)
-      }
-    }
+  // Handle Reporting Owner selection
+  const handleReportingOwnerChange = (value: string) => {
+    setSelectedReportingOwner(value)
+    
+    // Reset goal filter
+    setSelectedGoal(ALL_VALUE)
   }
 
   // Handle goal selection
   const handleGoalChange = (value: string) => {
     setSelectedGoal(value)
-
-    // If a specific goal is selected
-    if (value !== ALL_VALUE) {
-      // Update category to match the goal's parent category
-      const categoryId = relationshipMap.goalToCategory.get(value)
-      if (categoryId) {
-        setSelectedCategory(categoryId)
-
-        // Update pillar to match the category's parent pillar
-        const pillarId = relationshipMap.categoryToPillar.get(categoryId)
-        if (pillarId) {
-          setSelectedPillar(pillarId)
-        }
-      }
-    }
+    // No need to update upstream filters since this is the final filter
   }
 
-  // Get filtered programs based on selections
+  // Get filtered programs based on sponsor selections
   const filteredPrograms = useMemo(() => {
-    const programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }> = []
-
-    if (!data) {
-      return programs
-    }
-
-    data.pillars.forEach((pillar) => {
-      // Skip if specific pillar selected and doesn't match
-      if (selectedPillar !== ALL_VALUE && pillar.id !== selectedPillar) return
-
-      pillar.categories.forEach((category) => {
-        // Skip if specific category selected and doesn't match
-        if (selectedCategory !== ALL_VALUE && category.id !== selectedCategory) return
-
-        category.goals.forEach((goal) => {
-          // Skip if specific goal selected and doesn't match
-          if (selectedGoal !== ALL_VALUE && goal.id !== selectedGoal) return
-
-          // Add all programs from matching goals
-          if (goal.programs && goal.programs.length > 0) {
-            goal.programs.forEach((program) => {
-              programs.push({
-                ...program,
-                goalText: goal.text,
-                categoryName: category.name,
-                pillarName: pillar.name,
-              })
-            })
-          }
-        })
-      })
+    return allPrograms.filter(program => {
+      // Get sponsor arrays for this program
+      const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+      const sponsorsLeads = program.sponsorsLeads || ['(Not Specified)']
+      const reportingOwners = program.reportingOwners || ['(Not Specified)']
+      
+      // Check sponsor filters
+      const ordLtMatch = selectedOrdLtSponsor === ALL_VALUE || ordLtSponsors.includes(selectedOrdLtSponsor)
+      const sponsorsLeadMatch = selectedSponsorsLead === ALL_VALUE || sponsorsLeads.includes(selectedSponsorsLead)
+      const reportingOwnerMatch = selectedReportingOwner === ALL_VALUE || reportingOwners.includes(selectedReportingOwner)
+      
+      // Check goal filter
+      const goalMatch = selectedGoal === ALL_VALUE || program.strategicGoalId === selectedGoal
+      
+      return ordLtMatch && sponsorsLeadMatch && reportingOwnerMatch && goalMatch
     })
-
-    return programs
-  }, [selectedPillar, selectedCategory, selectedGoal, data])
+  }, [selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, allPrograms])
 
 
-  // Get selected pillar name
-  const pillarName = useMemo(() => {
-    if (selectedPillar === ALL_VALUE) return "All Strategic Pillars"
-    const pillar = relationshipMap.pillars.get(selectedPillar)
-    return pillar ? pillar.name : "Strategic Pillar"
-  }, [selectedPillar, relationshipMap.pillars])
+  // Get display name based on current selections
+  const displayName = useMemo(() => {
+    if (selectedOrdLtSponsor === ALL_VALUE && selectedSponsorsLead === ALL_VALUE && selectedReportingOwner === ALL_VALUE && selectedGoal === ALL_VALUE) {
+      return "All Programs"
+    }
+    
+    const parts = []
+    if (selectedOrdLtSponsor !== ALL_VALUE) parts.push(selectedOrdLtSponsor)
+    if (selectedSponsorsLead !== ALL_VALUE) parts.push(selectedSponsorsLead)
+    if (selectedReportingOwner !== ALL_VALUE) parts.push(selectedReportingOwner)
+    if (selectedGoal !== ALL_VALUE) {
+      const goalOption = goalOptions.find(opt => opt.value === selectedGoal)
+      if (goalOption) parts.push(goalOption.label)
+    }
+    
+    return parts.length > 0 ? parts.join(" → ") : "Filtered Programs"
+  }, [selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, goalOptions])
 
   // Function to capture the screen
   const captureScreen = async () => {
     // Check if a strategic goal is selected
     if (selectedGoal === ALL_VALUE) {
-      setToast({ message: "Select a Strategic Goal", type: "warning" })
+      setToast({ message: "Select a Strategic Goal to capture screen", type: "warning" })
       return
     }
 
@@ -476,13 +410,9 @@ export default function DetailsPage() {
     }
   }
 
-  const getPillarHeaderColor = (pillarId: string) => {
-    // If showing all pillars, use a neutral color
-    if (pillarId === ALL_VALUE) {
-      return "bg-gray-600"
-    }
-    
-    return getPillarColorById(pillarId)
+  const getHeaderColor = () => {
+    // Use a neutral color for sponsor-based filtering
+    return "bg-gray-600"
   }
 
   const getPillarTextColor = (pillarId: string) => {
@@ -873,7 +803,7 @@ export default function DetailsPage() {
   return (
     <div className="min-h-screen flex flex-col">
       <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-black">ORD Scorecard: {pillarName}</h1>
+        <h1 className="text-2xl font-bold text-black">ORD Scorecard: {displayName}</h1>
         <div className="flex items-center gap-4">
           <Link
             href="/instructions"
@@ -945,11 +875,11 @@ export default function DetailsPage() {
           <div className="flex items-center mb-3">
             <div className="flex-1">
               <Dropdown
-                options={pillarOptions}
-                value={selectedPillar}
-                onChange={handlePillarChange}
-                label="Strategic Pillar:"
-                placeholder="Select a pillar..."
+                options={ordLtSponsorOptions}
+                value={selectedOrdLtSponsor}
+                onChange={handleOrdLtSponsorChange}
+                label="ORD LT Sponsor:"
+                placeholder="Select an ORD LT Sponsor..."
                 labelWidth="w-36"
               />
             </div>
@@ -957,11 +887,22 @@ export default function DetailsPage() {
 
           <div className="mb-3">
             <Dropdown
-              options={categoryOptions}
-              value={selectedCategory}
-              onChange={handleCategoryChange}
-              label="Category:"
-              placeholder="Select a category..."
+              options={sponsorsLeadOptions}
+              value={selectedSponsorsLead}
+              onChange={handleSponsorsLeadChange}
+              label="Sponsors Lead:"
+              placeholder="Select a Sponsors Lead..."
+              labelWidth="w-36"
+            />
+          </div>
+
+          <div className="mb-3">
+            <Dropdown
+              options={reportingOwnerOptions}
+              value={selectedReportingOwner}
+              onChange={handleReportingOwnerChange}
+              label="Reporting Owner:"
+              placeholder="Select a Reporting Owner..."
               labelWidth="w-36"
             />
           </div>
@@ -997,7 +938,7 @@ export default function DetailsPage() {
             </tr>
             {/* Column headers row */}
             <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base border-r-2 border-gray-400`} style={{width: '14.3%'}}>
+              <th className={`border border-gray-300 ${getHeaderColor()} text-white p-3 text-left text-base border-r-2 border-gray-400`} style={{width: '14.3%'}}>
                 Strategic Programs
               </th>
               <th className="border border-gray-300 bg-gray-200 text-black p-3 text-center text-base relative border-r-2 border-gray-400" style={{width: '14.3%'}}>

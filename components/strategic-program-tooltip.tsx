@@ -36,17 +36,17 @@ export const StrategicProgramTooltip: React.FC<StrategicProgramTooltipProps> = (
       <div className="space-y-2 text-sm">
         <div>
           <span className="text-lime-400 font-medium">ORD LT Sponsors:</span>
-          <span className="text-white ml-2">{program.ordLtSponsors || "Not specified"}</span>
+          <span className="text-white ml-2">{program.ordLtSponsors?.join(', ') || "Not specified"}</span>
         </div>
         
         <div>
           <span className="text-lime-400 font-medium">Sponsors Lead:</span>
-          <span className="text-white ml-2">{program.sponsorsLeads || "Not specified"}</span>
+          <span className="text-white ml-2">{program.sponsorsLeads?.join(', ') || "Not specified"}</span>
         </div>
         
         <div>
           <span className="text-lime-400 font-medium">Reporting Owner:</span>
-          <span className="text-white ml-2">{program.reportingOwners || "Not specified"}</span>
+          <span className="text-white ml-2">{program.reportingOwners?.join(', ') || "Not specified"}</span>
         </div>
         
         <div>

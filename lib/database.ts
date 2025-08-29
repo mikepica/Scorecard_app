@@ -121,9 +121,9 @@ export class DatabaseService {
         q3_2026_status: row.q3_2026_status,
         q4_2026_status: row.q4_2026_status,
         
-        ordLtSponsors: row.ord_lt_sponsors,
-        sponsorsLeads: row.sponsors_leads,
-        reportingOwners: row.reporting_owners,
+        ordLtSponsors: row.ord_lt_sponsors || ['(Not Specified)'],
+        sponsorsLeads: row.sponsors_leads || ['(Not Specified)'],
+        reportingOwners: row.reporting_owners || ['(Not Specified)'],
         progressUpdates: row.progress_updates,
         programs: [],
         categoryId: row.category_id,
@@ -154,9 +154,9 @@ export class DatabaseService {
         q3_2026_status: row.q3_2026_status,
         q4_2026_status: row.q4_2026_status,
         
-        ordLtSponsors: row.ord_lt_sponsors,
-        sponsorsLeads: row.sponsors_leads,
-        reportingOwners: row.reporting_owners,
+        ordLtSponsors: row.ord_lt_sponsors || ['(Not Specified)'],
+        sponsorsLeads: row.sponsors_leads || ['(Not Specified)'],
+        reportingOwners: row.reporting_owners || ['(Not Specified)'],
         progressUpdates: row.progress_updates,
         
         // Quarterly progress updates (2025-2026)

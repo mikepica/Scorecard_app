@@ -23,9 +23,9 @@ export interface StrategicProgram {
   q4_2026_status?: "exceeded" | "on-track" | "delayed" | "missed"
   
   
-  ordLtSponsors?: string
-  sponsorsLeads?: string
-  reportingOwners?: string
+  ordLtSponsors?: string[]
+  sponsorsLeads?: string[]
+  reportingOwners?: string[]
   progressUpdates?: string
   
   // Quarterly progress updates (2025-2026)
@@ -69,9 +69,9 @@ export interface StrategicGoal {
   q4_2026_status?: "exceeded" | "on-track" | "delayed" | "missed"
   
   
-  ordLtSponsors?: string
-  sponsorsLeads?: string
-  reportingOwners?: string
+  ordLtSponsors?: string[]
+  sponsorsLeads?: string[]
+  reportingOwners?: string[]
   progressUpdates?: string
   programs?: StrategicProgram[]
   comments?: string
