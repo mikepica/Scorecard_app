@@ -101,8 +101,6 @@ export interface StrategicGoal {
 export interface Category {
   id: string
   name: string
-  status?: "exceeded" | "on-track" | "delayed" | "missed"
-  comments?: string
   goals: StrategicGoal[]
   strategicPillarId: string
 }

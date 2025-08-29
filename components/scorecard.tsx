@@ -56,26 +56,6 @@ function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar;
 }
 
 function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
-  // Handler for category status update
-  const handleCategoryStatusChange = async (newStatus: string | undefined) => {
-    console.log('DEBUG: Category status update - pillar.id:', pillar.id, 'category.id:', category.id, 'newStatus:', newStatus);
-    const response = await fetch('/api/scorecard/update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        fieldPath: [pillar.id, category.id],
-        newValue: newStatus,
-        type: 'category',
-      }),
-    })
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.log('DEBUG: Category update failed:', errorData);
-      throw new Error('Failed to update category status');
-    }
-    const updatedData = await response.json();
-    onDataUpdate(updatedData);
-  }
 
   // Handler for category name update
   const handleCategoryNameSave = async (newName: string) => {
@@ -100,10 +80,6 @@ function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { 
           value={category.name}
           onSave={handleCategoryNameSave}
           className={`text-base font-medium ${getCategoryColor(pillar)}`}
-        />
-        <StatusCircle
-          status={category.status}
-          onStatusChange={handleCategoryStatusChange}
         />
       </div>
       <ul className="space-y-2">

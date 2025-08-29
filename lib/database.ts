@@ -92,8 +92,6 @@ export class DatabaseService {
       const categories: Category[] = categoriesResult.rows.map(row => ({
         id: row.id,
         name: row.name,
-        status: row.status,
-        comments: row.comments,
         goals: [],
         strategicPillarId: row.pillar_id
       }));
@@ -490,14 +488,6 @@ export class DatabaseService {
           if (result.rowCount === 0) throw new Error(`Program with ID ${programQuarterProgressId} not found`);
           break;
           
-        case 'category':
-          const [, categoryId] = fieldPath;
-          result = await client.query(
-            'UPDATE categories SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
-            [newValue, categoryId]
-          );
-          if (result.rowCount === 0) throw new Error(`Category with ID ${categoryId} not found`);
-          break;
           
         case 'category-name':
           const [, categoryNameId] = fieldPath;
