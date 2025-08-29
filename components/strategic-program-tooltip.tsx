@@ -2,7 +2,11 @@ import React from 'react'
 import type { StrategicProgram } from '@/types/scorecard'
 
 interface StrategicProgramTooltipProps {
-  program: StrategicProgram
+  program: StrategicProgram & { 
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }
   isVisible: boolean
   position: { x: number; y: number }
 }
@@ -34,6 +38,31 @@ export const StrategicProgramTooltip: React.FC<StrategicProgramTooltipProps> = (
       }}
     >
       <div className="space-y-2 text-sm">
+        {program.pillarName && (
+          <div>
+            <span className="text-lime-400 font-medium">Strategic Pillar:</span>
+            <span className="text-white ml-2">{program.pillarName}</span>
+          </div>
+        )}
+        
+        {program.categoryName && (
+          <div>
+            <span className="text-lime-400 font-medium">Category:</span>
+            <span className="text-white ml-2">{program.categoryName}</span>
+          </div>
+        )}
+        
+        {program.goalText && (
+          <div>
+            <span className="text-lime-400 font-medium">Strategic Goal:</span>
+            <span className="text-white ml-2">{program.goalText}</span>
+          </div>
+        )}
+        
+        {(program.pillarName || program.categoryName || program.goalText) && (
+          <div className="border-t border-gray-600 pt-2"></div>
+        )}
+        
         <div>
           <span className="text-lime-400 font-medium">ORD LT Sponsors:</span>
           <span className="text-white ml-2">{program.ordLtSponsors?.join(', ') || "Not specified"}</span>
