@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff, ChevronDown } from "lucide-react"
+import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff, ChevronDown, Info } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -84,6 +84,15 @@ export default function DetailsPage() {
 
   // State for selected comparison quarter - defaults to previous quarter
   const [selectedComparisonQuarter, setSelectedComparisonQuarter] = useState(previousQuarter)
+
+  // State for starting quarter selection - defaults to Q1-2025, persisted in localStorage
+  const [startingQuarter, setStartingQuarter] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('scorecard-starting-quarter')
+      return saved || 'q1_2025'
+    }
+    return 'q1_2025'
+  })
 
   // Create a map of relationships for quick lookups
   const relationshipMap = useMemo(() => {
@@ -252,6 +261,50 @@ export default function DetailsPage() {
         label: quarter.label
       }))
   }, [currentQuarter.columnName])
+
+  // Handle starting quarter change with localStorage persistence
+  const handleStartingQuarterChange = (newStartingQuarter: string) => {
+    setStartingQuarter(newStartingQuarter)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('scorecard-starting-quarter', newStartingQuarter)
+    }
+  }
+
+  // Calculate 4 consecutive quarters starting from the selected quarter
+  const displayQuarters = useMemo(() => {
+    const allQuarters = getAvailableQuarters()
+    const startIndex = allQuarters.findIndex(q => q.columnName === startingQuarter)
+    
+    if (startIndex === -1) return allQuarters.slice(0, 4) // fallback to first 4
+    
+    // Get 4 consecutive quarters starting from selected quarter
+    const result = []
+    for (let i = 0; i < 4; i++) {
+      const quarterIndex = startIndex + i
+      if (quarterIndex < allQuarters.length) {
+        result.push(allQuarters[quarterIndex])
+      }
+    }
+    
+    return result
+  }, [startingQuarter])
+
+  // Generate dropdown options for starting quarters
+  // Only include quarters where we can show 4 consecutive quarters
+  const startingQuarterOptions = useMemo(() => {
+    const allQuarters = getAvailableQuarters()
+    const validStartingQuarters = []
+    
+    for (let i = 0; i <= allQuarters.length - 4; i++) {
+      const quarter = allQuarters[i]
+      validStartingQuarters.push({
+        value: quarter.columnName,
+        label: quarter.label
+      })
+    }
+    
+    return validStartingQuarters
+  }, [])
 
   // Handle pillar selection
   const handlePillarChange = (value: string) => {
@@ -942,8 +995,8 @@ export default function DetailsPage() {
               <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base`} style={{width: '14.3%'}}>
                 Strategic Programs
               </th>
-              <th className="border border-gray-300 bg-blue-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>
-                <div className="flex items-center justify-center">
+              <th className="border border-gray-300 bg-blue-500 text-white p-3 text-center text-base relative" style={{width: '14.3%'}}>
+                <div className="flex items-center justify-center gap-1">
                   <select 
                     value={selectedComparisonQuarter.columnName}
                     onChange={(e) => {
@@ -960,13 +1013,43 @@ export default function DetailsPage() {
                       </option>
                     ))}
                   </select>
+                  <div className="relative group">
+                    <Info size={14} className="text-white opacity-70 hover:opacity-100 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      Select a different Quarterly update to view
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                    </div>
+                  </div>
                 </div>
               </th>
               <th className="border border-gray-300 bg-purple-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>{currentQuarter.label}</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q1-2025</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q2-2025</th>
-              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q3-2025</th>
-              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q4-2025</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base relative" style={{width: '14.3%'}}>
+                <div className="flex items-center justify-center gap-1">
+                  <select 
+                    value={startingQuarter}
+                    onChange={(e) => handleStartingQuarterChange(e.target.value)}
+                    className="bg-transparent text-white border-0 text-center text-base cursor-pointer focus:outline-none focus:ring-0"
+                  >
+                    {startingQuarterOptions.map(option => (
+                      <option key={option.value} value={option.value} className="text-black">
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="relative group">
+                    <Info size={14} className="text-white opacity-70 hover:opacity-100 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      Select the Starting Quarter Objectives
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+                    </div>
+                  </div>
+                </div>
+              </th>
+              {displayQuarters.slice(1).map((quarter, index) => (
+                <th key={quarter.columnName} className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>
+                  {quarter.label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -1025,76 +1108,36 @@ export default function DetailsPage() {
                         <span className="text-xs text-gray-500 group-hover:text-blue-600">Generate Update</span>
                       </button>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
-                      <div className="mb-2">
-                        <EditableField
-                          value={program.q1_2025_objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q1_2025", newObjective)}
-                          className="text-base"
-                          placeholder="Enter Q1-2025 objective..."
-                        />
-                      </div>
-                      <div className="status-dot-container">
-                        <StatusCircle
-                          status={program.q1_2025_status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q1_2025", newStatus ?? '')}
-                        />
-                      </div>
-                    </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
-                      <div className="mb-2">
-                        <EditableField
-                          value={program.q2_2025_objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q2_2025", newObjective)}
-                          className="text-base"
-                          placeholder="Enter Q2-2025 objective..."
-                        />
-                      </div>
-                      <div className="status-dot-container">
-                        <StatusCircle
-                          status={program.q2_2025_status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q2_2025", newStatus ?? '')}
-                        />
-                      </div>
-                    </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
-                      <div className="mb-2">
-                        <EditableField
-                          value={program.q3_2025_objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q3_2025", newObjective)}
-                          className="text-base"
-                          placeholder="Enter Q3-2025 objective..."
-                        />
-                      </div>
-                      <div className="status-dot-container">
-                        <StatusCircle
-                          status={program.q3_2025_status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q3_2025", newStatus ?? '')}
-                        />
-                      </div>
-                    </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
-                      <div className="mb-2">
-                        <EditableField
-                          value={program.q4_2025_objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q4_2025", newObjective)}
-                          className="text-base"
-                          placeholder="Enter Q4-2025 objective..."
-                        />
-                      </div>
-                      <div className="status-dot-container">
-                        <StatusCircle
-                          status={program.q4_2025_status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q4_2025", newStatus ?? '')}
-                        />
-                      </div>
-                    </td>
+                    {displayQuarters.map((quarter, index) => {
+                      const quarterKey = quarter.columnName.replace('_progress', '')
+                      const objectiveField = `${quarterKey}_objective`
+                      const statusField = `${quarterKey}_status`
+                      
+                      return (
+                        <td key={quarter.columnName} className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
+                          <div className="mb-2">
+                            <EditableField
+                              value={(program as any)[objectiveField] || ""}
+                              onSave={(newObjective) => handleObjectiveUpdate(program.id, quarterKey, newObjective)}
+                              className="text-base"
+                              placeholder={`Enter ${quarter.label} objective...`}
+                            />
+                          </div>
+                          <div className="status-dot-container">
+                            <StatusCircle
+                              status={(program as any)[statusField]}
+                              onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? '')}
+                            />
+                          </div>
+                        </td>
+                      )
+                    })}
                   </tr>
                 );
               })
             ) : (
               <tr>
-                <td colSpan={7} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
+                <td colSpan={3 + displayQuarters.length} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
                   No programs found with the current filter settings.
                 </td>
               </tr>
