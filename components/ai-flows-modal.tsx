@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
+import type { ScoreCardData, Pillar, Category, StrategicGoal } from "@/types/scorecard"
 
 type AIFlowType = "goal-comparison" | "learnings-best-practices"
 
@@ -274,40 +274,6 @@ const programIds = (goal.programs || []).map(p => p.id)
     }
   }
 
-  const handleSelectAllPillars = (checked: boolean) => {
-    if (checked) {
-      const allPillarIds = (scorecardData?.pillars || []).map(p => p.id)
-      const allCategoryIds = (scorecardData?.pillars || []).flatMap(p => 
-        (p.categories || []).map(c => c.id)
-      )
-      const allGoalIds = (scorecardData?.pillars || []).flatMap(p => 
-        (p.categories || []).flatMap(c => 
-  (c.goals || []).map(g => g.id)
-        )
-      )
-      const allProgramIds = (scorecardData?.pillars || []).flatMap(p => 
-        (p.categories || []).flatMap(c => 
-  (c.goals || []).flatMap(g => 
-  (g.programs || []).map(prog => prog.id)
-          )
-        )
-      )
-      
-      setSelections({
-        pillars: allPillarIds,
-        categories: allCategoryIds,
-        goals: allGoalIds,
-        programs: allProgramIds
-      })
-    } else {
-      setSelections({
-        pillars: [],
-        categories: [],
-        goals: [],
-        programs: []
-      })
-    }
-  }
 
   const resetFilters = () => {
     const allPillarIds = (scorecardData?.pillars || []).map(p => p.id)
@@ -547,7 +513,7 @@ const programIds = (goal.programs || []).map(p => p.id)
                     {filteredPillars.map(pillar => {
                       const pillarExpanded = expandedNodes.has(pillar.id)
                       const pillarCategories = pillar.categories || []
-                      const pillarCategoryIds = pillarCategories.map(c => c.id)
+                      // const pillarCategoryIds = pillarCategories.map(c => c.id)
                       
                       return (
                         <div key={pillar.id} className="space-y-1">
@@ -580,7 +546,7 @@ const programIds = (goal.programs || []).map(p => p.id)
                           {pillarExpanded && pillarCategories.map(category => {
                             const categoryExpanded = expandedNodes.has(category.id)
                 const categoryGoals = category.goals || []
-                            const categoryGoalIds = categoryGoals.map(g => g.id)
+                            // const categoryGoalIds = categoryGoals.map(g => g.id)
                             
                             return (
                               <div key={category.id} className="ml-6 space-y-1">

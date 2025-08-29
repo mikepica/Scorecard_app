@@ -7,22 +7,48 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+interface FilterSelections {
+  pillars: number[];
+  categories: number[];
+  goals: number[];
+  programs: number[];
+}
+
+interface ScorecardData {
+  pillars: Array<{
+    id: number;
+    categories: Array<{
+      id: number;
+      strategicGoals: Array<{
+        id: number;
+        strategicPrograms: Array<{
+          id: number;
+          [key: string]: unknown;
+        }>;
+        [key: string]: unknown;
+      }>;
+      [key: string]: unknown;
+    }>;
+    [key: string]: unknown;
+  }>;
+}
+
 // Filter scorecard data based on user selections
-function filterScorecardData(fullData: any, selections: any) {
+function filterScorecardData(fullData: ScorecardData, selections: FilterSelections) {
   const filtered = {
-    pillars: fullData.pillars.filter((pillar: any) => 
+    pillars: fullData.pillars.filter((pillar) => 
       selections.pillars.includes(pillar.id)
-    ).map((pillar: any) => ({
+    ).map((pillar) => ({
       ...pillar,
-      categories: pillar.categories.filter((category: any) => 
+      categories: pillar.categories.filter((category) => 
         selections.categories.includes(category.id)
-      ).map((category: any) => ({
+      ).map((category) => ({
         ...category,
-        strategicGoals: category.strategicGoals.filter((goal: any) => 
+        strategicGoals: category.strategicGoals.filter((goal) => 
           selections.goals.includes(goal.id)
-        ).map((goal: any) => ({
+        ).map((goal) => ({
           ...goal,
-          strategicPrograms: goal.strategicPrograms.filter((program: any) => 
+          strategicPrograms: goal.strategicPrograms.filter((program) => 
             selections.programs.includes(program.id)
           )
         }))
@@ -143,7 +169,7 @@ export async function POST(req: Request) {
 
     // Load appropriate system prompt
     let promptPath;
-    const bodyFlowType = (body as any).flowType;
+    const bodyFlowType = (body as { flowType?: string }).flowType;
     
     if (isReprioritization) {
       promptPath = path.join(process.cwd(), 'Prompts', 'reprioritize-goals-system-prompt.md');

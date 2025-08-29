@@ -1,22 +1,22 @@
 "use client"
-import { StatusIndicator } from "@/components/status-indicator"
+// import { StatusIndicator } from "@/components/status-indicator"
 import { PillarIcon } from "@/components/pillar-icon"
 import type { ScoreCardData, Pillar, Category, StrategicGoal } from "@/types/scorecard"
 import { ChevronDown, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import { EditableField } from "@/components/ui/editable-field"
-import { useEditableField } from "@/hooks/use-editable-field"
-import { Dropdown } from "@/components/dropdown"
+// import { useEditableField } from "@/hooks/use-editable-field"
+// import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
 import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
 import { getPillarConfig } from "@/config/pillar-config"
 
-const STATUS_OPTIONS = [
-  { value: "exceeded", label: "Exceeded" },
-  { value: "on-track", label: "On Track" },
-  { value: "delayed", label: "Delayed" },
-  { value: "missed", label: "Missed" },
-]
+// const STATUS_OPTIONS = [
+//   { value: "exceeded", label: "Exceeded" },
+//   { value: "on-track", label: "On Track" },
+//   { value: "delayed", label: "Delayed" },
+//   { value: "missed", label: "Missed" },
+// ]
 
 export function Scorecard({ data, onDataUpdate, selectedQuarter = "q4" }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter?: string }) {
   // Check if data and data.pillars exist before mapping
@@ -190,7 +190,7 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
   }
 
   // Helper to get the correct status for the selected quarter
-  const getProgramStatus = (program: any) => {
+  const getProgramStatus = (program: StrategicProgram) => {
     switch (selectedQuarter) {
       case "q1": return program.q1Status;
       case "q2": return program.q2Status;

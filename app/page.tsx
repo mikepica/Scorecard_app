@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react"
 import { Scorecard } from "@/components/scorecard"
 // Database-only mode - load data from API
 import type { ScoreCardData } from "@/types/scorecard"
-import { Camera, BarChart2, Menu, FileText, Bot, ChevronDown } from "lucide-react"
+import { Camera, BarChart2, Menu, FileText, Bot } from "lucide-react"
 import Link from "next/link"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
@@ -17,9 +17,9 @@ export default function Home() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [selectedQuarter, setSelectedQuarter] = useState("q1")
-  const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
+  // const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
-  const [aiFlowType, setAIFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
+  const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
   const aiFlowsDropdownRef = useRef<HTMLDivElement>(null)
 
   const QUARTER_OPTIONS = [
@@ -118,18 +118,18 @@ export default function Home() {
         setToast({ message: "Screen captured successfully", type: "success" })
       }, "image/png")
     } catch (error) {
-      // Remove all console.error statements
+      console.error('Screen capture error:', error)
       setToast({ message: "Failed to capture screen", type: "error" })
     }
   }
 
-  const handleAIFlowSelection = (flowType: "goal-comparison" | "learnings-best-practices") => {
-    setAIFlowType(flowType)
-    setIsAIFlowsDropdownOpen(false)
-    setIsAIFlowsModalOpen(true)
-  }
+  // const handleAIFlowSelection = (flowType: "goal-comparison" | "learnings-best-practices") => {
+  //   setAIFlowType(flowType)
+  //   setIsAIFlowsDropdownOpen(false)
+  //   setIsAIFlowsModalOpen(true)
+  // }
 
-  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: any) => {
+  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: number[], categories: number[], goals: number[], programs: number[] }) => {
     try {
       setToast({ message: 'Analyzing selected data...', type: 'info' })
       

@@ -24,6 +24,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, data })
   } catch (error) {
+    console.error('POST error:', error)
     return NextResponse.json({ error: "Invalid data format" }, { status: 400 })
   }
 }

@@ -391,7 +391,6 @@ export class DatabaseService {
     fieldPath: string[],
     newValue: string | null,
     quarter?: string,
-    field?: string
   ): Promise<ScoreCardData> {
     const client = await getDbConnection();
     

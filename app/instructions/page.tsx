@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { BarChart2, Menu, Camera, FileText, X } from "lucide-react"
+import { BarChart2, X } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
 import Image from "next/image"

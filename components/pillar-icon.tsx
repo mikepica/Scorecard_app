@@ -1,5 +1,6 @@
 import { Pillar } from '@/types/scorecard'
 import { getPillarConfig } from '@/config/pillar-config'
+import Image from 'next/image'
 
 export function PillarIcon({ pillar }: { pillar: Pillar }) {
   const config = getPillarConfig(pillar)
@@ -22,10 +23,12 @@ export function PillarIcon({ pillar }: { pillar: Pillar }) {
     if (lowerName.includes("patient engagement")) {
       return (
         <div className="w-24 h-24 flex items-center justify-center">
-          <img 
+          <Image 
             src={iconSrc || "/placeholder.svg"} 
             alt={`${pillar.name} icon`} 
             className="w-15 h-15 object-contain" 
+            width={60}
+            height={60}
           />
         </div>
       )
@@ -34,10 +37,12 @@ export function PillarIcon({ pillar }: { pillar: Pillar }) {
     // Keep circle for all other pillars
     return (
       <div className={`w-24 h-24 rounded-full ${getBgColor()} flex items-center justify-center overflow-hidden p-2`}>
-        <img 
+        <Image 
           src={iconSrc || "/placeholder.svg"} 
           alt={`${pillar.name} icon`} 
           className="w-20 h-20 object-contain" 
+          width={80}
+          height={80}
         />
       </div>
     )

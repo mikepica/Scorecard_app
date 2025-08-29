@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff, ChevronDown, Info, Pencil } from "lucide-react"
+import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -16,7 +16,7 @@ import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { getPillarColorById } from "@/lib/pillar-utils"
 import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
-import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters, getQuarterInfo } from "@/lib/quarter-utils"
+import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -29,7 +29,7 @@ export default function DetailsPage() {
   // Quarter configuration
   const currentQuarter = getCurrentQuarter()
   const previousQuarter = getPreviousQuarter()
-  const defaultObjectiveYear = parseInt(process.env.NEXT_PUBLIC_DEFAULT_OBJECTIVE_YEAR || "2025")
+  // const defaultObjectiveYear = parseInt(process.env.NEXT_PUBLIC_DEFAULT_OBJECTIVE_YEAR || "2025")
 
   // Load data when the page loads
   useEffect(() => {
@@ -66,9 +66,9 @@ export default function DetailsPage() {
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false)
   const [currentInsightsProgram, setCurrentInsightsProgram] = useState<StrategicProgram | null>(null)
   const [isReprioritizationMode, setIsReprioritizationMode] = useState(false)
-  const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
+  // const [, setIsAIFlowsDropdownOpen] = useState(false)
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
-  const [aiFlowType, setAIFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
+  const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
 
   // State for selected filters - default to "all"
   const [selectedPillar, setSelectedPillar] = useState(ALL_VALUE)
@@ -552,7 +552,8 @@ export default function DetailsPage() {
     }
   }
 
-  // Handle progress update
+  // Handle progress update (unused - commented out)
+  /*
   const handleProgressUpdate = async (programId: string, newProgress: string) => {
     try {
       const program = filteredPrograms.find(p => p.id === programId)
@@ -580,6 +581,7 @@ export default function DetailsPage() {
       setToast({ message: 'Failed to update progress', type: 'error' })
     }
   }
+  */
 
   // Handle quarter-specific progress update
   const handleQuarterProgressUpdate = async (programId: string, quarterColumn: string, newProgress: string) => {
@@ -711,10 +713,12 @@ export default function DetailsPage() {
   }
 
   // Handle opening the Reprioritize Goals modal
+  /*
   const handleOpenReprioritizeModal = (program: StrategicProgram) => {
     setCurrentInsightsProgram(program)
     setIsInsightsModalOpen(true)
   }
+  */
 
   // Handle Reprioritize Goals action
   const handleReprioritization = async (prompt: string, files: File[]) => {
@@ -787,13 +791,15 @@ export default function DetailsPage() {
     }
   }
 
+  /*
   const handleAIFlowSelection = (flowType: "goal-comparison" | "learnings-best-practices") => {
     setAIFlowType(flowType)
     setIsAIFlowsDropdownOpen(false)
     setIsAIFlowsModalOpen(true)
   }
+  */
 
-  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: any) => {
+  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: number[], categories: number[], goals: number[], programs: number[] }) => {
     try {
       setToast({ message: 'Analyzing selected data...', type: 'info' })
       
@@ -1044,7 +1050,7 @@ export default function DetailsPage() {
                   </div>
                 </div>
               </th>
-              {displayQuarters.slice(1).map((quarter, index) => (
+              {displayQuarters.slice(1).map((quarter) => (
                 <th key={quarter.columnName} className="border border-gray-300 bg-gray-200 text-black p-3 text-center text-base" style={{width: '14.3%'}}>
                   {quarter.label}
                 </th>
@@ -1083,7 +1089,7 @@ export default function DetailsPage() {
                     </td>
                     <td className="border border-gray-300 p-3 border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <EditableField
-                        value={(program as any)[selectedComparisonQuarter.columnName] || ""}
+                        value={(program as StrategicProgram & Record<string, unknown>)[selectedComparisonQuarter.columnName] as string || ""}
                         onSave={(newProgress) => handleQuarterProgressUpdate(program.id, selectedComparisonQuarter.columnName, newProgress)}
                         className="text-base"
                         placeholder={`Enter ${selectedComparisonQuarter.label} progress...`}
@@ -1092,7 +1098,7 @@ export default function DetailsPage() {
                     <td className="border border-gray-300 p-3 relative border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <div className="pb-8">
                         <EditableField
-                          value={(program as any)[currentQuarter.columnName] || ""}
+                          value={(program as StrategicProgram & Record<string, unknown>)[currentQuarter.columnName] as string || ""}
                           onSave={(newProgress) => handleQuarterProgressUpdate(program.id, currentQuarter.columnName, newProgress)}
                           className="text-base"
                           placeholder={`Enter ${currentQuarter.label} progress...`}
@@ -1107,7 +1113,7 @@ export default function DetailsPage() {
                         <span className="text-xs text-gray-500 group-hover:text-blue-600">Enter Progress Update</span>
                       </button>
                     </td>
-                    {displayQuarters.map((quarter, index) => {
+                    {displayQuarters.map((quarter) => {
                       const quarterKey = quarter.columnName.replace('_progress', '')
                       const objectiveField = `${quarterKey}_objective`
                       const statusField = `${quarterKey}_status`
@@ -1116,7 +1122,7 @@ export default function DetailsPage() {
                         <td key={quarter.columnName} className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                           <div className="mb-2">
                             <EditableField
-                              value={(program as any)[objectiveField] || ""}
+                              value={(program as StrategicProgram & Record<string, unknown>)[objectiveField] as string || ""}
                               onSave={(newObjective) => handleObjectiveUpdate(program.id, quarterKey, newObjective)}
                               className="text-base"
                               placeholder={`Enter ${quarter.label} objective...`}
@@ -1124,7 +1130,7 @@ export default function DetailsPage() {
                           </div>
                           <div className="status-dot-container">
                             <StatusCircle
-                              status={(program as any)[statusField]}
+                              status={(program as StrategicProgram & Record<string, unknown>)[statusField] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
                               onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? null)}
                             />
                           </div>
@@ -1153,7 +1159,7 @@ export default function DetailsPage() {
             setIsGenerateModalOpen(false)
             setCurrentProgram(null)
           }}
-          initialContent={(currentProgram as any)[currentQuarter.columnName] || ""}
+          initialContent={(currentProgram as StrategicProgram & Record<string, unknown>)?.[currentQuarter.columnName] as string || ""}
           quarterInfo={currentQuarter}
           onGenerate={handleGenerateUpdate}
           onApply={handleApplyUpdate}
