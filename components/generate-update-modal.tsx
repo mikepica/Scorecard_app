@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Bot, Upload, Loader2, RefreshCw } from "lucide-react"
+import { Bot, Upload, Loader2, RefreshCw, Pencil } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -12,16 +12,18 @@ import {
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+import type { QuarterInfo } from "@/lib/quarter-utils"
 
 interface GenerateUpdateModalProps {
   isOpen: boolean
   onClose: () => void
   initialContent: string
+  quarterInfo: QuarterInfo
   onGenerate: (content: string, instructions: string, files: File[]) => Promise<string>
   onApply: (content: string) => void
 }
 
-export function GenerateUpdateModal({ isOpen, onClose, initialContent, onGenerate, onApply }: GenerateUpdateModalProps) {
+export function GenerateUpdateModal({ isOpen, onClose, initialContent, quarterInfo, onGenerate, onApply }: GenerateUpdateModalProps) {
   const [content, setContent] = useState(initialContent)
   const [originalContent, setOriginalContent] = useState(initialContent)
   const [instructions, setInstructions] = useState("")
@@ -85,24 +87,21 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, onGenerat
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-6xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
-            Generate Update
+            <Pencil className="h-5 w-5" />
+            Enter Progress Update
           </DialogTitle>
           <DialogDescription>
-            {hasGenerated 
-              ? "Review and edit the generated content before applying it to your progress updates."
-              : "Add text and attach documents to generate an update for this progress item."
-            }
+            Add in Progress update manually or use AI to draft it
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div>
             <label htmlFor="content" className="block text-sm font-medium mb-2">
-              Content {hasGenerated && <span className="text-green-600">(Generated)</span>}
+              Enter or Edit {quarterInfo.label} Progress update {hasGenerated && <span className="text-green-600">(Generated)</span>}
             </label>
             <Textarea
               id="content"
@@ -112,14 +111,27 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, onGenerat
               className={`min-h-[120px] ${hasGenerated ? 'border-green-300 bg-green-50' : ''}`}
               disabled={isGenerating}
             />
+            <Button 
+              onClick={handleApply}
+              className="mt-2"
+              disabled={isGenerating || !content.trim()}
+            >
+              Save Update
+            </Button>
           </div>
+
+          {/* Visual line separator */}
+          <hr className="border-gray-300" />
 
           {!hasGenerated && (
             <>
               <div>
                 <label htmlFor="instructions" className="block text-sm font-medium mb-2">
-                  Instructions
+                  Generate Update with AI
                 </label>
+                <p className="text-sm text-gray-600 mb-2">
+                  Write your prompt in the box and/or upload documentation for the AI to produce your update. The update will then be drafted in the above box to be saved.
+                </p>
                 <Textarea
                   id="instructions"
                   value={instructions}

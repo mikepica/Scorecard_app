@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff, ChevronDown, Info } from "lucide-react"
+import { BarChart2, Menu, Camera, Bot, FileText, Eye, EyeOff, ChevronDown, Info, Pencil } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, Pillar, Category, StrategicGoal, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -1101,10 +1101,10 @@ export default function DetailsPage() {
                       <button
                         onClick={() => handleOpenGenerateModal(program)}
                         className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
-                        title="Generate Update"
+                        title="Enter Progress Update"
                       >
-                        <Bot className="h-4 w-4 text-gray-500 group-hover:text-blue-600" />
-                        <span className="text-xs text-gray-500 group-hover:text-blue-600">Generate Update</span>
+                        <Pencil className="h-4 w-4 text-gray-500 group-hover:text-blue-600" />
+                        <span className="text-xs text-gray-500 group-hover:text-blue-600">Enter Progress Update</span>
                       </button>
                     </td>
                     {displayQuarters.map((quarter, index) => {
@@ -1154,6 +1154,7 @@ export default function DetailsPage() {
             setCurrentProgram(null)
           }}
           initialContent={(currentProgram as any)[currentQuarter.columnName] || ""}
+          quarterInfo={currentQuarter}
           onGenerate={handleGenerateUpdate}
           onApply={handleApplyUpdate}
         />
