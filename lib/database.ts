@@ -103,6 +103,28 @@ export class DatabaseService {
         text: row.text,
         status: row.status,
         comments: row.comments,
+        
+        // 2025 Objectives and Statuses
+        q1_2025_objective: row.q1_2025_objective,
+        q2_2025_objective: row.q2_2025_objective,
+        q3_2025_objective: row.q3_2025_objective,
+        q4_2025_objective: row.q4_2025_objective,
+        q1_2025_status: row.q1_2025_status,
+        q2_2025_status: row.q2_2025_status,
+        q3_2025_status: row.q3_2025_status,
+        q4_2025_status: row.q4_2025_status,
+        
+        // 2026 Objectives and Statuses
+        q1_2026_objective: row.q1_2026_objective,
+        q2_2026_objective: row.q2_2026_objective,
+        q3_2026_objective: row.q3_2026_objective,
+        q4_2026_objective: row.q4_2026_objective,
+        q1_2026_status: row.q1_2026_status,
+        q2_2026_status: row.q2_2026_status,
+        q3_2026_status: row.q3_2026_status,
+        q4_2026_status: row.q4_2026_status,
+        
+        // Legacy fields (for backward compatibility)
         q1Objective: row.q1_objective,
         q2Objective: row.q2_objective,
         q3Objective: row.q3_objective,
@@ -123,6 +145,28 @@ export class DatabaseService {
       const programs: StrategicProgram[] = programsResult.rows.map(row => ({
         id: row.id,
         text: row.text,
+        
+        // 2025 Objectives and Statuses
+        q1_2025_objective: row.q1_2025_objective,
+        q2_2025_objective: row.q2_2025_objective,
+        q3_2025_objective: row.q3_2025_objective,
+        q4_2025_objective: row.q4_2025_objective,
+        q1_2025_status: row.q1_2025_status,
+        q2_2025_status: row.q2_2025_status,
+        q3_2025_status: row.q3_2025_status,
+        q4_2025_status: row.q4_2025_status,
+        
+        // 2026 Objectives and Statuses
+        q1_2026_objective: row.q1_2026_objective,
+        q2_2026_objective: row.q2_2026_objective,
+        q3_2026_objective: row.q3_2026_objective,
+        q4_2026_objective: row.q4_2026_objective,
+        q1_2026_status: row.q1_2026_status,
+        q2_2026_status: row.q2_2026_status,
+        q3_2026_status: row.q3_2026_status,
+        q4_2026_status: row.q4_2026_status,
+        
+        // Legacy fields (for backward compatibility)
         q1Objective: row.q1_objective,
         q2Objective: row.q2_objective,
         q3Objective: row.q3_objective,
@@ -135,6 +179,17 @@ export class DatabaseService {
         sponsorsLeads: row.sponsors_leads,
         reportingOwners: row.reporting_owners,
         progressUpdates: row.progress_updates,
+        
+        // Quarterly progress updates (2025-2026)
+        q1_2025_progress: row.q1_2025_progress,
+        q2_2025_progress: row.q2_2025_progress,
+        q3_2025_progress: row.q3_2025_progress,
+        q4_2025_progress: row.q4_2025_progress,
+        q1_2026_progress: row.q1_2026_progress,
+        q2_2026_progress: row.q2_2026_progress,
+        q3_2026_progress: row.q3_2026_progress,
+        q4_2026_progress: row.q4_2026_progress,
+        
         updatedAt: row.updated_at,
         strategicGoalId: row.goal_id,
         categoryId: row.category_id,
@@ -235,6 +290,33 @@ export class DatabaseService {
     }
   }
 
+  // Update program quarter-specific progress
+  static async updateProgramQuarterProgress(programId: string, quarterColumn: string, progressUpdates: string): Promise<void> {
+    const client = await getDbConnection();
+    try {
+      // Validate column name to prevent SQL injection
+      const validColumns = [
+        'q1_2025_progress', 'q2_2025_progress', 'q3_2025_progress', 'q4_2025_progress',
+        'q1_2026_progress', 'q2_2026_progress', 'q3_2026_progress', 'q4_2026_progress'
+      ];
+      
+      if (!validColumns.includes(quarterColumn)) {
+        throw new Error(`Invalid quarter column: ${quarterColumn}`);
+      }
+      
+      const result = await client.query(
+        `UPDATE strategic_programs SET ${quarterColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+        [progressUpdates, programId]
+      );
+      
+      if (result.rowCount === 0) {
+        throw new Error(`Program with ID ${programId} not found`);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
   // Update category status
   static async updateCategoryStatus(categoryId: string, status: string): Promise<void> {
     const client = await getDbConnection();
@@ -323,7 +405,21 @@ export class DatabaseService {
         case 'program':
           if (!quarter) throw new Error('Quarter is required for program status updates');
           const [,, , programId] = fieldPath;
-          const column = `${quarter}_status`;
+          
+          // Support both legacy and year-specific formats
+          const column = quarter.includes('_') ? `${quarter}_status` : `${quarter}_status`;
+          
+          // Validate column name for year-specific formats
+          const validStatusColumns = [
+            'q1_status', 'q2_status', 'q3_status', 'q4_status', // legacy
+            'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
+            'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
+          ];
+          
+          if (!validStatusColumns.includes(column.replace('_status', '') + '_status')) {
+            throw new Error(`Invalid quarter status column: ${column}`);
+          }
+          
           result = await client.query(
             `UPDATE strategic_programs SET ${column} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
             [newValue, programId]
@@ -343,7 +439,21 @@ export class DatabaseService {
         case 'program-objective':
           if (!quarter) throw new Error('Quarter is required for program objective updates');
           const [,,, programObjId] = fieldPath;
-          const objColumn = `${quarter}_objective`;
+          
+          // Support both legacy and year-specific formats
+          const objColumn = quarter.includes('_') ? `${quarter}_objective` : `${quarter}_objective`;
+          
+          // Validate column name for year-specific formats
+          const validObjectiveColumns = [
+            'q1_objective', 'q2_objective', 'q3_objective', 'q4_objective', // legacy
+            'q1_2025_objective', 'q2_2025_objective', 'q3_2025_objective', 'q4_2025_objective',
+            'q1_2026_objective', 'q2_2026_objective', 'q3_2026_objective', 'q4_2026_objective'
+          ];
+          
+          if (!validObjectiveColumns.includes(objColumn.replace('_objective', '') + '_objective')) {
+            throw new Error(`Invalid quarter objective column: ${objColumn}`);
+          }
+          
           result = await client.query(
             `UPDATE strategic_programs SET ${objColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
             [newValue, programObjId]
@@ -358,6 +468,27 @@ export class DatabaseService {
             [newValue, programProgressId]
           );
           if (result.rowCount === 0) throw new Error(`Program with ID ${programProgressId} not found`);
+          break;
+
+        case 'program-quarter-progress':
+          if (!quarter) throw new Error('Quarter column is required for quarter-specific progress updates');
+          const [,,, programQuarterProgressId] = fieldPath;
+          
+          // Validate quarter column name to prevent SQL injection
+          const validColumns = [
+            'q1_2025_progress', 'q2_2025_progress', 'q3_2025_progress', 'q4_2025_progress',
+            'q1_2026_progress', 'q2_2026_progress', 'q3_2026_progress', 'q4_2026_progress'
+          ];
+          
+          if (!validColumns.includes(quarter)) {
+            throw new Error(`Invalid quarter column: ${quarter}`);
+          }
+          
+          result = await client.query(
+            `UPDATE strategic_programs SET ${quarter} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+            [newValue, programQuarterProgressId]
+          );
+          if (result.rowCount === 0) throw new Error(`Program with ID ${programQuarterProgressId} not found`);
           break;
           
         case 'category':

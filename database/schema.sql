@@ -80,6 +80,16 @@ CREATE TABLE strategic_programs (
     -- Progress updates
     progress_updates TEXT,
     
+    -- Quarterly progress updates (2025-2026)
+    q1_2025_progress TEXT,
+    q2_2025_progress TEXT,
+    q3_2025_progress TEXT,
+    q4_2025_progress TEXT,
+    q1_2026_progress TEXT,
+    q2_2026_progress TEXT,
+    q3_2026_progress TEXT,
+    q4_2026_progress TEXT,
+    
     -- Foreign keys
     goal_id VARCHAR(255) NOT NULL REFERENCES strategic_goals(id) ON DELETE CASCADE,
     category_id VARCHAR(255) NOT NULL REFERENCES categories(id) ON DELETE CASCADE,

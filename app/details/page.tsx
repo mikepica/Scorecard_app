@@ -16,6 +16,7 @@ import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { getPillarColorById } from "@/lib/pillar-utils"
 import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
+import { getCurrentQuarter, getPreviousQuarter } from "@/lib/quarter-utils"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -24,6 +25,11 @@ export default function DetailsPage() {
   // State for data loading
   const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Quarter configuration
+  const currentQuarter = getCurrentQuarter()
+  const previousQuarter = getPreviousQuarter()
+  const defaultObjectiveYear = parseInt(process.env.NEXT_PUBLIC_DEFAULT_OBJECTIVE_YEAR || "2025")
 
   // Load data when the page loads
   useEffect(() => {
@@ -508,6 +514,36 @@ export default function DetailsPage() {
     }
   }
 
+  // Handle quarter-specific progress update
+  const handleQuarterProgressUpdate = async (programId: string, quarterColumn: string, newProgress: string) => {
+    try {
+      const program = filteredPrograms.find(p => p.id === programId)
+      if (!program) {
+        throw new Error('Program not found')
+      }
+      
+      const response = await fetch('/api/scorecard/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, programId],
+          newValue: newProgress,
+          type: 'program-quarter-progress',
+          quarter: quarterColumn, // This will be the full column name like 'q3_2025_progress'
+        }),
+      })
+      if (!response.ok) {
+        throw new Error('Failed to update quarter progress')
+      }
+      const updatedData = await response.json()
+      setData(updatedData)
+      setToast({ message: 'Quarter progress updated successfully', type: 'success' })
+    } catch (error) {
+      console.error('Error updating quarter progress:', error)
+      setToast({ message: 'Failed to update quarter progress', type: 'error' })
+    }
+  }
+
   // Handle quarterly objective update
   const handleObjectiveUpdate = async (programId: string, quarter: string, newObjective: string) => {
     try {
@@ -591,11 +627,12 @@ export default function DetailsPage() {
     }
   }
 
-  // Handle Apply Update action - saves the final content to database
+  // Handle Apply Update action - saves the final content to current quarter column
   const handleApplyUpdate = async (content: string) => {
     try {
       if (currentProgram) {
-        await handleProgressUpdate(currentProgram.id, content)
+        // Save to the current quarter progress column instead of legacy progress_updates
+        await handleQuarterProgressUpdate(currentProgram.id, currentQuarter.columnName, content)
         setToast({ message: 'Update applied successfully!', type: 'success' })
         setIsGenerateModalOpen(false)
         setCurrentProgram(null)
@@ -888,14 +925,15 @@ export default function DetailsPage() {
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base`} style={{width: '15%'}}>
+              <th className={`border border-gray-300 ${getPillarHeaderColor(selectedPillar)} text-white p-3 text-left text-base`} style={{width: '14.3%'}}>
                 Strategic Programs
               </th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Progress Updates</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q1</th>
-              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q2</th>
-              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q3</th>
-              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center text-base" style={{width: '17%'}}>Q4</th>
+              <th className="border border-gray-300 bg-blue-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>{previousQuarter.label}</th>
+              <th className="border border-gray-300 bg-purple-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>{currentQuarter.label}</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q1-2025</th>
+              <th className="border border-gray-300 bg-green-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q2-2025</th>
+              <th className="border border-gray-300 bg-yellow-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q3-2025</th>
+              <th className="border border-gray-300 bg-red-500 text-white p-3 text-center text-base" style={{width: '14.3%'}}>Q4-2025</th>
             </tr>
           </thead>
           <tbody>
@@ -908,7 +946,7 @@ export default function DetailsPage() {
                   <tr key={program.id}>
                     <td 
                       className="border border-gray-300 p-3 relative hover:bg-gray-50" 
-                      style={{width: '15%'}}
+                      style={{width: '14.3%'}}
                       onMouseEnter={(e) => {
                         setHoveredProgram(program.id)
                         setTooltipPosition({ x: e.clientX, y: e.clientY })
@@ -928,23 +966,23 @@ export default function DetailsPage() {
                         className={`${getPillarTextColor(program.strategicPillarId)} font-medium text-base pr-8`}
                       />
                     </td>
-                    <td className="border border-gray-300 p-3 relative" style={{width: '17%'}}>
+                    <td className="border border-gray-300 p-3" style={{width: '14.3%'}}>
+                      <EditableField
+                        value={(program as any)[previousQuarter.columnName] || ""}
+                        onSave={(newProgress) => handleQuarterProgressUpdate(program.id, previousQuarter.columnName, newProgress)}
+                        className="text-base"
+                        placeholder={`Enter ${previousQuarter.label} progress...`}
+                      />
+                    </td>
+                    <td className="border border-gray-300 p-3 relative" style={{width: '14.3%'}}>
                       <div className="pb-8">
                         <EditableField
-                          value={program.progressUpdates || ""}
-                          onSave={(newProgress) => handleProgressUpdate(program.id, newProgress)}
+                          value={(program as any)[currentQuarter.columnName] || ""}
+                          onSave={(newProgress) => handleQuarterProgressUpdate(program.id, currentQuarter.columnName, newProgress)}
                           className="text-base"
-                          placeholder="Enter progress updates..."
+                          placeholder={`Enter ${currentQuarter.label} progress...`}
                         />
                       </div>
-                      <button
-                        onClick={() => handleOpenReprioritizeModal(program)}
-                        className="absolute bottom-2 left-2 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
-                        title="Reprioritize Goals"
-                      >
-                        <Bot className="h-4 w-4 text-gray-500 group-hover:text-purple-600" />
-                        <span className="text-xs text-gray-500 group-hover:text-purple-600">Reprioritize Goals</span>
-                      </button>
                       <button
                         onClick={() => handleOpenGenerateModal(program)}
                         className="absolute bottom-2 right-2 p-1 rounded hover:bg-gray-100 transition-colors group flex items-center gap-1"
@@ -954,67 +992,67 @@ export default function DetailsPage() {
                         <span className="text-xs text-gray-500 group-hover:text-blue-600">Generate Update</span>
                       </button>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                       <div className="mb-2">
                         <EditableField
-                          value={program.q1Objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q1", newObjective)}
+                          value={program.q1_2025_objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q1_2025", newObjective)}
                           className="text-base"
-                          placeholder="Enter Q1 objective..."
+                          placeholder="Enter Q1-2025 objective..."
                         />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
-                          status={program.q1Status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q1", newStatus ?? '')}
+                          status={program.q1_2025_status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q1_2025", newStatus ?? '')}
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                       <div className="mb-2">
                         <EditableField
-                          value={program.q2Objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q2", newObjective)}
+                          value={program.q2_2025_objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q2_2025", newObjective)}
                           className="text-base"
-                          placeholder="Enter Q2 objective..."
+                          placeholder="Enter Q2-2025 objective..."
                         />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
-                          status={program.q2Status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q2", newStatus ?? '')}
+                          status={program.q2_2025_status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q2_2025", newStatus ?? '')}
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                       <div className="mb-2">
                         <EditableField
-                          value={program.q3Objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q3", newObjective)}
+                          value={program.q3_2025_objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q3_2025", newObjective)}
                           className="text-base"
-                          placeholder="Enter Q3 objective..."
+                          placeholder="Enter Q3-2025 objective..."
                         />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
-                          status={program.q3Status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q3", newStatus ?? '')}
+                          status={program.q3_2025_status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q3_2025", newStatus ?? '')}
                         />
                       </div>
                     </td>
-                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '17%'}}>
+                    <td className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                       <div className="mb-2">
                         <EditableField
-                          value={program.q4Objective || ""}
-                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q4", newObjective)}
+                          value={program.q4_2025_objective || ""}
+                          onSave={(newObjective) => handleObjectiveUpdate(program.id, "q4_2025", newObjective)}
                           className="text-base"
-                          placeholder="Enter Q4 objective..."
+                          placeholder="Enter Q4-2025 objective..."
                         />
                       </div>
                       <div className="status-dot-container">
                         <StatusCircle
-                          status={program.q4Status}
-                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q4", newStatus ?? '')}
+                          status={program.q4_2025_status}
+                          onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), "q4_2025", newStatus ?? '')}
                         />
                       </div>
                     </td>
@@ -1023,7 +1061,7 @@ export default function DetailsPage() {
               })
             ) : (
               <tr>
-                <td colSpan={6} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
+                <td colSpan={7} className="border border-gray-300 p-4 text-center text-gray-500 text-base">
                   No programs found with the current filter settings.
                 </td>
               </tr>
@@ -1040,7 +1078,7 @@ export default function DetailsPage() {
             setIsGenerateModalOpen(false)
             setCurrentProgram(null)
           }}
-          initialContent={currentProgram.progressUpdates || ""}
+          initialContent={(currentProgram as any)[currentQuarter.columnName] || ""}
           onGenerate={handleGenerateUpdate}
           onApply={handleApplyUpdate}
         />

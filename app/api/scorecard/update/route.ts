@@ -10,7 +10,7 @@ export async function POST(request: Request) {
       quarter?: 'q1' | 'q2' | 'q3' | 'q4',
       field?: string 
     } = await request.json()
-    // type: 'program' | 'category' | 'goal' | 'program-text' | 'program-objective' | 'program-progress' | 'goal-text' | 'category-name'
+    // type: 'program' | 'category' | 'goal' | 'program-text' | 'program-objective' | 'program-progress' | 'program-quarter-progress' | 'goal-text' | 'category-name'
     // fieldPath: [pillarId, categoryId, goalId, programId] for program, [pillarId, categoryId] for category, [pillarId, categoryId, goalId] for goal
 
     console.log('🗄️  Processing database update operation:', type)
