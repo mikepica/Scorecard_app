@@ -5,7 +5,7 @@ export async function POST(request: Request) {
   try {
     const { fieldPath, newValue, type, quarter, field }: { 
       fieldPath: string[], 
-      newValue: string, 
+      newValue: string | null, 
       type: string, 
       quarter?: 'q1' | 'q2' | 'q3' | 'q4',
       field?: string 

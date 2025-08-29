@@ -30,6 +30,7 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, quarterIn
   const [files, setFiles] = useState<File[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasGenerated, setHasGenerated] = useState(false)
+  const [error, setError] = useState<string>("")
 
   // Reset state when modal opens/closes
   useEffect(() => {
@@ -40,6 +41,7 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, quarterIn
       setFiles([])
       setIsGenerating(false)
       setHasGenerated(false)
+      setError("")
     }
   }, [isOpen, initialContent])
 
@@ -71,6 +73,11 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, quarterIn
   }
 
   const handleApply = () => {
+    if (content.length > 750) {
+      setError("Please reduce to 750 or less characters")
+      return
+    }
+    setError("")
     onApply(content)
     onClose()
   }
@@ -82,12 +89,13 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, quarterIn
     setFiles([])
     setIsGenerating(false)
     setHasGenerated(false)
+    setError("")
     onClose()
   }
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl">
+      <DialogContent className="max-w-7xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pencil className="h-5 w-5" />
@@ -106,11 +114,24 @@ export function GenerateUpdateModal({ isOpen, onClose, initialContent, quarterIn
             <Textarea
               id="content"
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value)
+                setError("") // Clear error when user starts typing
+              }}
               placeholder="Enter update content..."
-              className={`min-h-[120px] ${hasGenerated ? 'border-green-300 bg-green-50' : ''}`}
+              className={`min-h-[240px] ${hasGenerated ? 'border-green-300 bg-green-50' : ''}`}
               disabled={isGenerating}
             />
+            <div className="flex justify-between items-center mt-1">
+              <div className={`text-sm ${content.length > 750 ? 'text-red-600' : 'text-gray-500'}`}>
+                {content.length}/750 characters
+              </div>
+              {error && (
+                <div className="text-sm text-red-600">
+                  {error}
+                </div>
+              )}
+            </div>
             <Button 
               onClick={handleApply}
               className="mt-2"

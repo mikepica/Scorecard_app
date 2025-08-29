@@ -497,7 +497,7 @@ export default function DetailsPage() {
     goalId: string,
     programId: string,
     quarter: string,
-    newStatus: string
+    newStatus: string | null
   ) => {
     try {
       const response = await fetch('/api/scorecard/update', {
@@ -1125,7 +1125,7 @@ export default function DetailsPage() {
                           <div className="status-dot-container">
                             <StatusCircle
                               status={(program as any)[statusField]}
-                              onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? '')}
+                              onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? null)}
                             />
                           </div>
                         </td>

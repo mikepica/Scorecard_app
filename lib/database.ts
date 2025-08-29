@@ -221,7 +221,7 @@ export class DatabaseService {
   }
 
   // Update program status (quarterly)
-  static async updateProgramStatus(programId: string, quarter: string, status: string): Promise<void> {
+  static async updateProgramStatus(programId: string, quarter: string, status: string | null): Promise<void> {
     const client = await getDbConnection();
     try {
       const column = `${quarter}_status`;
@@ -318,7 +318,7 @@ export class DatabaseService {
   }
 
   // Update category status
-  static async updateCategoryStatus(categoryId: string, status: string): Promise<void> {
+  static async updateCategoryStatus(categoryId: string, status: string | null): Promise<void> {
     const client = await getDbConnection();
     try {
       const result = await client.query(
@@ -352,7 +352,7 @@ export class DatabaseService {
   }
 
   // Update goal status
-  static async updateGoalStatus(goalId: string, status: string): Promise<void> {
+  static async updateGoalStatus(goalId: string, status: string | null): Promise<void> {
     const client = await getDbConnection();
     try {
       const result = await client.query(
@@ -389,7 +389,7 @@ export class DatabaseService {
   static async performUpdate(
     updateType: string,
     fieldPath: string[],
-    newValue: string,
+    newValue: string | null,
     quarter?: string,
     field?: string
   ): Promise<ScoreCardData> {

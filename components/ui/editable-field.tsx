@@ -29,17 +29,6 @@ export function EditableField({
     setEditValue(value)
   }, [value])
 
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      if (containerRef.current?.contains(e.target as Node)) {
-        e.preventDefault()
-        setIsEditing(true)
-      }
-    }
-
-    document.addEventListener("contextmenu", handleContextMenu)
-    return () => document.removeEventListener("contextmenu", handleContextMenu)
-  }, [])
 
   const handleSave = async () => {
     if (editValue === value) {
