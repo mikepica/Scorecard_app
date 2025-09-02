@@ -3,19 +3,28 @@
 import { useEffect, useState, useRef } from "react"
 import { Scorecard } from "@/components/scorecard"
 // Database-only mode - load data from API
-import type { ScoreCardData } from "@/types/scorecard"
+import type { ScoreCardData, StrategicProgram } from "@/types/scorecard"
 import { Camera, BarChart2, Menu, FileText, Bot } from "lucide-react"
 import Link from "next/link"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
 import { Dropdown } from "@/components/dropdown"
 import { AIFlowsModal } from "@/components/ai-flows-modal"
+import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 
 export default function Home() {
   const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
+  
+  // Program details sidebar state
+  const [isProgramSidebarOpen, setIsProgramSidebarOpen] = useState(false)
+  const [selectedProgram, setSelectedProgram] = useState<(StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) | null>(null)
   // Function to get current quarter based on today's date
   const getCurrentQuarter = () => {
     const today = new Date()
@@ -73,7 +82,7 @@ export default function Home() {
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (aiFlowsDropdownRef.current && !aiFlowsDropdownRef.current.contains(event.target as Node)) {
-        setIsAIFlowsDropdownOpen(false)
+        // setIsAIFlowsDropdownOpen(false) // This function doesn't exist in this component
       }
     }
 
@@ -86,6 +95,28 @@ export default function Home() {
   const handleDataUpdate = (newData: ScoreCardData) => {
     setData(newData)
     setToast({ message: "Changes saved successfully", type: "success" })
+  }
+
+  // Handler for opening program sidebar
+  const handleProgramSelect = (program: StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) => {
+    setSelectedProgram(program)
+    setIsProgramSidebarOpen(true)
+  }
+
+  // Handler for closing program sidebar
+  const handleProgramSidebarClose = () => {
+    setIsProgramSidebarOpen(false)
+    setSelectedProgram(null)
+  }
+
+  // Handler for program updates from sidebar
+  const handleProgramUpdate = (programId: string, updatedData: ScoreCardData) => {
+    setData(updatedData)
+    setToast({ message: "Program updated successfully", type: "success" })
   }
 
   // Function to capture the screen
@@ -248,26 +279,43 @@ export default function Home() {
         <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data || { pillars: [] }} />
       </div>
 
-      <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">
-        {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading scorecard data...</p>
+      <div className={`flex flex-1 transition-all duration-300`} style={{
+        paddingLeft: isProgramSidebarOpen ? (window.innerWidth >= 1024 ? '640px' : window.innerWidth >= 768 ? '512px' : '0') : '0'
+      }}>
+        <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
+                <p className="text-gray-600">Loading scorecard data...</p>
+              </div>
             </div>
-          </div>
-        ) : data ? (
-          <div className="flex-1 flex flex-col">
-            <Scorecard data={data} onDataUpdate={handleDataUpdate} selectedQuarter={selectedQuarter} />
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <p className="text-gray-600">No scorecard data available</p>
+          ) : data ? (
+            <div className="flex-1 flex flex-col">
+              <Scorecard 
+                data={data} 
+                onDataUpdate={handleDataUpdate} 
+                selectedQuarter={selectedQuarter}
+                onProgramSelect={handleProgramSelect}
+              />
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <p className="text-gray-600">No scorecard data available</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+      {/* Program Details Sidebar */}
+      <ProgramDetailsSidebar
+        program={selectedProgram}
+        isOpen={isProgramSidebarOpen}
+        onClose={handleProgramSidebarClose}
+        onUpdate={handleProgramUpdate}
+      />
+
       {/* AI Flows Modal */}
       {data && (
         <AIFlowsModal

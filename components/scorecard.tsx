@@ -1,8 +1,8 @@
 "use client"
 // import { StatusIndicator } from "@/components/status-indicator"
 import { PillarIcon } from "@/components/pillar-icon"
-import type { ScoreCardData, Pillar, Category, StrategicGoal } from "@/types/scorecard"
-import { ChevronDown, ChevronRight } from "lucide-react"
+import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
+import { ChevronDown, ChevronRight, Eye } from "lucide-react"
 import { useState } from "react"
 import { EditableField } from "@/components/ui/editable-field"
 // import { useEditableField } from "@/hooks/use-editable-field"
@@ -10,6 +10,7 @@ import { EditableField } from "@/components/ui/editable-field"
 import { StatusCircle } from "@/components/status-circle"
 import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
 import { getPillarConfig } from "@/config/pillar-config"
+import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 
 // const STATUS_OPTIONS = [
 //   { value: "exceeded", label: "Exceeded" },
@@ -18,7 +19,21 @@ import { getPillarConfig } from "@/config/pillar-config"
 //   { value: "missed", label: "Missed" },
 // ]
 
-export function Scorecard({ data, onDataUpdate, selectedQuarter = "q3_2025" }: { data: ScoreCardData; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter?: string }) {
+export function Scorecard({ 
+  data, 
+  onDataUpdate, 
+  selectedQuarter = "q3_2025", 
+  onProgramSelect 
+}: { 
+  data: ScoreCardData; 
+  onDataUpdate: (newData: ScoreCardData) => void; 
+  selectedQuarter?: string;
+  onProgramSelect?: (program: StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) => void;
+}) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
     return <div className="w-full p-4 text-center">No scorecard data available</div>
@@ -27,13 +42,33 @@ export function Scorecard({ data, onDataUpdate, selectedQuarter = "q3_2025" }: {
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
       {data.pillars.map((pillar) => (
-        <PillarCard key={pillar.id} pillar={pillar} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
+        <PillarCard 
+          key={pillar.id} 
+          pillar={pillar} 
+          onDataUpdate={onDataUpdate} 
+          selectedQuarter={selectedQuarter}
+          onProgramSelect={onProgramSelect}
+        />
       ))}
     </div>
   )
 }
 
-function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
+function PillarCard({ 
+  pillar, 
+  onDataUpdate, 
+  selectedQuarter, 
+  onProgramSelect 
+}: { 
+  pillar: Pillar; 
+  onDataUpdate: (newData: ScoreCardData) => void; 
+  selectedQuarter: string;
+  onProgramSelect?: (program: StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) => void;
+}) {
 
   return (
     <div className="border rounded-md overflow-hidden h-full flex flex-col relative">
@@ -46,7 +81,14 @@ function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar;
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
           pillar.categories.map((category) => (
-            <CategorySection key={category.id} category={category} pillar={pillar} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
+            <CategorySection 
+              key={category.id} 
+              category={category} 
+              pillar={pillar} 
+              onDataUpdate={onDataUpdate} 
+              selectedQuarter={selectedQuarter}
+              onProgramSelect={onProgramSelect}
+            />
           ))}
       </div>
       {/* Bottom line positioned slightly above the bottom */}
@@ -55,7 +97,23 @@ function PillarCard({ pillar, onDataUpdate, selectedQuarter }: { pillar: Pillar;
   )
 }
 
-function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { category: Category; pillar: Pillar; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
+function CategorySection({ 
+  category, 
+  pillar, 
+  onDataUpdate, 
+  selectedQuarter, 
+  onProgramSelect 
+}: { 
+  category: Category; 
+  pillar: Pillar; 
+  onDataUpdate: (newData: ScoreCardData) => void; 
+  selectedQuarter: string;
+  onProgramSelect?: (program: StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) => void;
+}) {
 
   // Handler for category name update
   const handleCategoryNameSave = async (newName: string) => {
@@ -84,15 +142,43 @@ function CategorySection({ category, pillar, onDataUpdate, selectedQuarter }: { 
       </div>
       <ul className="space-y-2">
         {category.goals && category.goals.map((goal) => (
-          <GoalItem key={goal.id} goal={goal} pillar={pillar} category={category} onDataUpdate={onDataUpdate} selectedQuarter={selectedQuarter} />
+          <GoalItem 
+            key={goal.id} 
+            goal={goal} 
+            pillar={pillar} 
+            category={category} 
+            onDataUpdate={onDataUpdate} 
+            selectedQuarter={selectedQuarter}
+            onProgramSelect={onProgramSelect}
+          />
         ))}
       </ul>
     </div>
   )
 }
 
-function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { goal: StrategicGoal; pillar: Pillar; category: Category; onDataUpdate: (newData: ScoreCardData) => void; selectedQuarter: string }) {
+function GoalItem({ 
+  goal, 
+  pillar, 
+  category, 
+  onDataUpdate, 
+  selectedQuarter, 
+  onProgramSelect 
+}: { 
+  goal: StrategicGoal; 
+  pillar: Pillar; 
+  category: Category; 
+  onDataUpdate: (newData: ScoreCardData) => void; 
+  selectedQuarter: string;
+  onProgramSelect?: (program: StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) => void;
+}) {
   const [expanded, setExpanded] = useState(false)
+  const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
   const hasPrograms = goal.programs && goal.programs.length > 0
 
   // Get the status for the selected quarter
@@ -219,12 +305,44 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
       {expanded && hasPrograms && (
         <ul className={`pl-6 mt-2 space-y-2 border-l-2 ${getProgramBorderColor(pillar.name)}`}>
           {goal.programs?.map((program) => (
-            <li key={program.id} className="flex items-start justify-between gap-2">
-              <EditableField
-                value={program.text}
-                onSave={async (newValue) => handleProgramTextSave(program.id, newValue)}
-                className="text-sm"
-              />
+            <li key={program.id} className="flex items-start justify-between gap-2 group">
+              <div className="flex-1 flex items-start gap-2">
+                <div 
+                  className="flex-1"
+                  onMouseEnter={(e) => {
+                    setHoveredProgram(program.id)
+                    setTooltipPosition({ x: e.clientX, y: e.clientY })
+                  }}
+                  onMouseMove={(e) => {
+                    if (hoveredProgram === program.id) {
+                      setTooltipPosition({ x: e.clientX, y: e.clientY })
+                    }
+                  }}
+                  onMouseLeave={() => setHoveredProgram(null)}
+                >
+                  <EditableField
+                    value={program.text}
+                    onSave={async (newValue) => handleProgramTextSave(program.id, newValue)}
+                    className="text-sm"
+                  />
+                </div>
+                <button
+                  onClick={() => {
+                    if (onProgramSelect) {
+                      onProgramSelect({
+                        ...program,
+                        goalText: goal.text,
+                        categoryName: category.name,
+                        pillarName: pillar.name
+                      })
+                    }
+                  }}
+                  className="opacity-30 hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 group-hover:opacity-60"
+                  title="View program details"
+                >
+                  <Eye size={14} className="text-gray-600" />
+                </button>
+              </div>
               <StatusCircle
                 status={getProgramStatus(program)}
                 onStatusChange={async (newStatus) => {
@@ -246,6 +364,20 @@ function GoalItem({ goal, pillar, category, onDataUpdate, selectedQuarter }: { g
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Strategic Program Tooltip */}
+      {hoveredProgram && goal.programs && (
+        <StrategicProgramTooltip
+          program={{
+            ...goal.programs.find(p => p.id === hoveredProgram)!,
+            goalText: goal.text,
+            categoryName: category.name,
+            pillarName: pillar.name
+          }}
+          isVisible={hoveredProgram !== null}
+          position={tooltipPosition}
+        />
       )}
     </li>
   )
