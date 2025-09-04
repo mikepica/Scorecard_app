@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react'
 import { X, ChevronDown, ChevronUp } from 'lucide-react'
-import type { StrategicProgram } from '@/types/scorecard'
+import type { StrategicProgram, ScoreCardData } from '@/types/scorecard'
 import { StatusCircle } from '@/components/status-circle'
 import { EditableField } from '@/components/ui/editable-field'
-import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters, parseQuarterColumnName } from '@/lib/quarter-utils'
+import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from '@/lib/quarter-utils'
 import type { QuarterInfo } from '@/lib/quarter-utils'
 
 interface ProgramDetailsSidebarProps {
@@ -16,7 +16,7 @@ interface ProgramDetailsSidebarProps {
   } | null
   isOpen: boolean
   onClose: () => void
-  onUpdate: (programId: string, updates: any) => void
+  onUpdate: (programId: string, updates: ScoreCardData) => void
   isFunctionalView?: boolean
   availablePrograms?: Array<StrategicProgram & {
     goalText?: string
@@ -334,7 +334,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
               </div>
             </div>
             <EditableField
-              value={(program as any)[selectedComparisonQuarter.columnName] || ""}
+              value={program[selectedComparisonQuarter.columnName as keyof StrategicProgram] as string || ""}
               onSave={(newProgress) => handleProgressUpdate(selectedComparisonQuarter.columnName, newProgress)}
               className="text-sm"
               placeholder={`Enter ${selectedComparisonQuarter.label} progress...`}
@@ -345,7 +345,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
           <div className="bg-blue-50 rounded-lg p-4">
             <h4 className="font-medium text-gray-800 mb-3">Current Progress Update ({currentQuarter.label})</h4>
             <EditableField
-              value={(program as any)[currentQuarter.columnName] || ""}
+              value={program[currentQuarter.columnName as keyof StrategicProgram] as string || ""}
               onSave={(newProgress) => handleProgressUpdate(currentQuarter.columnName, newProgress)}
               className="text-sm"
               placeholder={`Enter ${currentQuarter.label} progress...`}
@@ -395,12 +395,12 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <h5 className="font-medium text-gray-700">{quarterInfo.label}</h5>
                     <StatusCircle
-                      status={(program as any)[statusField]}
+                      status={program[statusField as keyof StrategicProgram] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
                       onStatusChange={(newStatus) => handleStatusUpdate(quarterKey, newStatus ?? null)}
                     />
                   </div>
                   <EditableField
-                    value={(program as any)[objectiveField] || ""}
+                    value={program[objectiveField as keyof StrategicProgram] as string || ""}
                     onSave={(newObjective) => handleObjectiveUpdate(quarterKey, newObjective)}
                     className="text-sm"
                     placeholder={`Enter ${quarterInfo.label} objective...`}

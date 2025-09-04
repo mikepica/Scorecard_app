@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera, X, Users } from "lucide-react"
+import { Eye, EyeOff, Info, Pencil, X, FileText, Bot, Camera, BarChart2, Menu } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"

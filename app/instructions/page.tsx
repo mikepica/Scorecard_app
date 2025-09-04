@@ -76,7 +76,7 @@ export default function InstructionsPage() {
             <div className="prose prose-xl max-w-none">
               <h2 className="text-2xl font-bold mb-4">Providing quarterly status updates</h2>
               <h3 className="text-lg font-semibold mb-6 text-gray-700">
-                Click on pencil icon on the current quarter's progress updates to edit
+                Click on pencil icon on the current quarter&apos;s progress updates to edit
               </h3>
               <p className="mb-6 text-gray-600">
                 Select dropdowns on previous quarter and which quarter the objectives begin to view

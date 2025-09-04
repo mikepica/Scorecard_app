@@ -16,7 +16,6 @@ export function Header({
   selectedQuarter,
   onQuarterChange,
   isFunctionalView = false,
-  isChatOpen,
   onToggleChat,
 }: {
   title?: string
@@ -27,7 +26,6 @@ export function Header({
   selectedQuarter?: string
   onQuarterChange?: (value: string) => void
   isFunctionalView?: boolean
-  isChatOpen?: boolean
   onToggleChat?: () => void
 }) {
   const [showStatusModal, setShowStatusModal] = useState(false)

@@ -1,23 +1,20 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import { Scorecard } from "@/components/scorecard"
 import type { ScoreCardData, StrategicProgram } from "@/types/scorecard"
-import { Camera, BarChart2, Menu, FileText, Bot, Info, X, Users } from "lucide-react"
-import Link from "next/link"
+import { X } from "lucide-react"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
-import { Dropdown } from "@/components/dropdown"
 import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
-import { FunctionDropdown } from "@/components/function-dropdown"
 import { FilterModal } from "@/components/filter-modal"
 import { Header } from "@/components/header"
 import { useSearchParams } from "next/navigation"
 import { useMemo } from "react"
 
-export default function FunctionalView() {
+function FunctionalViewContent() {
   const searchParams = useSearchParams()
   const selectedFunction = searchParams.get('function')
   
@@ -313,7 +310,6 @@ export default function FunctionalView() {
         selectedQuarter={selectedQuarter}
         onQuarterChange={setSelectedQuarter}
         isFunctionalView={true}
-        isChatOpen={isChatOpen}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
       />
 
@@ -414,5 +410,24 @@ export default function FunctionalView() {
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </main>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function FunctionalView() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <FunctionalViewContent />
+    </Suspense>
   )
 }

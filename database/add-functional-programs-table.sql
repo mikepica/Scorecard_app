@@ -14,17 +14,6 @@ CREATE TABLE functional_programs (
     category TEXT,
     strategic_goal TEXT,
     
-    -- Legacy quarterly objectives (backward compatibility)
-    q1_objective TEXT,
-    q2_objective TEXT,
-    q3_objective TEXT,
-    q4_objective TEXT,
-    
-    -- Legacy quarterly status (backward compatibility)
-    q1_status VARCHAR(20) CHECK (q1_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-    q2_status VARCHAR(20) CHECK (q2_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-    q3_status VARCHAR(20) CHECK (q3_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
-    q4_status VARCHAR(20) CHECK (q4_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
     
     -- 2025 Objectives and Statuses
     q1_2025_objective TEXT,
@@ -51,8 +40,6 @@ CREATE TABLE functional_programs (
     sponsors_leads TEXT[],
     reporting_owners TEXT[],
     
-    -- Progress updates
-    progress_updates TEXT,
     
     -- Quarterly progress updates (2025-2026)
     q1_2025_progress TEXT,

@@ -4,15 +4,12 @@ import { useEffect, useState, useRef, useMemo } from "react"
 import { Scorecard } from "@/components/scorecard"
 // Database-only mode - load data from API
 import type { ScoreCardData, StrategicProgram } from "@/types/scorecard"
-import { Camera, BarChart2, Menu, FileText, Bot, Info, X, Users } from "lucide-react"
-import Link from "next/link"
+import { X } from "lucide-react"
 import { Toast } from "@/components/toast"
 import { AIChat } from "@/components/ai-chat"
-import { Dropdown } from "@/components/dropdown"
 import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
-import { FunctionDropdown } from "@/components/function-dropdown"
 import { FilterModal } from "@/components/filter-modal"
 import { Header } from "@/components/header"
 
@@ -312,7 +309,6 @@ export default function Home() {
         selectedQuarter={selectedQuarter}
         onQuarterChange={setSelectedQuarter}
         isFunctionalView={false}
-        isChatOpen={isChatOpen}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
       />
 
