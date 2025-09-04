@@ -1,42 +1,12 @@
 "use client"
 
 import Link from "next/link"
-import { BarChart2, X } from "lucide-react"
-import ReactMarkdown from "react-markdown"
-import { useState, useEffect } from "react"
-import Image from "next/image"
+import { BarChart2, Info, X } from "lucide-react"
+import BragStatusTable from "@/components/brag-status-table"
+import { useState } from "react"
 
 export default function InstructionsPage() {
-  const [showModal, setShowModal] = useState(false)
-  const [mainContent, setMainContent] = useState('')
-  const [aiContent, setAiContent] = useState('')
-  const [oodaContent, setOodaContent] = useState('')
-
-  useEffect(() => {
-    // Load markdown content
-    Promise.all([
-      fetch('/api/markdown/main-instructions').then(res => res.text()),
-      fetch('/api/markdown/ai-usage').then(res => res.text()),
-      fetch('/api/markdown/ooda-ai-integration').then(res => res.text())
-    ]).then(([main, ai, ooda]) => {
-      setMainContent(main)
-      setAiContent(ai)
-      setOodaContent(ooda)
-    }).catch(err => console.error('Failed to load markdown:', err))
-  }, [])
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowModal(false)
-      }
-    }
-    
-    if (showModal) {
-      document.addEventListener('keydown', handleEscape)
-      return () => document.removeEventListener('keydown', handleEscape)
-    }
-  }, [showModal])
+  const [showStatusModal, setShowStatusModal] = useState(false)
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -44,6 +14,14 @@ export default function InstructionsPage() {
         <h1 className="text-2xl font-bold text-black">ORD Scorecard: Instructions</h1>
         
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowStatusModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 transition-colors"
+            title="View BRAG Status Legend"
+            aria-label="View BRAG Status Legend"
+          >
+            <Info size={20} />
+          </button>
           <Link
             href="/"
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
@@ -62,78 +40,62 @@ export default function InstructionsPage() {
         </div>
       </header>
       
-      <div className="max-w-full mx-auto px-2 pt-8 flex-1">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-          {/* Left Panel - Main Instructions */}
-          <div className="bg-white rounded-lg shadow-lg p-6 overflow-y-auto">
-            <div className="prose prose-lg max-w-none">
-              <ReactMarkdown>{mainContent}</ReactMarkdown>
+      <div className="max-w-full mx-auto px-8 pt-8 flex-1">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 h-full min-h-[calc(100vh-200px)]">
+          {/* Left Panel - Navigation Overview */}
+          <div className="bg-white rounded-lg shadow-lg p-8 overflow-y-auto">
+            <div className="prose prose-xl max-w-none">
+              <h2 className="text-2xl font-bold mb-6">Main Scorecard (Home)</h2>
+              <ul className="list-disc pl-6 mb-8 space-y-2">
+                <li>Summary view displaying strategic pillars and their categories</li>
+                <li>Quarter Selection dropdown to view different time periods</li>
+                <li>Screen Capture functionality for reports and presentations</li>
+                <li>AI Chat integration for scorecard analysis and insights</li>
+              </ul>
+
+              <h2 className="text-2xl font-bold mb-6">Program View (Details)</h2>
+              <ul className="list-disc pl-6 space-y-2">
+                <li>Detailed table view of goals and strategic programs</li>
+                <li>Advanced filtering by Pillar, Category, and Strategic Goal</li>
+                <li>Editable fields for program updates and modifications</li>
+                <li>Bulk operations for efficient data management</li>
+              </ul>
             </div>
           </div>
 
-          {/* Right Panel */}
-          <div className="flex flex-col gap-4">
-            {/* Top Right - AI Usage */}
-            <div className="bg-white rounded-lg shadow-lg p-6 flex-1 overflow-y-auto">
-              <div className="prose prose-sm max-w-none">
-                <ReactMarkdown>{aiContent}</ReactMarkdown>
-              </div>
-            </div>
-
-            {/* Bottom Right - Split between OODA AI Integration and OODA Loop */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-1">
-              {/* Bottom Left - OODA AI Integration */}
-              <div className="bg-white rounded-lg shadow-lg p-4 overflow-y-auto">
-                <div className="prose prose-xs max-w-none">
-                  <ReactMarkdown>{oodaContent}</ReactMarkdown>
-                </div>
-              </div>
-
-              {/* Bottom Right - OODA Loop Diagram */}
-              <div className="bg-white rounded-lg shadow-lg p-2 flex flex-col">
-                <h3 className="text-lg font-bold mb-2 text-center">OODA Loop</h3>
-                <div className="flex-1 flex items-center justify-center">
-                  <div 
-                    className="relative cursor-pointer hover:opacity-80 transition-opacity w-full h-full flex items-center justify-center"
-                    onClick={() => setShowModal(true)}
-                    title="Click to view full size"
-                  >
-                    <Image
-                      src="/OODA-loop-words.jpg"
-                      alt="OODA Loop Diagram"
-                      width={300}
-                      height={300}
-                      className="rounded-lg shadow-md object-contain max-w-full max-h-full"
-                      style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '100%' }}
-                    />
-                  </div>
-                </div>
-              </div>
+          {/* Right Panel - Status Updates Guide */}
+          <div className="bg-white rounded-lg shadow-lg p-8 overflow-y-auto">
+            <div className="prose prose-xl max-w-none">
+              <h2 className="text-2xl font-bold mb-4">Providing quarterly status updates</h2>
+              <h3 className="text-lg font-semibold mb-6 text-gray-700">
+                Click on pencil icon on the current quarter's progress updates to edit
+              </h3>
+              <p className="mb-6 text-gray-600">
+                Select dropdowns on previous quarter and which quarter the objectives begin to view
+              </p>
+              
+              <BragStatusTable className="mt-6" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Modal for full-size OODA diagram */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-5xl max-h-full bg-white rounded-lg p-4">
-            <button
-              onClick={() => setShowModal(false)}
-              className="absolute -top-2 -right-2 bg-red-600 hover:bg-red-700 text-white rounded-full p-2 z-10 shadow-lg"
-              aria-label="Close modal"
-            >
-              <X size={24} />
-            </button>
-            <div className="bg-white p-4 rounded-lg">
-              <Image
-                src="/OODA.Boyd.svg"
-                alt="OODA Loop - Full Diagram"
-                width={900}
-                height={700}
-                className="rounded-lg shadow-xl"
-                style={{ maxWidth: '100%', height: 'auto' }}
-              />
+      {/* BRAG Status Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">BRAG Status Legend</h2>
+              <button
+                onClick={() => setShowStatusModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <BragStatusTable />
             </div>
           </div>
         </div>

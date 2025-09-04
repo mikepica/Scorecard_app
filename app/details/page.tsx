@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera } from "lucide-react"
+import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera, X } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -16,6 +16,7 @@ import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
+import BragStatusTable from "@/components/brag-status-table"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -65,6 +66,7 @@ export default function DetailsPage() {
 
   // State for AI Chat
   const [isChatOpen, setIsChatOpen] = useState(false)
+  const [showStatusModal, setShowStatusModal] = useState(false)
 
   // State for toast notifications
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
@@ -805,6 +807,14 @@ export default function DetailsPage() {
       <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-black">ORD Scorecard: {displayName}</h1>
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowStatusModal(true)}
+            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 transition-colors"
+            title="View BRAG Status Legend"
+            aria-label="View BRAG Status Legend"
+          >
+            <Info size={20} />
+          </button>
           <Link
             href="/instructions"
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
@@ -1139,6 +1149,27 @@ export default function DetailsPage() {
         />
       )}
       
+      {/* BRAG Status Modal */}
+      {showStatusModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900">BRAG Status Legend</h2>
+              <button
+                onClick={() => setShowStatusModal(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close modal"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto">
+              <BragStatusTable />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
