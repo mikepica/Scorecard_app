@@ -53,7 +53,7 @@ export function Dropdown({
 
       {isOpen && (
         <div
-          className="absolute z-10 w-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
+          className="absolute z-[60] w-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
           style={{ top: "100%", marginLeft: labelWidth }}
         >
           {options.map((option) => (

@@ -18,6 +18,16 @@ interface ProgramDetailsSidebarProps {
   onClose: () => void
   onUpdate: (programId: string, updates: any) => void
   isFunctionalView?: boolean
+  availablePrograms?: Array<StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }>
+  onProgramSelect?: (program: StrategicProgram & {
+    goalText?: string
+    categoryName?: string
+    pillarName?: string
+  }) => void
 }
 
 export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
@@ -25,7 +35,9 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
   isOpen,
   onClose,
   onUpdate,
-  isFunctionalView = false
+  isFunctionalView = false,
+  availablePrograms = [],
+  onProgramSelect
 }) => {
   const [selectedComparisonQuarter, setSelectedComparisonQuarter] = useState<QuarterInfo>(getPreviousQuarter())
   const [isComparisonDropdownOpen, setIsComparisonDropdownOpen] = useState(false)
@@ -39,6 +51,9 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
     return 'q1_2025'
   })
   const [isQuarterlyDropdownOpen, setIsQuarterlyDropdownOpen] = useState(false)
+  
+  // State for program dropdown
+  const [isProgramDropdownOpen, setIsProgramDropdownOpen] = useState(false)
   
   const currentQuarter = getCurrentQuarter()
   const availableQuarters = getAvailableQuarters()
@@ -94,9 +109,10 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element
-      if (!target.closest('.comparison-dropdown') && !target.closest('.quarterly-dropdown')) {
+      if (!target.closest('.comparison-dropdown') && !target.closest('.quarterly-dropdown') && !target.closest('.program-dropdown')) {
         setIsComparisonDropdownOpen(false)
         setIsQuarterlyDropdownOpen(false)
+        setIsProgramDropdownOpen(false)
       }
     }
 
@@ -188,7 +204,14 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
     }
   }
 
-  if (!isOpen || !program) return null
+  // Auto-select first program if none selected but sidebar is open
+  React.useEffect(() => {
+    if (isOpen && !program && availablePrograms.length > 0 && onProgramSelect) {
+      onProgramSelect(availablePrograms[0])
+    }
+  }, [isOpen, program, availablePrograms, onProgramSelect])
+
+  if (!isOpen) return null
 
   return (
     <>
@@ -218,18 +241,66 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
 
         {/* Program Title */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
-          <h3 className="font-medium text-gray-800 text-sm leading-tight">
-            {program.text}
-          </h3>
-          <div className="mt-2 text-xs text-gray-600 space-y-1">
-            {program.pillarName && <div><strong>Pillar:</strong> {program.pillarName}</div>}
-            {program.categoryName && <div><strong>Category:</strong> {program.categoryName}</div>}
-            {program.goalText && <div><strong>Goal:</strong> {program.goalText}</div>}
-          </div>
+          {program ? (
+            <>
+              <h3 className="font-medium text-gray-800 text-sm leading-tight">
+                {program.text}
+              </h3>
+              <div className="mt-2 text-xs text-gray-600 space-y-1">
+                {program.pillarName && <div><strong>Pillar:</strong> {program.pillarName}</div>}
+                {program.categoryName && <div><strong>Category:</strong> {program.categoryName}</div>}
+                {program.goalText && <div><strong>Goal:</strong> {program.goalText}</div>}
+              </div>
+              
+              {/* Strategic Program Dropdown */}
+              {availablePrograms.length > 1 && onProgramSelect && (
+                <div className="mt-3">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Strategic Program:</label>
+                  <div className="program-dropdown relative">
+                    <button
+                      onClick={() => setIsProgramDropdownOpen(!isProgramDropdownOpen)}
+                      className="w-full flex items-center justify-between px-3 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+                    >
+                      <span className="truncate">{program.text}</span>
+                      {isProgramDropdownOpen ? <ChevronUp size={14} className="flex-shrink-0" /> : <ChevronDown size={14} className="flex-shrink-0" />}
+                    </button>
+                    
+                    {isProgramDropdownOpen && (
+                      <div className="absolute left-0 top-full mt-1 w-full bg-white border border-gray-300 rounded shadow-lg z-10 max-h-60 overflow-y-auto">
+                        {availablePrograms.map((availableProgram) => (
+                          <button
+                            key={availableProgram.id}
+                            onClick={() => {
+                              onProgramSelect(availableProgram)
+                              setIsProgramDropdownOpen(false)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-50 first:rounded-t last:rounded-b ${
+                              availableProgram.id === program.id ? 'bg-blue-50 text-blue-700 font-medium' : ''
+                            }`}
+                          >
+                            <div className="truncate">{availableProgram.text}</div>
+                            {availableProgram.goalText && (
+                              <div className="text-xs text-gray-500 truncate">{availableProgram.goalText}</div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-8">
+              <h3 className="font-medium text-gray-600 text-sm mb-2">No Program Selected</h3>
+              <p className="text-xs text-gray-500">Loading program...</p>
+            </div>
+          )}
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-6">
+        {program && (
+          <div className="p-4 space-y-6">
           
           {/* Previous Progress Update Section */}
           <div className="bg-gray-50 rounded-lg p-4">
@@ -340,6 +411,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
           </div>
 
         </div>
+        )}
       </div>
     </>
   )

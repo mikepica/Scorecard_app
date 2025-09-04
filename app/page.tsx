@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { Scorecard } from "@/components/scorecard"
 // Database-only mode - load data from API
 import type { ScoreCardData, StrategicProgram } from "@/types/scorecard"
@@ -13,6 +13,8 @@ import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
 import { FunctionDropdown } from "@/components/function-dropdown"
+import { FilterModal } from "@/components/filter-modal"
+import { Header } from "@/components/header"
 
 export default function Home() {
   const [data, setData] = useState<ScoreCardData | null>(null)
@@ -20,6 +22,16 @@ export default function Home() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [showStatusModal, setShowStatusModal] = useState(false)
+  
+  // Filter modal state
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
+  
+  // Filter state - default to "all"
+  const ALL_VALUE = "all"
+  const [selectedOrdLtSponsor, setSelectedOrdLtSponsor] = useState(ALL_VALUE)
+  const [selectedSponsorsLead, setSelectedSponsorsLead] = useState(ALL_VALUE)
+  const [selectedReportingOwner, setSelectedReportingOwner] = useState(ALL_VALUE)
+  const [selectedGoal, setSelectedGoal] = useState(ALL_VALUE)
   
   // Program details sidebar state
   const [isProgramSidebarOpen, setIsProgramSidebarOpen] = useState(false)
@@ -99,6 +111,76 @@ export default function Home() {
     setData(newData)
     setToast({ message: "Changes saved successfully", type: "success" })
   }
+
+  // Extract all programs for filter processing
+  const allPrograms = useMemo(() => {
+    const programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }> = []
+
+    if (!data) {
+      return programs
+    }
+
+    data.pillars.forEach((pillar) => {
+      pillar.categories.forEach((category) => {
+        category.goals.forEach((goal) => {
+          if (goal.programs && goal.programs.length > 0) {
+            goal.programs.forEach((program) => {
+              programs.push({
+                ...program,
+                goalText: goal.text,
+                categoryName: category.name,
+                pillarName: pillar.name,
+              })
+            })
+          }
+        })
+      })
+    })
+
+    return programs
+  }, [data])
+
+  // Get filtered programs based on selections
+  const filteredPrograms = useMemo(() => {
+    return allPrograms.filter(program => {
+      // Get sponsor arrays for this program
+      const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+      const sponsorsLeads = program.sponsorsLeads || ['(Not Specified)']
+      const reportingOwners = program.reportingOwners || ['(Not Specified)']
+      
+      // Check sponsor filters
+      const ordLtMatch = selectedOrdLtSponsor === ALL_VALUE || ordLtSponsors.includes(selectedOrdLtSponsor)
+      const sponsorsLeadMatch = selectedSponsorsLead === ALL_VALUE || sponsorsLeads.includes(selectedSponsorsLead)
+      const reportingOwnerMatch = selectedReportingOwner === ALL_VALUE || reportingOwners.includes(selectedReportingOwner)
+      
+      // Check goal filter
+      const goalMatch = selectedGoal === ALL_VALUE || program.strategicGoalId === selectedGoal
+      
+      return ordLtMatch && sponsorsLeadMatch && reportingOwnerMatch && goalMatch
+    })
+  }, [selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, allPrograms])
+
+  // Filter data to only show content that matches filters
+  const filteredData = useMemo(() => {
+    if (!data || (selectedOrdLtSponsor === ALL_VALUE && selectedSponsorsLead === ALL_VALUE && selectedReportingOwner === ALL_VALUE && selectedGoal === ALL_VALUE)) {
+      return data
+    }
+
+    const filteredProgramIds = new Set(filteredPrograms.map(p => p.id))
+    
+    const filteredPillars = data.pillars.map(pillar => ({
+      ...pillar,
+      categories: pillar.categories.map(category => ({
+        ...category,
+        goals: category.goals.map(goal => ({
+          ...goal,
+          programs: goal.programs ? goal.programs.filter(program => filteredProgramIds.has(program.id)) : []
+        })).filter(goal => goal.programs && goal.programs.length > 0)
+      })).filter(category => category.goals.length > 0)
+    })).filter(pillar => pillar.categories.length > 0)
+
+    return { pillars: filteredPillars }
+  }, [data, filteredPrograms, selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal])
 
   // Handler for opening program sidebar
   const handleProgramSelect = (program: StrategicProgram & {
@@ -221,76 +303,20 @@ export default function Home() {
 
   return (
     <main className="min-h-screen flex flex-col">
-      <div className="relative py-2 bg-gray-200 flex justify-between items-center px-4">
-        <h1 className="text-2xl font-bold text-black">ORD Scorecard</h1>
+      <Header 
+        title="ORD Scorecard"
+        onCaptureScreen={captureScreen}
+        onToggleSidebar={() => setIsProgramSidebarOpen(!isProgramSidebarOpen)}
+        onOpenFilter={() => setIsFilterModalOpen(true)}
+        quarterOptions={QUARTER_OPTIONS}
+        selectedQuarter={selectedQuarter}
+        onQuarterChange={setSelectedQuarter}
+        isFunctionalView={false}
+        isChatOpen={isChatOpen}
+        onToggleChat={() => setIsChatOpen(!isChatOpen)}
+      />
 
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowStatusModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 transition-colors"
-            title="View BRAG Status Legend"
-            aria-label="View BRAG Status Legend"
-          >
-            <Info size={20} />
-          </button>
-          <Dropdown
-            options={QUARTER_OPTIONS}
-            value={selectedQuarter}
-            onChange={setSelectedQuarter}
-            label="Quarter:"
-            labelWidth="w-24"
-          />
-          <button
-            onClick={captureScreen}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <Camera size={20} />
-            <span className="whitespace-nowrap">Capture Screen</span>
-          </button>
-
-          <Link
-            href="/instructions"
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <FileText size={20} />
-            <span className="whitespace-nowrap">Instructions</span>
-          </Link>
-
-          <div className="relative group">
-            <button
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px] cursor-not-allowed opacity-75"
-              disabled
-            >
-              <Bot size={20} />
-              <span className="whitespace-nowrap">AI Flows</span>
-            </button>
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-800 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-              Functionality released in future update after determining how users interact with this application
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
-            </div>
-          </div>
-
-          <FunctionDropdown />
-
-          <Link
-            href="/details"
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <BarChart2 size={20} />
-            <span className="whitespace-nowrap">Program View</span>
-          </Link>
-
-          <button
-            onClick={() => setIsChatOpen(!isChatOpen)}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <Menu size={20} />
-            <span className="whitespace-nowrap">AI Chat</span>
-          </button>
-        </div>
-
-        <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data || { pillars: [] }} />
-      </div>
+      <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data || { pillars: [] }} />
 
       <div className={`flex flex-1 transition-all duration-300`} style={{
         paddingLeft: isProgramSidebarOpen ? (window.innerWidth >= 1024 ? '640px' : window.innerWidth >= 768 ? '512px' : '0') : '0'
@@ -303,10 +329,10 @@ export default function Home() {
                 <p className="text-gray-600">Loading scorecard data...</p>
               </div>
             </div>
-          ) : data ? (
+          ) : filteredData ? (
             <div className="flex-1 flex flex-col">
               <Scorecard 
-                data={data} 
+                data={filteredData} 
                 onDataUpdate={handleDataUpdate} 
                 selectedQuarter={selectedQuarter}
                 onProgramSelect={handleProgramSelect}
@@ -327,6 +353,8 @@ export default function Home() {
         isOpen={isProgramSidebarOpen}
         onClose={handleProgramSidebarClose}
         onUpdate={handleProgramUpdate}
+        availablePrograms={allPrograms}
+        onProgramSelect={handleProgramSelect}
       />
 
       {/* AI Flows Modal */}
@@ -339,6 +367,25 @@ export default function Home() {
           onGenerate={handleAIFlowsGenerate}
         />
       )}
+
+      {/* Filter Modal */}
+      <FilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        filters={{
+          selectedOrdLtSponsor,
+          selectedSponsorsLead,
+          selectedReportingOwner,
+          selectedGoal
+        }}
+        onFiltersChange={{
+          setSelectedOrdLtSponsor,
+          setSelectedSponsorsLead,
+          setSelectedReportingOwner,
+          setSelectedGoal
+        }}
+        allPrograms={allPrograms}
+      />
 
       {/* BRAG Status Modal */}
       {showStatusModal && (
