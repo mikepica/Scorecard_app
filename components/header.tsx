@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, BarChart2, Camera, Info, X } from "lucide-react"
+import { Menu, BarChart2, Camera, Info, X, Users } from "lucide-react"
 import { AIChat } from "./ai-chat"
 import BragStatusTable from "./brag-status-table"
 import Link from "next/link"
@@ -29,6 +29,13 @@ export function Header({
         >
           <Info size={20} />
         </button>
+        <Link
+          href="/functional"
+          className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+        >
+          <Users size={20} />
+          <span className="whitespace-nowrap">Functional View</span>
+        </Link>
         <Link
           href="/details"
           className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"

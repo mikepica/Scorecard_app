@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera, X } from "lucide-react"
+import { BarChart2, Menu, Bot, FileText, Eye, EyeOff, Info, Pencil, Camera, X, Users } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -17,6 +17,7 @@ import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 import BragStatusTable from "@/components/brag-status-table"
+import { FunctionDropdown } from "@/components/function-dropdown"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -822,6 +823,8 @@ export default function DetailsPage() {
             <FileText size={20} />
             <span className="whitespace-nowrap">Instructions</span>
           </Link>
+
+          <FunctionDropdown />
 
           <div className="relative group">
             <button

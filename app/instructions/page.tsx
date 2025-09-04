@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { BarChart2, Info, X } from "lucide-react"
+import { BarChart2, Info, X, Users } from "lucide-react"
 import BragStatusTable from "@/components/brag-status-table"
 import { useState } from "react"
 
@@ -27,7 +27,15 @@ export default function InstructionsPage() {
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <BarChart2 size={20} />
-            <span className="whitespace-nowrap">Goal-level view</span>
+            <span className="whitespace-nowrap">ORD View</span>
+          </Link>
+
+          <Link
+            href="/functional"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+          >
+            <Users size={20} />
+            <span className="whitespace-nowrap">Functional View</span>
           </Link>
 
           <Link

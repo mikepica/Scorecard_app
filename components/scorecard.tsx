@@ -23,7 +23,8 @@ export function Scorecard({
   data, 
   onDataUpdate, 
   selectedQuarter = "q3_2025", 
-  onProgramSelect 
+  onProgramSelect,
+  isFunctionalView = false
 }: { 
   data: ScoreCardData; 
   onDataUpdate: (newData: ScoreCardData) => void; 
@@ -33,6 +34,7 @@ export function Scorecard({
     categoryName?: string
     pillarName?: string
   }) => void;
+  isFunctionalView?: boolean;
 }) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
@@ -48,6 +50,7 @@ export function Scorecard({
           onDataUpdate={onDataUpdate} 
           selectedQuarter={selectedQuarter}
           onProgramSelect={onProgramSelect}
+          isFunctionalView={isFunctionalView}
         />
       ))}
     </div>
@@ -58,7 +61,8 @@ function PillarCard({
   pillar, 
   onDataUpdate, 
   selectedQuarter, 
-  onProgramSelect 
+  onProgramSelect,
+  isFunctionalView = false
 }: { 
   pillar: Pillar; 
   onDataUpdate: (newData: ScoreCardData) => void; 
@@ -68,6 +72,7 @@ function PillarCard({
     categoryName?: string
     pillarName?: string
   }) => void;
+  isFunctionalView?: boolean;
 }) {
 
   return (
@@ -88,6 +93,7 @@ function PillarCard({
               onDataUpdate={onDataUpdate} 
               selectedQuarter={selectedQuarter}
               onProgramSelect={onProgramSelect}
+              isFunctionalView={isFunctionalView}
             />
           ))}
       </div>
@@ -102,7 +108,8 @@ function CategorySection({
   pillar, 
   onDataUpdate, 
   selectedQuarter, 
-  onProgramSelect 
+  onProgramSelect,
+  isFunctionalView = false
 }: { 
   category: Category; 
   pillar: Pillar; 
@@ -113,11 +120,13 @@ function CategorySection({
     categoryName?: string
     pillarName?: string
   }) => void;
+  isFunctionalView?: boolean;
 }) {
 
   // Handler for category name update
   const handleCategoryNameSave = async (newName: string) => {
-    const response = await fetch('/api/scorecard/update', {
+    const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -150,6 +159,7 @@ function CategorySection({
             onDataUpdate={onDataUpdate} 
             selectedQuarter={selectedQuarter}
             onProgramSelect={onProgramSelect}
+            isFunctionalView={isFunctionalView}
           />
         ))}
       </ul>
@@ -163,7 +173,8 @@ function GoalItem({
   category, 
   onDataUpdate, 
   selectedQuarter, 
-  onProgramSelect 
+  onProgramSelect,
+  isFunctionalView = false
 }: { 
   goal: StrategicGoal; 
   pillar: Pillar; 
@@ -175,6 +186,7 @@ function GoalItem({
     categoryName?: string
     pillarName?: string
   }) => void;
+  isFunctionalView?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false)
   const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
@@ -200,7 +212,8 @@ function GoalItem({
 
   // Handler for goal status update
   const handleGoalStatusChange = async (newStatus: string | undefined) => {
-    const response = await fetch('/api/scorecard/update', {
+    const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -217,7 +230,8 @@ function GoalItem({
 
   // Handler for goal text update
   const handleGoalTextSave = async (newText: string) => {
-    const response = await fetch('/api/scorecard/update', {
+    const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -233,13 +247,14 @@ function GoalItem({
 
   // Local handler for program text editing
   const handleProgramTextSave = async (programId: string, newValue: string) => {
-    const response = await fetch('/api/scorecard/update', {
+    const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+    const response = await fetch(apiEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fieldPath: [pillar.id, category.id, goal.id, programId],
         newValue,
-        type: 'program-text',
+        type: isFunctionalView ? 'functional-program-text' : 'program-text',
       }),
     })
     if (!response.ok) throw new Error('Failed to update program text');
@@ -346,13 +361,14 @@ function GoalItem({
               <StatusCircle
                 status={getProgramStatus(program)}
                 onStatusChange={async (newStatus) => {
-                  const response = await fetch('/api/scorecard/update', {
+                  const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+                  const response = await fetch(apiEndpoint, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                       fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
                       newValue: newStatus,
-                      type: 'program',
+                      type: isFunctionalView ? 'functional-program' : 'program',
                       quarter: selectedQuarter,
                     }),
                   })

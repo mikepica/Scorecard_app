@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react"
 import { Scorecard } from "@/components/scorecard"
-// Database-only mode - load data from API
 import type { ScoreCardData, StrategicProgram } from "@/types/scorecard"
 import { Camera, BarChart2, Menu, FileText, Bot, Info, X, Users } from "lucide-react"
 import Link from "next/link"
@@ -13,8 +12,12 @@ import { AIFlowsModal } from "@/components/ai-flows-modal"
 import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
 import { FunctionDropdown } from "@/components/function-dropdown"
+import { useSearchParams } from "next/navigation"
 
-export default function Home() {
+export default function FunctionalView() {
+  const searchParams = useSearchParams()
+  const selectedFunction = searchParams.get('function')
+  
   const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
@@ -28,6 +31,7 @@ export default function Home() {
     categoryName?: string
     pillarName?: string
   }) | null>(null)
+  
   // Function to get current quarter based on today's date
   const getCurrentQuarter = () => {
     const today = new Date()
@@ -41,7 +45,6 @@ export default function Home() {
   }
 
   const [selectedQuarter, setSelectedQuarter] = useState(getCurrentQuarter())
-  // const [isAIFlowsDropdownOpen, setIsAIFlowsDropdownOpen] = useState(false)
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
   const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
   const aiFlowsDropdownRef = useRef<HTMLDivElement>(null)
@@ -61,16 +64,19 @@ export default function Home() {
     async function loadData() {
       setLoading(true)
       try {
-        const response = await fetch('/api/scorecard')
+        const apiUrl = selectedFunction 
+          ? `/api/functional-scorecard?function=${encodeURIComponent(selectedFunction)}`
+          : '/api/functional-scorecard'
+        const response = await fetch(apiUrl)
         if (!response.ok) {
-          throw new Error('Failed to load scorecard data')
+          throw new Error('Failed to load functional scorecard data')
         }
         const loadedData = await response.json()
         setData(loadedData)
       } catch (error) {
-        console.error('Error loading scorecard data:', error)
+        console.error('Error loading functional scorecard data:', error)
         setToast({
-          message: "Failed to load scorecard data",
+          message: "Failed to load functional scorecard data",
           type: "error"
         })
       } finally {
@@ -79,7 +85,7 @@ export default function Home() {
     }
 
     loadData()
-  }, [])
+  }, [selectedFunction])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -119,7 +125,7 @@ export default function Home() {
   // Handler for program updates from sidebar
   const handleProgramUpdate = (programId: string, updatedData: ScoreCardData) => {
     setData(updatedData)
-    setToast({ message: "Program updated successfully", type: "success" })
+    setToast({ message: "Functional program updated successfully", type: "success" })
   }
 
   // Function to capture the screen
@@ -155,7 +161,7 @@ export default function Home() {
         const date = new Date()
         const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}_${date.getHours().toString().padStart(2, "0")}-${date.getMinutes().toString().padStart(2, "0")}`
 
-        link.download = `scorecard_overview_${formattedDate}.png`
+        link.download = `functional_scorecard_overview_${formattedDate}.png`
 
         // Trigger download
         document.body.appendChild(link)
@@ -173,15 +179,9 @@ export default function Home() {
     }
   }
 
-  // const handleAIFlowSelection = (flowType: "goal-comparison" | "learnings-best-practices") => {
-  //   setAIFlowType(flowType)
-  //   setIsAIFlowsDropdownOpen(false)
-  //   setIsAIFlowsModalOpen(true)
-  // }
-
   const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: number[], categories: number[], goals: number[], programs: number[] }) => {
     try {
-      setToast({ message: 'Analyzing selected data...', type: 'info' })
+      setToast({ message: 'Analyzing selected functional data...', type: 'info' })
       
       // Reset chat
       setIsChatOpen(false)
@@ -211,18 +211,20 @@ export default function Home() {
         setIsChatOpen(true)
         setToast({ message: 'Analysis complete! Check AI Chat for results.', type: 'success' })
       } else {
-        setToast({ message: 'Failed to analyze data', type: 'error' })
+        setToast({ message: 'Failed to analyze functional data', type: 'error' })
       }
     } catch (error) {
-      console.error('Error in AI Flows:', error)
-      setToast({ message: 'Error analyzing data', type: 'error' })
+      console.error('Error in Functional AI Flows:', error)
+      setToast({ message: 'Error analyzing functional data', type: 'error' })
     }
   }
 
   return (
     <main className="min-h-screen flex flex-col">
       <div className="relative py-2 bg-gray-200 flex justify-between items-center px-4">
-        <h1 className="text-2xl font-bold text-black">ORD Scorecard</h1>
+        <h1 className="text-2xl font-bold text-black">
+          ORD Scorecard - Functional View{selectedFunction ? `: ${selectedFunction}` : ''}
+        </h1>
 
         <div className="flex items-center gap-4">
           <button
@@ -273,6 +275,14 @@ export default function Home() {
           <FunctionDropdown />
 
           <Link
+            href="/"
+            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+          >
+            <Users size={20} />
+            <span className="whitespace-nowrap">ORD View</span>
+          </Link>
+
+          <Link
             href="/details"
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
@@ -300,7 +310,7 @@ export default function Home() {
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
-                <p className="text-gray-600">Loading scorecard data...</p>
+                <p className="text-gray-600">Loading functional scorecard data...</p>
               </div>
             </div>
           ) : data ? (
@@ -310,12 +320,13 @@ export default function Home() {
                 onDataUpdate={handleDataUpdate} 
                 selectedQuarter={selectedQuarter}
                 onProgramSelect={handleProgramSelect}
+                isFunctionalView={true}
               />
             </div>
           ) : (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">
-                <p className="text-gray-600">No scorecard data available</p>
+                <p className="text-gray-600">No functional scorecard data available</p>
               </div>
             </div>
           )}
@@ -327,6 +338,7 @@ export default function Home() {
         isOpen={isProgramSidebarOpen}
         onClose={handleProgramSidebarClose}
         onUpdate={handleProgramUpdate}
+        isFunctionalView={true}
       />
 
       {/* AI Flows Modal */}

@@ -17,13 +17,15 @@ interface ProgramDetailsSidebarProps {
   isOpen: boolean
   onClose: () => void
   onUpdate: (programId: string, updates: any) => void
+  isFunctionalView?: boolean
 }
 
 export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
   program,
   isOpen,
   onClose,
-  onUpdate
+  onUpdate,
+  isFunctionalView = false
 }) => {
   const [selectedComparisonQuarter, setSelectedComparisonQuarter] = useState<QuarterInfo>(getPreviousQuarter())
   const [isComparisonDropdownOpen, setIsComparisonDropdownOpen] = useState(false)
@@ -107,13 +109,14 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
     if (!program) return
     
     try {
-      const response = await fetch('/api/scorecard/update', {
+      const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
           newValue: newStatus,
-          type: 'program',
+          type: isFunctionalView ? 'functional-program' : 'program',
           quarter,
         }),
       })
@@ -134,13 +137,14 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
     if (!program) return
     
     try {
-      const response = await fetch('/api/scorecard/update', {
+      const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
           newValue: newProgress,
-          type: 'program-quarter-progress',
+          type: isFunctionalView ? 'functional-program-quarter-progress' : 'program-quarter-progress',
           quarter: quarterColumn,
         }),
       })
@@ -161,13 +165,14 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
     if (!program) return
     
     try {
-      const response = await fetch('/api/scorecard/update', {
+      const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
           newValue: newObjective,
-          type: 'program-objective',
+          type: isFunctionalView ? 'functional-program-objective' : 'program-objective',
           quarter,
         }),
       })

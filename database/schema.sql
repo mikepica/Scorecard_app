@@ -156,8 +156,70 @@ CREATE TRIGGER update_categories_updated_at BEFORE UPDATE ON categories FOR EACH
 CREATE TRIGGER update_strategic_goals_updated_at BEFORE UPDATE ON strategic_goals FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_strategic_programs_updated_at BEFORE UPDATE ON strategic_programs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Functional Programs table
+CREATE TABLE functional_programs (
+    id VARCHAR(255) PRIMARY KEY,
+    text TEXT NOT NULL,
+    
+    -- Quarterly objectives
+    q1_objective TEXT,
+    q2_objective TEXT,
+    q3_objective TEXT,
+    q4_objective TEXT,
+    
+    -- Quarterly status
+    q1_status VARCHAR(20) CHECK (q1_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
+    q2_status VARCHAR(20) CHECK (q2_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
+    q3_status VARCHAR(20) CHECK (q3_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
+    q4_status VARCHAR(20) CHECK (q4_status IN ('exceeded', 'on-track', 'delayed', 'missed')),
+    
+    -- Personnel fields (arrays)
+    ord_lt_sponsors TEXT[],
+    sponsors_leads TEXT[],
+    reporting_owners TEXT[],
+    
+    -- Progress updates
+    progress_updates TEXT,
+    
+    -- Quarterly progress updates (2025-2026)
+    q1_2025_progress TEXT,
+    q2_2025_progress TEXT,
+    q3_2025_progress TEXT,
+    q4_2025_progress TEXT,
+    q1_2026_progress TEXT,
+    q2_2026_progress TEXT,
+    q3_2026_progress TEXT,
+    q4_2026_progress TEXT,
+    
+    -- Link to strategic program (nullable for future use)
+    linked_ORD_strategic_program_ID VARCHAR(255),
+    
+    -- Foreign keys
+    goal_id VARCHAR(255) NOT NULL REFERENCES strategic_goals(id) ON DELETE CASCADE,
+    category_id VARCHAR(255) NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    pillar_id VARCHAR(255) NOT NULL REFERENCES strategic_pillars(id) ON DELETE CASCADE,
+    
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for functional_programs table
+CREATE INDEX idx_functional_programs_goal_id ON functional_programs(goal_id);
+CREATE INDEX idx_functional_programs_category_id ON functional_programs(category_id);
+CREATE INDEX idx_functional_programs_pillar_id ON functional_programs(pillar_id);
+CREATE INDEX idx_functional_programs_linked_strategic ON functional_programs(linked_ORD_strategic_program_ID);
+
+-- Apply update trigger to functional_programs
+CREATE TRIGGER update_functional_programs_updated_at BEFORE UPDATE ON functional_programs FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Trigger to track progress updates changes
 CREATE TRIGGER track_progress_updates_changes
     BEFORE UPDATE ON strategic_programs
+    FOR EACH ROW
+    EXECUTE FUNCTION record_progress_update_change();
+
+-- Trigger to track functional progress updates changes
+CREATE TRIGGER track_functional_progress_updates_changes
+    BEFORE UPDATE ON functional_programs
     FOR EACH ROW
     EXECUTE FUNCTION record_progress_update_change();
