@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server';
+// to be commented out
 import OpenAI from 'openai';
 import { promises as fs } from 'fs';
 import path from 'path';
 
+// to be commented out
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// import { openai } from @/lib/openai
 
 interface FilterSelections {
   pillars: number[];
