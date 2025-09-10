@@ -2,6 +2,7 @@ import type React from "react"
 import type { Metadata } from "next"
 import "./globals.css"
 import "react-day-picker/dist/style.css"
+import { Toaster } from "@/components/ui/sonner"
 
 export const metadata: Metadata = {
   title: "ORD Scorecard",
@@ -17,7 +18,10 @@ export default function RootLayout({
       <head>
         <meta name="download" content="force" />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <Toaster />
+      </body>
     </html>
   )
 }
