@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, BarChart2, Camera, Info, X, Users, Filter, FileText, Bot } from "lucide-react"
+import { Menu, BarChart2, X, Users, Filter } from "lucide-react"
 import BragStatusTable from "./brag-status-table"
 import { Dropdown } from "./dropdown"
 import { FunctionDropdown } from "./function-dropdown"
+import { MenuDropdown } from "./menu-dropdown"
 import Link from "next/link"
 
 export function Header({
@@ -61,15 +62,6 @@ export function Header({
         </div>
 
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowStatusModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 transition-colors"
-            title="View BRAG Status Legend"
-            aria-label="View BRAG Status Legend"
-          >
-            <Info size={20} />
-          </button>
-          
           {/* Quarter Dropdown */}
           {quarterOptions && selectedQuarter && onQuarterChange && (
             <Dropdown
@@ -80,28 +72,6 @@ export function Header({
               labelWidth="w-24"
             />
           )}
-
-          <Link
-            href="/instructions"
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <FileText size={20} />
-            <span className="whitespace-nowrap">Instructions</span>
-          </Link>
-
-          <div className="relative group">
-            <button
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px] cursor-not-allowed opacity-75"
-              disabled
-            >
-              <Bot size={20} />
-              <span className="whitespace-nowrap">AI Flows</span>
-            </button>
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-800 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-              Functionality released in future update after determining how users interact with this application
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
-            </div>
-          </div>
 
           <FunctionDropdown />
 
@@ -123,16 +93,6 @@ export function Header({
             <span className="whitespace-nowrap">Program View</span>
           </Link>
 
-          {onCaptureScreen && (
-            <button
-              onClick={onCaptureScreen}
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-            >
-              <Camera size={20} />
-              <span className="whitespace-nowrap">Capture Screen</span>
-            </button>
-          )}
-
           {onToggleChat && (
             <button
               onClick={onToggleChat}
@@ -142,6 +102,11 @@ export function Header({
               <span className="whitespace-nowrap">AI Chat</span>
             </button>
           )}
+
+          <MenuDropdown 
+            onCaptureScreen={onCaptureScreen}
+            onShowBragInfo={() => setShowStatusModal(true)}
+          />
         </div>
       </header>
 
