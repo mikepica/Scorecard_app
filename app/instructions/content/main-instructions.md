@@ -6,7 +6,7 @@
 - **Quarter Selection** dropdown to view different time periods
 - **Screen Capture** functionality for reports and presentations
 - **AI Chat** integration for scorecard analysis and insights
-### Program View (Details)
+### Table View (Details)
 - **Detailed table view** of all strategic programs
 - **Advanced filtering** by Pillar, Category, and Strategic Goal
 - **Editable fields** for program updates and modifications

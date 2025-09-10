@@ -90,7 +90,7 @@ export function Header({
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <BarChart2 size={20} />
-            <span className="whitespace-nowrap">Program View</span>
+            <span className="whitespace-nowrap">Table View</span>
           </Link>
 
           {onToggleChat && (

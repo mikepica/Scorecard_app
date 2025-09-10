@@ -86,14 +86,18 @@ export class DatabaseService {
       const pillars: Pillar[] = pillarsResult.rows.map(row => ({
         id: row.id,
         name: row.name,
-        categories: []
+        categories: [],
+        startQuarter: row.start_quarter,
+        endQuarter: row.end_quarter
       }));
 
       const categories: Category[] = categoriesResult.rows.map(row => ({
         id: row.id,
         name: row.name,
         goals: [],
-        strategicPillarId: row.pillar_id
+        strategicPillarId: row.pillar_id,
+        startQuarter: row.start_quarter,
+        endQuarter: row.end_quarter
       }));
 
       const goals: StrategicGoal[] = goalsResult.rows.map(row => ({
@@ -127,7 +131,9 @@ export class DatabaseService {
         progressUpdates: row.progress_updates,
         programs: [],
         categoryId: row.category_id,
-        strategicPillarId: row.pillar_id
+        strategicPillarId: row.pillar_id,
+        startQuarter: row.start_quarter,
+        endQuarter: row.end_quarter
       }));
 
       const programs: StrategicProgram[] = programsResult.rows.map(row => ({
@@ -172,7 +178,9 @@ export class DatabaseService {
         updatedAt: row.updated_at,
         strategicGoalId: row.goal_id,
         categoryId: row.category_id,
-        strategicPillarId: row.pillar_id
+        strategicPillarId: row.pillar_id,
+        startQuarter: row.start_quarter,
+        endQuarter: row.end_quarter
       }));
 
       // Build hierarchical structure
@@ -264,7 +272,9 @@ export class DatabaseService {
         strategicPillarId: row.pillar || 'Unspecified Pillar',
         linkedORDStrategicProgramId: row.linked_ord_strategic_program_id,
         // Add function field if needed in StrategicProgram interface
-        functionArea: row.function
+        functionArea: row.function,
+        startQuarter: row.start_quarter,
+        endQuarter: row.end_quarter
       }));
 
       // Build functional hierarchy from text fields
@@ -422,7 +432,9 @@ export class DatabaseService {
         strategicPillarId: row.pillar || 'Unspecified Pillar',
         linkedORDStrategicProgramId: row.linked_ord_strategic_program_id,
         // Add function field if needed in StrategicProgram interface
-        functionArea: row.function
+        functionArea: row.function,
+        startQuarter: row.start_quarter,
+        endQuarter: row.end_quarter
       }));
 
       // Build functional hierarchy from text fields (same logic as getFunctionalScoreCardData)

@@ -11,6 +11,7 @@ import { StatusCircle } from "@/components/status-circle"
 import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
 import { getPillarConfig } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
+import { filterVisibleItems } from "@/lib/quarter-visibility"
 
 // const STATUS_OPTIONS = [
 //   { value: "exceeded", label: "Exceeded" },
@@ -41,9 +42,12 @@ export function Scorecard({
     return <div className="w-full p-4 text-center">No scorecard data available</div>
   }
 
+  // Filter pillars based on quarter visibility
+  const visiblePillars = filterVisibleItems(data.pillars, selectedQuarter)
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
-      {data.pillars.map((pillar) => (
+      {visiblePillars.map((pillar) => (
         <PillarCard 
           key={pillar.id} 
           pillar={pillar} 
@@ -85,7 +89,7 @@ function PillarCard({
       </div>
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
-          pillar.categories.map((category) => (
+          filterVisibleItems(pillar.categories, selectedQuarter).map((category) => (
             <CategorySection 
               key={category.id} 
               category={category} 
@@ -150,7 +154,7 @@ function CategorySection({
         />
       </div>
       <ul className="space-y-2">
-        {category.goals && category.goals.map((goal) => (
+        {category.goals && filterVisibleItems(category.goals, selectedQuarter).map((goal) => (
           <GoalItem 
             key={goal.id} 
             goal={goal} 
@@ -191,7 +195,8 @@ function GoalItem({
   const [expanded, setExpanded] = useState(false)
   const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
-  const hasPrograms = goal.programs && goal.programs.length > 0
+  const visiblePrograms = goal.programs ? filterVisibleItems(goal.programs, selectedQuarter) : []
+  const hasPrograms = visiblePrograms.length > 0
 
   // Get the status for the selected quarter
   const getGoalStatus = (selectedQuarter: string) => {
@@ -319,7 +324,7 @@ function GoalItem({
 
       {expanded && hasPrograms && (
         <ul className={`pl-6 mt-2 space-y-2 border-l-2 ${getProgramBorderColor(pillar.name)}`}>
-          {goal.programs?.map((program) => (
+          {visiblePrograms.map((program) => (
             <li key={program.id} className="flex items-start justify-between gap-2 group">
               <div className="flex-1 flex items-start gap-2">
                 <div 

@@ -39,6 +39,11 @@ export interface StrategicProgram {
   q4_2026_progress?: string
   
   updatedAt?: string
+  
+  // Quarter visibility controls
+  startQuarter?: string
+  endQuarter?: string
+  
   strategicGoalId: string
   categoryId: string
   strategicPillarId: string
@@ -76,6 +81,11 @@ export interface StrategicGoal {
   progressUpdates?: string
   programs?: StrategicProgram[]
   comments?: string
+  
+  // Quarter visibility controls
+  startQuarter?: string
+  endQuarter?: string
+  
   categoryId: string
   strategicPillarId: string
 }
@@ -84,6 +94,11 @@ export interface Category {
   id: string
   name: string
   goals: StrategicGoal[]
+  
+  // Quarter visibility controls
+  startQuarter?: string
+  endQuarter?: string
+  
   strategicPillarId: string
 }
 
@@ -91,6 +106,10 @@ export interface Pillar {
   id: string
   name: string
   categories: Category[]
+  
+  // Quarter visibility controls
+  startQuarter?: string
+  endQuarter?: string
 }
 
 export interface ScoreCardData {

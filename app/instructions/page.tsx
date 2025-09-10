@@ -43,7 +43,7 @@ export default function InstructionsPage() {
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
           >
             <BarChart2 size={20} />
-            <span className="whitespace-nowrap">Program View</span>
+            <span className="whitespace-nowrap">Table View</span>
           </Link>
         </div>
       </header>
@@ -61,7 +61,7 @@ export default function InstructionsPage() {
                 <li>AI Chat integration for scorecard analysis and insights</li>
               </ul>
 
-              <h2 className="text-2xl font-bold mb-6">Program View (Details)</h2>
+              <h2 className="text-2xl font-bold mb-6">Table View (Details)</h2>
               <ul className="list-disc pl-6 space-y-2">
                 <li>Detailed table view of goals and strategic programs</li>
                 <li>Advanced filtering by Pillar, Category, and Strategic Goal</li>

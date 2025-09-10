@@ -5,7 +5,7 @@ import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { Eye, EyeOff, Info, Pencil, X, FileText, Bot, Camera, BarChart2, Menu } from "lucide-react"
+import { Eye, EyeOff, Info, Pencil, X, BarChart2, Menu } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -18,6 +18,7 @@ import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 import BragStatusTable from "@/components/brag-status-table"
 import { FunctionDropdown } from "@/components/function-dropdown"
+import { MenuDropdown } from "@/components/menu-dropdown"
 
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
@@ -808,37 +809,7 @@ export default function DetailsPage() {
       <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-black">ORD Scorecard: {displayName}</h1>
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowStatusModal(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 transition-colors"
-            title="View BRAG Status Legend"
-            aria-label="View BRAG Status Legend"
-          >
-            <Info size={20} />
-          </button>
-          <Link
-            href="/instructions"
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <FileText size={20} />
-            <span className="whitespace-nowrap">Instructions</span>
-          </Link>
-
           <FunctionDropdown />
-
-          <div className="relative group">
-            <button
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px] cursor-not-allowed opacity-75"
-              disabled
-            >
-              <Bot size={20} />
-              <span className="whitespace-nowrap">AI Flows</span>
-            </button>
-            <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-800 text-white text-sm rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-              Functionality released in future update after determining how users interact with this application
-              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-gray-800"></div>
-            </div>
-          </div>
 
           <button
             onClick={() => setFiltersVisible(!filtersVisible)}
@@ -846,14 +817,6 @@ export default function DetailsPage() {
           >
             {filtersVisible ? <Eye size={20} /> : <EyeOff size={20} />}
             <span className="whitespace-nowrap">Show/Hide Filters</span>
-          </button>
-
-          <button
-            onClick={captureScreen}
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <Camera size={20} />
-            <span className="whitespace-nowrap">Capture Screen</span>
           </button>
 
           <Link
@@ -871,6 +834,11 @@ export default function DetailsPage() {
             <Menu size={20} />
             <span className="whitespace-nowrap">AI Chat</span>
           </button>
+
+          <MenuDropdown 
+            onCaptureScreen={captureScreen}
+            onShowBragInfo={() => setShowStatusModal(true)}
+          />
         </div>
 
         <AIChat 
