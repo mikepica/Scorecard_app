@@ -16,20 +16,32 @@ export function MenuDropdown({ onCaptureScreen, onShowBragInfo, className = "" }
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+      try {
+        if (event.target && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+          setIsOpen(false)
+        }
+      } catch (error) {
+        // Safely ignore errors from invalid event targets
+        console.warn('Click outside handler error:', error)
       }
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
+    if (isOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    
     return () => {
       document.removeEventListener("mousedown", handleClickOutside)
     }
-  }, [])
+  }, [isOpen])
 
   const handleMenuItemClick = (action?: () => void) => {
-    setIsOpen(false)
-    if (action) action()
+    try {
+      setIsOpen(false)
+      if (action) action()
+    } catch (error) {
+      console.error('Menu item click error:', error)
+    }
   }
 
   return (
