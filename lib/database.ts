@@ -1076,4 +1076,332 @@ export class DatabaseService {
       client.release();
     }
   }
+
+  // ============ ALIGNMENT METHODS ============
+
+  // Get alignments for a specific item
+  static async getAlignments(itemType: string, itemId: string): Promise<any[]> {
+    const client = await getDbConnection();
+    
+    try {
+      const query = `
+        SELECT 
+          sa.*,
+          -- Functional item details
+          CASE 
+            WHEN sa.functional_type = 'pillar' THEN sp_func.name
+            WHEN sa.functional_type = 'category' THEN c_func.name
+            WHEN sa.functional_type = 'goal' THEN sg_func.text
+            WHEN sa.functional_type = 'program' THEN fp.text
+          END as functional_name,
+          CASE 
+            WHEN sa.functional_type = 'pillar' THEN sp_func.name
+            WHEN sa.functional_type = 'category' THEN COALESCE(sp_func_cat.name, 'Unknown') || ' > ' || c_func.name
+            WHEN sa.functional_type = 'goal' THEN COALESCE(sp_func_goal.name, 'Unknown') || ' > ' || COALESCE(c_func_goal.name, 'Unknown') || ' > ' || sg_func.text
+            WHEN sa.functional_type = 'program' THEN COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') || ' > ' || fp.text
+          END as functional_path,
+          -- ORD item details
+          CASE 
+            WHEN sa.ord_type = 'pillar' THEN sp_ord.name
+            WHEN sa.ord_type = 'category' THEN c_ord.name
+            WHEN sa.ord_type = 'goal' THEN sg_ord.text
+            WHEN sa.ord_type = 'program' THEN sp_ord_prog.text
+          END as ord_name,
+          CASE 
+            WHEN sa.ord_type = 'pillar' THEN sp_ord.name
+            WHEN sa.ord_type = 'category' THEN COALESCE(sp_ord_cat.name, 'Unknown') || ' > ' || c_ord.name
+            WHEN sa.ord_type = 'goal' THEN COALESCE(sp_ord_goal.name, 'Unknown') || ' > ' || COALESCE(c_ord_goal.name, 'Unknown') || ' > ' || sg_ord.text
+            WHEN sa.ord_type = 'program' THEN COALESCE(sp_ord_prog_pillar.name, 'Unknown') || ' > ' || COALESCE(c_ord_prog_cat.name, 'Unknown') || ' > ' || COALESCE(sg_ord_prog_goal.text, 'Unknown') || ' > ' || sp_ord_prog.text
+          END as ord_path
+        FROM scorecard_alignments sa
+        -- Functional joins
+        LEFT JOIN strategic_pillars sp_func ON sa.functional_pillar_id = sp_func.id AND sa.functional_type = 'pillar'
+        LEFT JOIN categories c_func ON sa.functional_category_id = c_func.id AND sa.functional_type = 'category'
+        LEFT JOIN strategic_pillars sp_func_cat ON c_func.pillar_id = sp_func_cat.id
+        LEFT JOIN strategic_goals sg_func ON sa.functional_goal_id = sg_func.id AND sa.functional_type = 'goal'
+        LEFT JOIN strategic_pillars sp_func_goal ON sg_func.pillar_id = sp_func_goal.id
+        LEFT JOIN categories c_func_goal ON sg_func.category_id = c_func_goal.id
+        LEFT JOIN functional_programs fp ON sa.functional_program_id = fp.id AND sa.functional_type = 'program'
+        -- ORD joins
+        LEFT JOIN strategic_pillars sp_ord ON sa.ord_pillar_id = sp_ord.id AND sa.ord_type = 'pillar'
+        LEFT JOIN categories c_ord ON sa.ord_category_id = c_ord.id AND sa.ord_type = 'category'
+        LEFT JOIN strategic_pillars sp_ord_cat ON c_ord.pillar_id = sp_ord_cat.id
+        LEFT JOIN strategic_goals sg_ord ON sa.ord_goal_id = sg_ord.id AND sa.ord_type = 'goal'
+        LEFT JOIN strategic_pillars sp_ord_goal ON sg_ord.pillar_id = sp_ord_goal.id
+        LEFT JOIN categories c_ord_goal ON sg_ord.category_id = c_ord_goal.id
+        LEFT JOIN strategic_programs sp_ord_prog ON sa.ord_program_id = sp_ord_prog.id AND sa.ord_type = 'program'
+        LEFT JOIN strategic_pillars sp_ord_prog_pillar ON sp_ord_prog.pillar_id = sp_ord_prog_pillar.id
+        LEFT JOIN categories c_ord_prog_cat ON sp_ord_prog.category_id = c_ord_prog_cat.id
+        LEFT JOIN strategic_goals sg_ord_prog_goal ON sp_ord_prog.goal_id = sg_ord_prog_goal.id
+        WHERE 
+          (sa.functional_type = $1 AND (
+            sa.functional_pillar_id = $2 OR
+            sa.functional_category_id = $2 OR
+            sa.functional_goal_id = $2 OR
+            sa.functional_program_id = $2
+          ))
+          OR
+          (sa.ord_type = $1 AND (
+            sa.ord_pillar_id = $2 OR
+            sa.ord_category_id = $2 OR
+            sa.ord_goal_id = $2 OR
+            sa.ord_program_id = $2
+          ))
+        ORDER BY sa.created_at DESC
+      `;
+      
+      const result = await client.query(query, [itemType, itemId]);
+      return result.rows;
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  // Search for alignment targets
+  static async searchAlignmentTargets(searchTerm: string, excludeType?: string, excludeId?: string): Promise<any[]> {
+    const client = await getDbConnection();
+    
+    try {
+      const searchPattern = `%${searchTerm}%`;
+      
+      // Search across all item types
+      const queries = [];
+      const params = [];
+      let paramIndex = 1;
+      
+      // Strategic Pillars (ORD)
+      if (excludeType !== 'pillar' || excludeId) {
+        queries.push(`
+          SELECT 'pillar' as type, 'ord' as source, id, name as title, name as path
+          FROM strategic_pillars
+          WHERE name ILIKE $${paramIndex}
+          ${excludeType === 'pillar' ? `AND id != $${paramIndex + 1}` : ''}
+        `);
+        params.push(searchPattern);
+        if (excludeType === 'pillar') {
+          params.push(excludeId);
+          paramIndex += 2;
+        } else {
+          paramIndex += 1;
+        }
+      }
+      
+      // Categories (ORD)
+      if (excludeType !== 'category' || excludeId) {
+        queries.push(`
+          SELECT 'category' as type, 'ord' as source, c.id, c.name as title,
+                 sp.name || ' > ' || c.name as path
+          FROM categories c
+          LEFT JOIN strategic_pillars sp ON c.pillar_id = sp.id
+          WHERE c.name ILIKE $${paramIndex}
+          ${excludeType === 'category' ? `AND c.id != $${paramIndex + 1}` : ''}
+        `);
+        params.push(searchPattern);
+        if (excludeType === 'category') {
+          params.push(excludeId);
+          paramIndex += 2;
+        } else {
+          paramIndex += 1;
+        }
+      }
+      
+      // Strategic Goals (ORD)
+      if (excludeType !== 'goal' || excludeId) {
+        queries.push(`
+          SELECT 'goal' as type, 'ord' as source, sg.id, sg.text as title,
+                 sp.name || ' > ' || c.name || ' > ' || sg.text as path
+          FROM strategic_goals sg
+          LEFT JOIN categories c ON sg.category_id = c.id
+          LEFT JOIN strategic_pillars sp ON sg.pillar_id = sp.id
+          WHERE sg.text ILIKE $${paramIndex}
+          ${excludeType === 'goal' ? `AND sg.id != $${paramIndex + 1}` : ''}
+        `);
+        params.push(searchPattern);
+        if (excludeType === 'goal') {
+          params.push(excludeId);
+          paramIndex += 2;
+        } else {
+          paramIndex += 1;
+        }
+      }
+      
+      // Strategic Programs (ORD)
+      if (excludeType !== 'program' || excludeId) {
+        queries.push(`
+          SELECT 'program' as type, 'ord' as source, sp_prog.id, sp_prog.text as title,
+                 sp.name || ' > ' || c.name || ' > ' || sg.text || ' > ' || sp_prog.text as path
+          FROM strategic_programs sp_prog
+          LEFT JOIN strategic_goals sg ON sp_prog.goal_id = sg.id
+          LEFT JOIN categories c ON sp_prog.category_id = c.id
+          LEFT JOIN strategic_pillars sp ON sp_prog.pillar_id = sp.id
+          WHERE sp_prog.text ILIKE $${paramIndex}
+          ${excludeType === 'program' ? `AND sp_prog.id != $${paramIndex + 1}` : ''}
+        `);
+        params.push(searchPattern);
+        if (excludeType === 'program') {
+          params.push(excludeId);
+          paramIndex += 2;
+        } else {
+          paramIndex += 1;
+        }
+      }
+      
+      // Functional Programs
+      queries.push(`
+        SELECT 'program' as type, 'functional' as source, id, text as title,
+               COALESCE(pillar, 'Unknown') || ' > ' || COALESCE(category, 'Unknown') || ' > ' || 
+               COALESCE(strategic_goal, 'Unknown') || ' > ' || text as path
+        FROM functional_programs
+        WHERE text ILIKE $${paramIndex}
+        ${excludeType === 'program' ? `AND id != $${paramIndex + 1}` : ''}
+      `);
+      params.push(searchPattern);
+      if (excludeType === 'program') {
+        params.push(excludeId);
+      }
+      
+      const finalQuery = queries.join(' UNION ALL ') + ' ORDER BY title LIMIT 20';
+      const result = await client.query(finalQuery, params);
+      return result.rows;
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  // Create new alignment
+  static async createAlignment(alignmentData: {
+    functionalType: string;
+    functionalId: string;
+    ordType: string;
+    ordId: string;
+    strength: string;
+    rationale?: string;
+    createdBy?: string;
+  }): Promise<any> {
+    const client = await getDbConnection();
+    
+    try {
+      // Prepare the insertion data
+      const insertData: any = {
+        functional_type: alignmentData.functionalType,
+        ord_type: alignmentData.ordType,
+        alignment_strength: alignmentData.strength,
+        alignment_rationale: alignmentData.rationale || null,
+        created_by: alignmentData.createdBy || 'system'
+      };
+      
+      // Set the appropriate ID fields based on type
+      insertData[`functional_${alignmentData.functionalType}_id`] = alignmentData.functionalId;
+      insertData[`ord_${alignmentData.ordType}_id`] = alignmentData.ordId;
+      
+      const columns = Object.keys(insertData).join(', ');
+      const placeholders = Object.keys(insertData).map((_, i) => `$${i + 1}`).join(', ');
+      const values = Object.values(insertData);
+      
+      const result = await client.query(
+        `INSERT INTO scorecard_alignments (${columns}) VALUES (${placeholders}) RETURNING *`,
+        values
+      );
+      
+      return result.rows[0];
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  // Update alignment
+  static async updateAlignment(id: string, updates: {
+    strength?: string;
+    rationale?: string;
+  }): Promise<any> {
+    const client = await getDbConnection();
+    
+    try {
+      const setParts = [];
+      const values = [];
+      let paramIndex = 1;
+      
+      if (updates.strength) {
+        setParts.push(`alignment_strength = $${paramIndex}`);
+        values.push(updates.strength);
+        paramIndex++;
+      }
+      
+      if (updates.rationale !== undefined) {
+        setParts.push(`alignment_rationale = $${paramIndex}`);
+        values.push(updates.rationale);
+        paramIndex++;
+      }
+      
+      setParts.push(`updated_at = CURRENT_TIMESTAMP`);
+      values.push(id);
+      
+      const result = await client.query(
+        `UPDATE scorecard_alignments SET ${setParts.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        values
+      );
+      
+      if (result.rowCount === 0) {
+        throw new Error(`Alignment with ID ${id} not found`);
+      }
+      
+      return result.rows[0];
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  // Delete alignment
+  static async deleteAlignment(id: string): Promise<void> {
+    const client = await getDbConnection();
+    
+    try {
+      const result = await client.query(
+        'DELETE FROM scorecard_alignments WHERE id = $1',
+        [id]
+      );
+      
+      if (result.rowCount === 0) {
+        throw new Error(`Alignment with ID ${id} not found`);
+      }
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  // Get alignment count for an item
+  static async getAlignmentCount(itemType: string, itemId: string): Promise<number> {
+    const client = await getDbConnection();
+    
+    try {
+      const result = await client.query(
+        `SELECT COUNT(*) as count FROM scorecard_alignments 
+         WHERE 
+           (functional_type = $1 AND (
+             functional_pillar_id = $2 OR
+             functional_category_id = $2 OR
+             functional_goal_id = $2 OR
+             functional_program_id = $2
+           ))
+           OR
+           (ord_type = $1 AND (
+             ord_pillar_id = $2 OR
+             ord_category_id = $2 OR
+             ord_goal_id = $2 OR
+             ord_program_id = $2
+           ))`,
+        [itemType, itemId]
+      );
+      
+      return parseInt(result.rows[0].count, 10);
+      
+    } finally {
+      client.release();
+    }
+  }
 }

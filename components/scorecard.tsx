@@ -12,6 +12,8 @@ import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
 import { getPillarConfig } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { filterVisibleItems } from "@/lib/quarter-visibility"
+import { AlignmentIndicator } from "@/components/alignment-indicator"
+import { AlignmentFloatingCard } from "@/components/alignment-floating-card"
 
 // const STATUS_OPTIONS = [
 //   { value: "exceeded", label: "Exceeded" },
@@ -37,6 +39,43 @@ export function Scorecard({
   }) => void;
   isFunctionalView?: boolean;
 }) {
+  // Alignment state management
+  const [alignmentCard, setAlignmentCard] = useState<{
+    isOpen: boolean
+    itemType: 'pillar' | 'category' | 'goal' | 'program'
+    itemId: string
+    itemName: string
+    position: { x: number; y: number }
+  } | null>(null)
+
+  const handleAlignmentClick = (
+    itemType: 'pillar' | 'category' | 'goal' | 'program',
+    itemId: string,
+    itemName: string,
+    event: React.MouseEvent
+  ) => {
+    const rect = (event.target as HTMLElement).getBoundingClientRect()
+    setAlignmentCard({
+      isOpen: true,
+      itemType,
+      itemId,
+      itemName,
+      position: {
+        x: rect.right + 10,
+        y: rect.top
+      }
+    })
+  }
+
+  const closeAlignmentCard = () => {
+    setAlignmentCard(null)
+  }
+
+  const handleAlignmentChange = () => {
+    // Optionally trigger a data refresh or show a toast
+    // For now, we'll just close the card to refresh alignment counts
+    setAlignmentCard(null)
+  }
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
     return <div className="w-full p-4 text-center">No scorecard data available</div>
@@ -46,18 +85,34 @@ export function Scorecard({
   const visiblePillars = filterVisibleItems(data.pillars, selectedQuarter)
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
-      {visiblePillars.map((pillar) => (
-        <PillarCard 
-          key={pillar.id} 
-          pillar={pillar} 
-          onDataUpdate={onDataUpdate} 
-          selectedQuarter={selectedQuarter}
-          onProgramSelect={onProgramSelect}
-          isFunctionalView={isFunctionalView}
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
+        {visiblePillars.map((pillar) => (
+          <PillarCard 
+            key={pillar.id} 
+            pillar={pillar} 
+            onDataUpdate={onDataUpdate} 
+            selectedQuarter={selectedQuarter}
+            onProgramSelect={onProgramSelect}
+            isFunctionalView={isFunctionalView}
+            onAlignmentClick={handleAlignmentClick}
+          />
+        ))}
+      </div>
+      
+      {/* Alignment Floating Card */}
+      {alignmentCard && (
+        <AlignmentFloatingCard
+          itemType={alignmentCard.itemType}
+          itemId={alignmentCard.itemId}
+          itemName={alignmentCard.itemName}
+          isOpen={alignmentCard.isOpen}
+          onClose={closeAlignmentCard}
+          position={alignmentCard.position}
+          onAlignmentChange={handleAlignmentChange}
         />
-      ))}
-    </div>
+      )}
+    </>
   )
 }
 
@@ -66,7 +121,8 @@ function PillarCard({
   onDataUpdate, 
   selectedQuarter, 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick
 }: { 
   pillar: Pillar; 
   onDataUpdate: (newData: ScoreCardData) => void; 
@@ -77,14 +133,28 @@ function PillarCard({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick: (
+    itemType: 'pillar' | 'category' | 'goal' | 'program',
+    itemId: string,
+    itemName: string,
+    event: React.MouseEvent
+  ) => void;
 }) {
 
   return (
     <div className="border rounded-md overflow-hidden h-full flex flex-col relative">
       <div className={`p-3 ${getPillarColorWithText(pillar)}`}>
-        <div className="flex items-center gap-2">
-          <PillarIcon pillar={pillar} />
-          <h2 className="text-xl font-bold">{pillar.name}</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <PillarIcon pillar={pillar} />
+            <h2 className="text-xl font-bold">{pillar.name}</h2>
+          </div>
+          <AlignmentIndicator
+            itemType="pillar"
+            itemId={pillar.id}
+            onClick={(e) => onAlignmentClick('pillar', pillar.id, pillar.name, e)}
+            className="text-white/80 hover:text-white"
+          />
         </div>
       </div>
       <div className="p-3 overflow-auto flex-1">
@@ -98,6 +168,7 @@ function PillarCard({
               selectedQuarter={selectedQuarter}
               onProgramSelect={onProgramSelect}
               isFunctionalView={isFunctionalView}
+              onAlignmentClick={onAlignmentClick}
             />
           ))}
       </div>
@@ -113,7 +184,8 @@ function CategorySection({
   onDataUpdate, 
   selectedQuarter, 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick
 }: { 
   category: Category; 
   pillar: Pillar; 
@@ -125,6 +197,12 @@ function CategorySection({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick: (
+    itemType: 'pillar' | 'category' | 'goal' | 'program',
+    itemId: string,
+    itemName: string,
+    event: React.MouseEvent
+  ) => void;
 }) {
 
   // Handler for category name update
@@ -146,11 +224,17 @@ function CategorySection({
 
   return (
     <div className="mb-4 last:mb-0">
-      <div className="flex items-center mb-2 gap-2">
+      <div className="flex items-center justify-between mb-2 gap-2">
         <EditableField
           value={category.name}
           onSave={handleCategoryNameSave}
           className={`text-base font-medium ${getCategoryColor(pillar)}`}
+        />
+        <AlignmentIndicator
+          itemType="category"
+          itemId={category.id}
+          onClick={(e) => onAlignmentClick('category', category.id, category.name, e)}
+          className="flex-shrink-0"
         />
       </div>
       <ul className="space-y-2">
@@ -164,6 +248,7 @@ function CategorySection({
             selectedQuarter={selectedQuarter}
             onProgramSelect={onProgramSelect}
             isFunctionalView={isFunctionalView}
+            onAlignmentClick={onAlignmentClick}
           />
         ))}
       </ul>
@@ -178,7 +263,8 @@ function GoalItem({
   onDataUpdate, 
   selectedQuarter, 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick
 }: { 
   goal: StrategicGoal; 
   pillar: Pillar; 
@@ -191,6 +277,12 @@ function GoalItem({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick: (
+    itemType: 'pillar' | 'category' | 'goal' | 'program',
+    itemId: string,
+    itemName: string,
+    event: React.MouseEvent
+  ) => void;
 }) {
   const [expanded, setExpanded] = useState(false)
   const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
@@ -316,10 +408,17 @@ function GoalItem({
             className="text-base"
           />
         </div>
-        <StatusCircle
-          status={displayStatus}
-          onStatusChange={handleGoalStatusChange}
-        />
+        <div className="flex items-center gap-2">
+          <AlignmentIndicator
+            itemType="goal"
+            itemId={goal.id}
+            onClick={(e) => onAlignmentClick('goal', goal.id, goal.text, e)}
+          />
+          <StatusCircle
+            status={displayStatus}
+            onStatusChange={handleGoalStatusChange}
+          />
+        </div>
       </div>
 
       {expanded && hasPrograms && (
@@ -346,22 +445,30 @@ function GoalItem({
                     className="text-sm"
                   />
                 </div>
-                <button
-                  onClick={() => {
-                    if (onProgramSelect) {
-                      onProgramSelect({
-                        ...program,
-                        goalText: goal.text,
-                        categoryName: category.name,
-                        pillarName: pillar.name
-                      })
-                    }
-                  }}
-                  className="opacity-30 hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 group-hover:opacity-60"
-                  title="View program details"
-                >
-                  <Eye size={14} className="text-gray-600" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <AlignmentIndicator
+                    itemType="program"
+                    itemId={program.id}
+                    onClick={(e) => onAlignmentClick('program', program.id, program.text, e)}
+                    className="opacity-60 hover:opacity-100"
+                  />
+                  <button
+                    onClick={() => {
+                      if (onProgramSelect) {
+                        onProgramSelect({
+                          ...program,
+                          goalText: goal.text,
+                          categoryName: category.name,
+                          pillarName: pillar.name
+                        })
+                      }
+                    }}
+                    className="opacity-30 hover:opacity-100 transition-opacity p-1 rounded hover:bg-gray-100 group-hover:opacity-60"
+                    title="View program details"
+                  >
+                    <Eye size={14} className="text-gray-600" />
+                  </button>
+                </div>
               </div>
               <StatusCircle
                 status={getProgramStatus(program)}
