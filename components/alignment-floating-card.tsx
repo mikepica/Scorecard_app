@@ -64,10 +64,42 @@ export function AlignmentFloatingCard({
   const [isSearching, setIsSearching] = useState(false)
   const [selectedStrength, setSelectedStrength] = useState<'strong' | 'moderate' | 'weak' | 'informational'>('moderate')
   const [rationale, setRationale] = useState("")
-  // const [editingAlignment, setEditingAlignment] = useState<string | null>(null)
+  const [editingAlignment, setEditingAlignment] = useState<string | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+
+  const fetchAlignments = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch(`/api/alignments?itemType=${itemType}&itemId=${itemId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setAlignments(data.alignments)
+      }
+    } catch (error) {
+      console.error('Error fetching alignments:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [itemType, itemId])
+
+  const searchAlignmentTargets = useCallback(async () => {
+    setIsSearching(true)
+    try {
+      const response = await fetch(
+        `/api/alignments/search?q=${encodeURIComponent(searchTerm)}&excludeType=${itemType}&excludeId=${itemId}`
+      )
+      if (response.ok) {
+        const data = await response.json()
+        setSearchResults(data.results)
+      }
+    } catch (error) {
+      console.error('Error searching alignment targets:', error)
+    } finally {
+      setIsSearching(false)
+    }
+  }, [searchTerm, itemType, itemId])
 
   // Fetch alignments when component opens
   useEffect(() => {
@@ -108,38 +140,6 @@ export function AlignmentFloatingCard({
       setSearchResults([])
     }
   }, [searchTerm, searchAlignmentTargets])
-
-  const fetchAlignments = useCallback(async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch(`/api/alignments?itemType=${itemType}&itemId=${itemId}`)
-      if (response.ok) {
-        const data = await response.json()
-        setAlignments(data.alignments)
-      }
-    } catch (error) {
-      console.error('Error fetching alignments:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [itemType, itemId])
-
-  const searchAlignmentTargets = useCallback(async () => {
-    setIsSearching(true)
-    try {
-      const response = await fetch(
-        `/api/alignments/search?q=${encodeURIComponent(searchTerm)}&excludeType=${itemType}&excludeId=${itemId}`
-      )
-      if (response.ok) {
-        const data = await response.json()
-        setSearchResults(data.results)
-      }
-    } catch (error) {
-      console.error('Error searching alignment targets:', error)
-    } finally {
-      setIsSearching(false)
-    }
-  }, [searchTerm, itemType, itemId])
 
   const createAlignment = async (target: SearchResult) => {
     try {
