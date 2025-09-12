@@ -6,16 +6,19 @@ import { ChevronDown, ChevronRight, Search, Check } from "lucide-react"
 interface HierarchicalItem {
   id: string
   name: string
-  type: 'pillar' | 'category' | 'goal' | 'program'
+  type: 'root' | 'pillar' | 'category' | 'goal' | 'program'
   children?: HierarchicalItem[]
-  path?: string
+  source?: 'ord' | 'functional'
+  functionArea?: string
 }
 
 interface SelectedItem {
   id: string
   name: string
-  type: 'pillar' | 'category' | 'goal' | 'program'
+  type: 'root' | 'pillar' | 'category' | 'goal' | 'program'
   path: string
+  source?: 'ord' | 'functional'
+  functionArea?: string
 }
 
 interface HierarchicalSelectProps {
@@ -63,11 +66,11 @@ export function HierarchicalSelect({
 
   const colors = themeClasses[theme]
 
-  // Initialize expanded state to show top level by default
+  // Initialize expanded state with all nodes collapsed by default
   useEffect(() => {
     if (data.length > 0 && expandedNodes.size === 0) {
-      const topLevelIds = data.map(item => item.id)
-      setExpandedNodes(new Set(topLevelIds))
+      // Start with empty set - all nodes collapsed
+      setExpandedNodes(new Set())
     }
   }, [data])
 
@@ -95,11 +98,18 @@ export function HierarchicalSelect({
   }
 
   const handleSelect = (item: HierarchicalItem, path: string) => {
+    // Don't allow selection of root items
+    if (item.type === 'root') {
+      return
+    }
+    
     const selectedItem: SelectedItem = {
       id: item.id,
       name: item.name,
       type: item.type,
-      path: path
+      path: path,
+      source: item.source,
+      functionArea: item.functionArea
     }
     onSelect(selectedItem)
     setIsOpen(false)
@@ -130,6 +140,7 @@ export function HierarchicalSelect({
 
     const getTypeIcon = (type: string) => {
       switch (type) {
+        case 'root': return '📋'
         case 'pillar': return '🏛️'
         case 'category': return '📁'
         case 'goal': return '🎯'
@@ -141,10 +152,12 @@ export function HierarchicalSelect({
     return (
       <div key={item.id}>
         <div
-          className={`flex items-center cursor-pointer py-2 px-3 rounded-md text-sm ${
-            isSelected 
-              ? colors.itemSelected
-              : `${colors.itemHover} text-gray-700`
+          className={`flex items-center py-2 px-3 rounded-md text-sm ${
+            item.type === 'root' 
+              ? 'font-semibold text-gray-800 bg-gray-100 cursor-default'
+              : isSelected 
+                ? `cursor-pointer ${colors.itemSelected}`
+                : `cursor-pointer ${colors.itemHover} text-gray-700`
           }`}
           style={{ paddingLeft: `${level * 20 + 12}px` }}
           onClick={() => handleSelect(item, currentPath)}

@@ -237,6 +237,24 @@ export class DatabaseService {
     }
   }
 
+  // Get distinct function values from functional programs
+  static async getDistinctFunctions(): Promise<string[]> {
+    const client = await getDbConnection();
+    
+    try {
+      const result = await client.query(`
+        SELECT DISTINCT function 
+        FROM functional_programs 
+        WHERE function IS NOT NULL 
+        ORDER BY function
+      `);
+      
+      return result.rows.map(row => row.function);
+    } finally {
+      client.release();
+    }
+  }
+
   // Get all functional scorecard data with hierarchical structure
   static async getFunctionalScoreCardData(): Promise<ScoreCardData> {
     const client = await getDbConnection();

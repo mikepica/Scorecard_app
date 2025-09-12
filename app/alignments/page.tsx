@@ -33,20 +33,23 @@ interface UnalignedItem {
 interface HierarchicalItem {
   id: string
   name: string
-  type: 'pillar' | 'category' | 'goal' | 'program'
+  type: 'root' | 'pillar' | 'category' | 'goal' | 'program'
   children?: HierarchicalItem[]
+  source?: 'ord' | 'functional'
+  functionArea?: string
 }
 
 interface SelectedItem {
   id: string
   name: string
-  type: 'pillar' | 'category' | 'goal' | 'program'
+  type: 'root' | 'pillar' | 'category' | 'goal' | 'program'
   path: string
+  source?: 'ord' | 'functional'
+  functionArea?: string
 }
 
 interface HierarchicalData {
-  functional: HierarchicalItem[]
-  ord: HierarchicalItem[]
+  combined: HierarchicalItem[]
 }
 
 interface AlignmentSuggestion {
@@ -79,7 +82,7 @@ function CreateAlignmentForm({
   }) => void; 
   onCancel: () => void; 
 }) {
-  const [hierarchicalData, setHierarchicalData] = useState<HierarchicalData>({ functional: [], ord: [] })
+  const [hierarchicalData, setHierarchicalData] = useState<HierarchicalData>({ combined: [] })
   const [functionalItem, setFunctionalItem] = useState<SelectedItem | null>(null)
   const [ordItem, setOrdItem] = useState<SelectedItem | null>(null)
   const [strength, setStrength] = useState<'strong' | 'moderate' | 'weak' | 'informational'>('moderate')
@@ -109,11 +112,34 @@ function CreateAlignmentForm({
     if (!functionalItem || !ordItem) {
       return
     }
+    
+    // Extract original IDs (remove source prefix, including function slug if present)
+    const extractOriginalId = (prefixedId: string) => {
+      // Handle patterns like: ord-[id], functional-[slug]-[id]
+      if (prefixedId.startsWith('ord-')) {
+        return prefixedId.replace(/^ord-/, '')
+      } else if (prefixedId.startsWith('functional-')) {
+        // Split by dash and take the last segment as the original ID
+        const segments = prefixedId.split('-')
+        return segments[segments.length - 1]
+      }
+      return prefixedId
+    }
+    
+    // Determine which item is functional and which is ORD
+    const functionalSelectedItem = functionalItem.source === 'functional' ? functionalItem : ordItem
+    const ordSelectedItem = functionalItem.source === 'ord' ? functionalItem : ordItem
+    
+    // If both items are from the same source, we can't create an alignment
+    if (functionalItem.source === ordItem.source) {
+      return
+    }
+    
     onSave({
-      functionalType: functionalItem.type,
-      functionalId: functionalItem.id,
-      ordType: ordItem.type,
-      ordId: ordItem.id,
+      functionalType: functionalSelectedItem.type,
+      functionalId: extractOriginalId(functionalSelectedItem.id),
+      ordType: ordSelectedItem.type,
+      ordId: extractOriginalId(ordSelectedItem.id),
       strength,
       rationale: rationale.trim() || undefined
     })
@@ -140,24 +166,22 @@ function CreateAlignmentForm({
   return (
     <form onSubmit={handleSubmit} className="p-6">
       <div className="space-y-6">
-        {/* Functional Side */}
+        {/* First Item Selection */}
         <div>
-          <h4 className="font-medium text-green-600 mb-3">FUNCTIONAL SIDE</h4>
           <HierarchicalSelect
-            data={hierarchicalData.functional}
-            placeholder="Select functional item..."
+            data={hierarchicalData.combined}
+            placeholder="Select first item..."
             selectedItem={functionalItem}
             onSelect={setFunctionalItem}
             theme="green"
           />
         </div>
 
-        {/* ORD Side */}
+        {/* Second Item Selection */}
         <div>
-          <h4 className="font-medium text-blue-600 mb-3">ORD SIDE</h4>
           <HierarchicalSelect
-            data={hierarchicalData.ord}
-            placeholder="Select ORD item..."
+            data={hierarchicalData.combined}
+            placeholder="Select second item..."
             selectedItem={ordItem}
             onSelect={setOrdItem}
             theme="blue"
@@ -207,7 +231,7 @@ function CreateAlignmentForm({
         <div className="flex space-x-3">
           <button
             type="submit"
-            disabled={!functionalItem || !ordItem}
+            disabled={!functionalItem || !ordItem || functionalItem.source === ordItem.source}
             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             Create Alignment
