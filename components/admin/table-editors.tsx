@@ -381,6 +381,18 @@ export function ProgramsEditor() {
       type: 'textarea'
     },
     {
+      key: 'start_quarter',
+      label: 'Start Quarter',
+      type: 'text',
+      width: '120px'
+    },
+    {
+      key: 'end_quarter',
+      label: 'End Quarter',
+      type: 'text',
+      width: '120px'
+    },
+    {
       key: 'updated_at',
       label: 'Last Updated',
       type: 'timestamp',
@@ -552,6 +564,18 @@ export function FunctionalProgramsEditor() {
       key: 'q4_2025_progress',
       label: 'Q4 2025 Progress',
       type: 'textarea'
+    },
+    {
+      key: 'start_quarter',
+      label: 'Start Quarter',
+      type: 'text',
+      width: '120px'
+    },
+    {
+      key: 'end_quarter',
+      label: 'End Quarter',
+      type: 'text',
+      width: '120px'
     },
     {
       key: 'updated_at',
