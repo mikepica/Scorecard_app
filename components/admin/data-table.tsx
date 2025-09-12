@@ -529,7 +529,7 @@ export function DataTable({
                       <Select
                         value={(newRowData[column.key] as string) || ''}
                         onValueChange={async (value) => {
-                          let updatedData = { ...newRowData, [column.key]: value };
+                          const updatedData = { ...newRowData, [column.key]: value };
                           
                           // Clear dependent field values when parent changes
                           if (column.key === 'pillar_id') {

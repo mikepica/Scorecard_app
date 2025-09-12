@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { X, Plus, Search, Trash2, Edit3 } from "lucide-react"
 
 interface Alignment {
@@ -51,7 +51,6 @@ const strengthLabels = {
 export function AlignmentFloatingCard({
   itemType,
   itemId,
-  itemName,
   isOpen,
   onClose,
   position,
@@ -65,7 +64,7 @@ export function AlignmentFloatingCard({
   const [isSearching, setIsSearching] = useState(false)
   const [selectedStrength, setSelectedStrength] = useState<'strong' | 'moderate' | 'weak' | 'informational'>('moderate')
   const [rationale, setRationale] = useState("")
-  const [editingAlignment, setEditingAlignment] = useState<string | null>(null)
+  // const [editingAlignment, setEditingAlignment] = useState<string | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -75,7 +74,7 @@ export function AlignmentFloatingCard({
     if (isOpen && itemType && itemId) {
       fetchAlignments()
     }
-  }, [isOpen, itemType, itemId])
+  }, [isOpen, itemType, itemId, fetchAlignments])
 
   // Handle click outside to close
   useEffect(() => {
@@ -108,9 +107,9 @@ export function AlignmentFloatingCard({
     } else {
       setSearchResults([])
     }
-  }, [searchTerm])
+  }, [searchTerm, searchAlignmentTargets])
 
-  const fetchAlignments = async () => {
+  const fetchAlignments = useCallback(async () => {
     setIsLoading(true)
     try {
       const response = await fetch(`/api/alignments?itemType=${itemType}&itemId=${itemId}`)
@@ -123,9 +122,9 @@ export function AlignmentFloatingCard({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [itemType, itemId])
 
-  const searchAlignmentTargets = async () => {
+  const searchAlignmentTargets = useCallback(async () => {
     setIsSearching(true)
     try {
       const response = await fetch(
@@ -140,7 +139,7 @@ export function AlignmentFloatingCard({
     } finally {
       setIsSearching(false)
     }
-  }
+  }, [searchTerm, itemType, itemId])
 
   const createAlignment = async (target: SearchResult) => {
     try {
@@ -193,28 +192,28 @@ export function AlignmentFloatingCard({
     }
   }
 
-  const updateAlignment = async (alignmentId: string, strength: string, newRationale: string) => {
-    try {
-      const response = await fetch(`/api/alignments?id=${alignmentId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          strength,
-          rationale: newRationale.trim() || undefined
-        })
-      })
+  // const updateAlignment = async (alignmentId: string, strength: string, newRationale: string) => {
+  //   try {
+  //     const response = await fetch(`/api/alignments?id=${alignmentId}`, {
+  //       method: 'PATCH',
+  //       headers: {
+  //         'Content-Type': 'application/json'
+  //       },
+  //       body: JSON.stringify({
+  //         strength,
+  //         rationale: newRationale.trim() || undefined
+  //       })
+  //     })
 
-      if (response.ok) {
-        setEditingAlignment(null)
-        await fetchAlignments()
-        onAlignmentChange?.()
-      }
-    } catch (error) {
-      console.error('Error updating alignment:', error)
-    }
-  }
+  //     if (response.ok) {
+  //       setEditingAlignment(null)
+  //       await fetchAlignments()
+  //       onAlignmentChange?.()
+  //     }
+  //   } catch (error) {
+  //     console.error('Error updating alignment:', error)
+  //   }
+  // }
 
   if (!isOpen) return null
 
@@ -341,7 +340,7 @@ export function AlignmentFloatingCard({
               </label>
               <select
                 value={selectedStrength}
-                onChange={(e) => setSelectedStrength(e.target.value as any)}
+                onChange={(e) => setSelectedStrength(e.target.value as 'strong' | 'moderate' | 'weak' | 'informational')}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="strong">Strong</option>
@@ -403,7 +402,7 @@ export function AlignmentFloatingCard({
                   </div>
                 ) : (
                   <p className="text-xs text-gray-500 py-2">
-                    No items found matching "{searchTerm}"
+                    No items found matching &ldquo;{searchTerm}&rdquo;
                   </p>
                 )}
               </div>

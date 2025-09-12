@@ -6,9 +6,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
-    const sortColumn = searchParams.get('sortColumn') || 'changed_at';
-    const sortDirection = (searchParams.get('sortDirection') || 'DESC') as 'ASC' | 'DESC';
-    const search = searchParams.get('search');
+    // Note: sortColumn, sortDirection, and search are extracted but not currently used
+    // const sortColumn = searchParams.get('sortColumn') || 'changed_at';
+    // const sortDirection = (searchParams.get('sortDirection') || 'DESC') as 'ASC' | 'DESC';
+    // const search = searchParams.get('search');
     const programId = searchParams.get('programId');
 
     // For progress history, we'll use the existing method but adapt it for pagination

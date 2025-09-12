@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
           const client = await getDbConnection();
           try {
             const result = await client.query('SELECT id, name FROM categories ORDER BY name');
-            const allCategoryOptions = result.rows.map((category: any) => ({ value: category.id, label: category.name }));
+            const allCategoryOptions = result.rows.map((category: { id: number; name: string }) => ({ value: category.id, label: category.name }));
             return NextResponse.json(allCategoryOptions);
           } finally {
             client.release();
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
           const client = await getDbConnection();
           try {
             const result = await client.query('SELECT id, text FROM strategic_goals ORDER BY text');
-            const allGoalOptions = result.rows.map((goal: any) => ({ value: goal.id, label: goal.text }));
+            const allGoalOptions = result.rows.map((goal: { id: number; text: string }) => ({ value: goal.id, label: goal.text }));
             return NextResponse.json(allGoalOptions);
           } finally {
             client.release();

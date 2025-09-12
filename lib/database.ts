@@ -1,6 +1,36 @@
 import { Pool, PoolClient } from 'pg';
 import { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from '@/types/scorecard';
 
+// Alignment interfaces
+interface Alignment {
+  id: string
+  functional_type: string
+  ord_type: string
+  alignment_strength: 'strong' | 'moderate' | 'weak' | 'informational'
+  alignment_rationale?: string
+  functional_name: string
+  functional_path: string
+  ord_name: string
+  ord_path: string
+  created_at: string
+}
+
+interface SearchResult {
+  type: string
+  source: string
+  id: string
+  title: string
+  path: string
+}
+
+interface AlignmentInsertData {
+  functional_type: string
+  ord_type: string
+  alignment_strength: string
+  alignment_rationale: string | null
+  created_by: string
+}
+
 // Database connection pool
 let pool: Pool | null = null;
 
@@ -1080,7 +1110,7 @@ export class DatabaseService {
   // ============ ALIGNMENT METHODS ============
 
   // Get alignments for a specific item
-  static async getAlignments(itemType: string, itemId: string): Promise<any[]> {
+  static async getAlignments(itemType: string, itemId: string): Promise<Alignment[]> {
     const client = await getDbConnection();
     
     try {
@@ -1159,7 +1189,7 @@ export class DatabaseService {
   }
 
   // Search for alignment targets
-  static async searchAlignmentTargets(searchTerm: string, excludeType?: string, excludeId?: string): Promise<any[]> {
+  static async searchAlignmentTargets(searchTerm: string, excludeType?: string, excludeId?: string): Promise<SearchResult[]> {
     const client = await getDbConnection();
     
     try {
@@ -1279,12 +1309,12 @@ export class DatabaseService {
     strength: string;
     rationale?: string;
     createdBy?: string;
-  }): Promise<any> {
+  }): Promise<{ id: string; success: boolean }> {
     const client = await getDbConnection();
     
     try {
       // Prepare the insertion data
-      const insertData: any = {
+      const insertData: AlignmentInsertData = {
         functional_type: alignmentData.functionalType,
         ord_type: alignmentData.ordType,
         alignment_strength: alignmentData.strength,
@@ -1316,7 +1346,7 @@ export class DatabaseService {
   static async updateAlignment(id: string, updates: {
     strength?: string;
     rationale?: string;
-  }): Promise<any> {
+  }): Promise<{ success: boolean }> {
     const client = await getDbConnection();
     
     try {
