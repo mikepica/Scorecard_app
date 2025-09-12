@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Menu, ChevronDown, Database, FileText, Bot, Camera, Info } from "lucide-react"
+import { Menu, ChevronDown, Database, FileText, Bot, Camera, Info, Link as LinkIcon } from "lucide-react"
 import Link from "next/link"
 
 interface MenuDropdownProps {
@@ -76,6 +76,16 @@ export function MenuDropdown({ onCaptureScreen, onShowBragInfo, className = "" }
           >
             <FileText size={20} className="text-gray-600" />
             <span>Instructions</span>
+          </Link>
+
+          {/* Alignments */}
+          <Link
+            href="/alignments"
+            onClick={() => handleMenuItemClick()}
+            className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-100 text-gray-900 border-b border-gray-200"
+          >
+            <LinkIcon size={20} className="text-purple-600" />
+            <span>Alignments</span>
           </Link>
 
           {/* AI Flows (disabled) */}

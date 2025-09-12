@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, BarChart2, X, Users, Filter } from "lucide-react"
+import { Menu, BarChart2, X, Users, Filter, Link as LinkIcon } from "lucide-react"
 import BragStatusTable from "./brag-status-table"
 import { Dropdown } from "./dropdown"
 import { FunctionDropdown } from "./function-dropdown"
@@ -18,6 +18,7 @@ export function Header({
   onQuarterChange,
   isFunctionalView = false,
   onToggleChat,
+  showScorecardLink = false,
 }: {
   title?: string
   onCaptureScreen?: () => void
@@ -28,6 +29,7 @@ export function Header({
   onQuarterChange?: (value: string) => void
   isFunctionalView?: boolean
   onToggleChat?: () => void
+  showScorecardLink?: boolean
 }) {
   const [showStatusModal, setShowStatusModal] = useState(false)
 
@@ -82,6 +84,16 @@ export function Header({
             >
               <Users size={20} />
               <span className="whitespace-nowrap">ORD View</span>
+            </Link>
+          )}
+
+          {showScorecardLink && (
+            <Link
+              href="/"
+              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            >
+              <BarChart2 size={20} />
+              <span className="whitespace-nowrap">Scorecard</span>
             </Link>
           )}
 

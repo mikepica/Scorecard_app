@@ -1434,4 +1434,145 @@ export class DatabaseService {
       client.release();
     }
   }
+
+  // Get all alignments
+  static async getAllAlignments(): Promise<Alignment[]> {
+    const client = await getDbConnection();
+    
+    try {
+      // First, let's check if the table exists and get basic data
+      console.log('Checking alignments table...');
+      const tableCheck = await client.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'scorecard_alignments'
+      `);
+      console.log('Alignments table exists:', tableCheck.rows.length > 0);
+      
+      if (tableCheck.rows.length === 0) {
+        console.log('Alignments table does not exist');
+        return [];
+      }
+      
+      // Get simple count first
+      const countResult = await client.query('SELECT COUNT(*) as count FROM scorecard_alignments');
+      console.log('Total alignments in database:', countResult.rows[0].count);
+      
+      if (parseInt(countResult.rows[0].count) === 0) {
+        console.log('No alignments found in database');
+        return [];
+      }
+      
+      // Start with a simpler query to debug
+      const simpleQuery = `
+        SELECT 
+          id,
+          functional_type,
+          ord_type,
+          alignment_strength,
+          alignment_rationale,
+          created_at,
+          'Test Functional' as functional_name,
+          'Functional > Path' as functional_path,
+          'Test ORD' as ord_name,
+          'ORD > Path' as ord_path
+        FROM scorecard_alignments 
+        ORDER BY created_at DESC
+        LIMIT 10
+      `;
+      
+      console.log('Executing simplified query...');
+      const result = await client.query(simpleQuery);
+      console.log('Query returned rows:', result.rows.length);
+      
+      return result.rows;
+      
+    } finally {
+      client.release();
+    }
+  }
+
+  // Get unaligned items
+  static async getUnalignedItems(): Promise<Array<{
+    id: string;
+    type: string;
+    source: string;
+    name: string;
+    path: string;
+  }>> {
+    const client = await getDbConnection();
+    
+    try {
+      // Get functional items that have no alignments
+      const functionalQuery = `
+        SELECT 
+          fp.id,
+          'program' as type,
+          'functional' as source,
+          fp.text as name,
+          COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') || ' > ' || fp.text as path
+        FROM functional_programs fp
+        LEFT JOIN scorecard_alignments sa ON sa.functional_program_id = fp.id
+        WHERE sa.id IS NULL
+        
+        UNION ALL
+        
+        SELECT 
+          sg.id,
+          'goal' as type,
+          'functional' as source,
+          sg.text as name,
+          COALESCE(sp.name, 'Unknown') || ' > ' || COALESCE(c.name, 'Unknown') || ' > ' || sg.text as path
+        FROM strategic_goals sg
+        LEFT JOIN strategic_pillars sp ON sg.pillar_id = sp.id
+        LEFT JOIN categories c ON sg.category_id = c.id
+        LEFT JOIN scorecard_alignments sa ON sa.functional_goal_id = sg.id
+        WHERE sa.id IS NULL
+        AND EXISTS (SELECT 1 FROM strategic_programs WHERE strategic_goal_id = sg.id)
+        
+        ORDER BY path
+        LIMIT 50
+      `;
+      
+      // Get ORD items that have no alignments
+      const ordQuery = `
+        SELECT 
+          sp.id,
+          'program' as type,
+          'ord' as source,
+          sp.text as name,
+          COALESCE(sp.pillar, 'Unknown') || ' > ' || COALESCE(sp.category, 'Unknown') || ' > ' || COALESCE(sp.strategic_goal, 'Unknown') || ' > ' || sp.text as path
+        FROM strategic_programs sp
+        LEFT JOIN scorecard_alignments sa ON sa.ord_program_id = sp.id
+        WHERE sa.id IS NULL
+        
+        UNION ALL
+        
+        SELECT 
+          sg.id,
+          'goal' as type,
+          'ord' as source,
+          sg.text as name,
+          COALESCE(sp_pillar.name, 'Unknown') || ' > ' || COALESCE(c.name, 'Unknown') || ' > ' || sg.text as path
+        FROM strategic_goals sg
+        LEFT JOIN strategic_pillars sp_pillar ON sg.pillar_id = sp_pillar.id
+        LEFT JOIN categories c ON sg.category_id = c.id
+        LEFT JOIN scorecard_alignments sa ON sa.ord_goal_id = sg.id
+        WHERE sa.id IS NULL
+        AND EXISTS (SELECT 1 FROM strategic_programs WHERE strategic_goal_id = sg.id)
+        
+        ORDER BY path
+        LIMIT 50
+      `;
+      
+      const [functionalResult, ordResult] = await Promise.all([
+        client.query(functionalQuery),
+        client.query(ordQuery)
+      ]);
+      
+      return [...functionalResult.rows, ...ordResult.rows];
+      
+    } finally {
+      client.release();
+    }
+  }
 }
