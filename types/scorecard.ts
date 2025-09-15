@@ -48,6 +48,7 @@ export interface StrategicProgram {
   categoryId: string
   strategicPillarId: string
   linkedORDStrategicProgramId?: string
+  functionArea?: string
 }
 
 export interface StrategicGoal {

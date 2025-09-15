@@ -319,7 +319,6 @@ export class DatabaseService {
         categoryId: row.category || 'Unspecified Category',
         strategicPillarId: row.pillar || 'Unspecified Pillar',
         linkedORDStrategicProgramId: row.linked_ord_strategic_program_id,
-        // Add function field if needed in StrategicProgram interface
         functionArea: row.function,
         startQuarter: row.start_quarter,
         endQuarter: row.end_quarter
@@ -479,7 +478,6 @@ export class DatabaseService {
         categoryId: row.category || 'Unspecified Category',
         strategicPillarId: row.pillar || 'Unspecified Pillar',
         linkedORDStrategicProgramId: row.linked_ord_strategic_program_id,
-        // Add function field if needed in StrategicProgram interface
         functionArea: row.function,
         startQuarter: row.start_quarter,
         endQuarter: row.end_quarter

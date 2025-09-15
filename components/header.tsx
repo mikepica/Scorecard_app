@@ -1,12 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, BarChart2, X, Filter } from "lucide-react"
+import { Menu, X, Filter } from "lucide-react"
 import BragStatusTable from "./brag-status-table"
 import { Dropdown } from "./dropdown"
 import { GoalViewsDropdown } from "./goal-views-dropdown"
+import { TableViewsDropdown } from "./table-views-dropdown"
 import { MenuDropdown } from "./menu-dropdown"
-import Link from "next/link"
 
 export function Header({
   title = "ORD Scorecard",
@@ -73,13 +73,7 @@ export function Header({
 
           <GoalViewsDropdown />
 
-          <Link
-            href="/details"
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <BarChart2 size={20} />
-            <span className="whitespace-nowrap">Table View</span>
-          </Link>
+          <TableViewsDropdown />
 
           {onToggleChat && (
             <button

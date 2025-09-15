@@ -353,25 +353,34 @@ function DetailsPageContent() {
     // No need to update upstream filters since this is the final filter
   }
 
-  // Get filtered programs based on sponsor selections
+  // Get filtered programs based on sponsor selections and function
   const filteredPrograms = useMemo(() => {
     return allPrograms.filter(program => {
-      // Get sponsor arrays for this program
-      const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+      // For function-specific filtering, use functionArea instead of ordLtSponsors
+      if (selectedFunction && selectedFunction !== 'all-functions') {
+        // Filter by exact function match for functional data
+        const functionMatch = program.functionArea === selectedFunction
+        if (!functionMatch) return false
+      } else {
+        // For ORD data or all-functions view, use sponsor-based filtering
+        const ordLtSponsors = program.ordLtSponsors || ['(Not Specified)']
+        const ordLtMatch = selectedOrdLtSponsor === ALL_VALUE || ordLtSponsors.includes(selectedOrdLtSponsor)
+        if (!ordLtMatch) return false
+      }
+      
+      // Apply remaining filters (these work for both functional and ORD data)
       const sponsorsLeads = program.sponsorsLeads || ['(Not Specified)']
       const reportingOwners = program.reportingOwners || ['(Not Specified)']
       
-      // Check sponsor filters
-      const ordLtMatch = selectedOrdLtSponsor === ALL_VALUE || ordLtSponsors.includes(selectedOrdLtSponsor)
       const sponsorsLeadMatch = selectedSponsorsLead === ALL_VALUE || sponsorsLeads.includes(selectedSponsorsLead)
       const reportingOwnerMatch = selectedReportingOwner === ALL_VALUE || reportingOwners.includes(selectedReportingOwner)
       
       // Check goal filter
       const goalMatch = selectedGoal === ALL_VALUE || program.strategicGoalId === selectedGoal
       
-      return ordLtMatch && sponsorsLeadMatch && reportingOwnerMatch && goalMatch
+      return sponsorsLeadMatch && reportingOwnerMatch && goalMatch
     })
-  }, [selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, allPrograms])
+  }, [selectedFunction, selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, allPrograms])
 
 
   // Get display name based on current selections
