@@ -83,20 +83,15 @@ function DetailsPageContent() {
 
   // Update filters when selectedFunction changes
   useEffect(() => {
-    if (selectedFunction && selectedFunction !== 'all-functions') {
-      // For specific function, lock to that function
-      setSelectedOrdLtSponsor(selectedFunction)
-      setSelectedSponsorsLead(ALL_VALUE)
-      setSelectedReportingOwner(ALL_VALUE)
-      setSelectedGoal(ALL_VALUE)
-    } else if (selectedFunction === 'all-functions') {
-      // For all functions, reset to show all
+    if (selectedFunction) {
+      // For any function selection (specific or all-functions), reset filters to ALL_VALUE
+      // The filtering logic will handle function-specific filtering via functionArea
       setSelectedOrdLtSponsor(ALL_VALUE)
       setSelectedSponsorsLead(ALL_VALUE)
       setSelectedReportingOwner(ALL_VALUE)
       setSelectedGoal(ALL_VALUE)
     }
-  }, [selectedFunction])
+  }, [selectedFunction, ALL_VALUE])
 
   // State for AI Chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -117,10 +112,8 @@ function DetailsPageContent() {
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
   const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
 
-  // State for selected filters - default to "all" or selected function (except for all-functions)
-  const [selectedOrdLtSponsor, setSelectedOrdLtSponsor] = useState(
-    selectedFunction && selectedFunction !== 'all-functions' ? selectedFunction : ALL_VALUE
-  )
+  // State for selected filters - default to "all"
+  const [selectedOrdLtSponsor, setSelectedOrdLtSponsor] = useState(ALL_VALUE)
   const [selectedSponsorsLead, setSelectedSponsorsLead] = useState(ALL_VALUE)
   const [selectedReportingOwner, setSelectedReportingOwner] = useState(ALL_VALUE)
   const [selectedGoal, setSelectedGoal] = useState(ALL_VALUE)
