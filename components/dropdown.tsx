@@ -10,6 +10,7 @@ interface DropdownProps {
   label: string
   placeholder?: string
   labelWidth?: string
+  disabled?: boolean
 }
 
 export function Dropdown({
@@ -19,6 +20,7 @@ export function Dropdown({
   label,
   placeholder = "Select...",
   labelWidth = "w-32",
+  disabled = false,
 }: DropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -42,16 +44,18 @@ export function Dropdown({
     <div className="relative w-full flex items-center" ref={dropdownRef}>
       <label className={`font-medium text-lg ${labelWidth} flex-shrink-0`}>{label}</label>
       <div
-        className="flex items-center justify-between w-full p-2 border border-gray-300 rounded-md bg-white cursor-pointer"
-        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between w-full p-2 border border-gray-300 rounded-md ${
+          disabled ? 'bg-gray-100 cursor-not-allowed' : 'bg-white cursor-pointer'
+        }`}
+        onClick={() => !disabled && setIsOpen(!isOpen)}
       >
         <span className={selectedOption ? "text-gray-900" : "text-gray-500"}>
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <ChevronDown size={16} className="text-gray-500" />
+        <ChevronDown size={16} className={`text-gray-500 ${disabled ? 'opacity-50' : ''}`} />
       </div>
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <div
           className="absolute z-[60] w-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"
           style={{ top: "100%", marginLeft: labelWidth }}

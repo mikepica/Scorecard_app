@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useMemo, useEffect } from "react"
+import { useState, useMemo, useEffect, Suspense } from "react"
+import { useSearchParams } from "next/navigation"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
@@ -17,6 +18,7 @@ import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 import BragStatusTable from "@/components/brag-status-table"
 import { GoalViewsDropdown } from "@/components/goal-views-dropdown"
+import { TableViewsDropdown } from "@/components/table-views-dropdown"
 import { MenuDropdown } from "@/components/menu-dropdown"
 
 // Special value to represent "All" selection
@@ -34,7 +36,10 @@ const getUniqueSponsorValues = (programs: Array<StrategicProgram & { goalText: s
   return Array.from(allValues).sort()
 }
 
-export default function DetailsPage() {
+function DetailsPageContent() {
+  const searchParams = useSearchParams()
+  const selectedFunction = searchParams.get('function')
+  
   // State for data loading
   const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -49,7 +54,18 @@ export default function DetailsPage() {
     async function loadData() {
       setLoading(true)
       try {
-        const response = await fetch('/api/scorecard')
+        // Determine which API to use based on selectedFunction
+        let apiUrl = '/api/scorecard' // Default to ORD scorecard
+        
+        if (selectedFunction === 'all-functions') {
+          // Load all functional data (without specific function filter)
+          apiUrl = '/api/functional-scorecard'
+        } else if (selectedFunction) {
+          // Load specific function data
+          apiUrl = `/api/functional-scorecard?function=${encodeURIComponent(selectedFunction)}`
+        }
+        
+        const response = await fetch(apiUrl)
         if (!response.ok) {
           throw new Error('Failed to load scorecard data')
         }
@@ -63,7 +79,24 @@ export default function DetailsPage() {
     }
 
     loadData()
-  }, [])
+  }, [selectedFunction])
+
+  // Update filters when selectedFunction changes
+  useEffect(() => {
+    if (selectedFunction && selectedFunction !== 'all-functions') {
+      // For specific function, lock to that function
+      setSelectedOrdLtSponsor(selectedFunction)
+      setSelectedSponsorsLead(ALL_VALUE)
+      setSelectedReportingOwner(ALL_VALUE)
+      setSelectedGoal(ALL_VALUE)
+    } else if (selectedFunction === 'all-functions') {
+      // For all functions, reset to show all
+      setSelectedOrdLtSponsor(ALL_VALUE)
+      setSelectedSponsorsLead(ALL_VALUE)
+      setSelectedReportingOwner(ALL_VALUE)
+      setSelectedGoal(ALL_VALUE)
+    }
+  }, [selectedFunction])
 
   // State for AI Chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -84,8 +117,10 @@ export default function DetailsPage() {
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
   const [aiFlowType] = useState<"goal-comparison" | "learnings-best-practices">("goal-comparison")
 
-  // State for selected filters - default to "all"
-  const [selectedOrdLtSponsor, setSelectedOrdLtSponsor] = useState(ALL_VALUE)
+  // State for selected filters - default to "all" or selected function (except for all-functions)
+  const [selectedOrdLtSponsor, setSelectedOrdLtSponsor] = useState(
+    selectedFunction && selectedFunction !== 'all-functions' ? selectedFunction : ALL_VALUE
+  )
   const [selectedSponsorsLead, setSelectedSponsorsLead] = useState(ALL_VALUE)
   const [selectedReportingOwner, setSelectedReportingOwner] = useState(ALL_VALUE)
   const [selectedGoal, setSelectedGoal] = useState(ALL_VALUE)
@@ -141,9 +176,14 @@ export default function DetailsPage() {
 
   // ORD LT Sponsor options - all unique values
   const ordLtSponsorOptions = useMemo(() => {
+    // If a specific function is selected, only show that function as an option (locked filter)
+    if (selectedFunction && selectedFunction !== 'all-functions') {
+      return [{ value: selectedFunction, label: selectedFunction }]
+    }
+    
     const uniqueValues = getUniqueSponsorValues(allPrograms, 'ordLtSponsors')
     return [{ value: ALL_VALUE, label: "All" }, ...uniqueValues.map(value => ({ value, label: value }))]
-  }, [allPrograms])
+  }, [allPrograms, selectedFunction])
 
   // Sponsors Lead options - filtered by selected ORD LT Sponsor
   const sponsorsLeadOptions = useMemo(() => {
@@ -336,6 +376,41 @@ export default function DetailsPage() {
 
   // Get display name based on current selections
   const displayName = useMemo(() => {
+    // If viewing all functions, show that prominently
+    if (selectedFunction === 'all-functions') {
+      if (selectedSponsorsLead === ALL_VALUE && selectedReportingOwner === ALL_VALUE && selectedGoal === ALL_VALUE) {
+        return "All Functions Table View"
+      }
+      
+      const parts = ["All Functions"]
+      if (selectedSponsorsLead !== ALL_VALUE) parts.push(selectedSponsorsLead)
+      if (selectedReportingOwner !== ALL_VALUE) parts.push(selectedReportingOwner)
+      if (selectedGoal !== ALL_VALUE) {
+        const goalOption = goalOptions.find(opt => opt.value === selectedGoal)
+        if (goalOption) parts.push(goalOption.label)
+      }
+      
+      return parts.join(" → ")
+    }
+    
+    // If viewing a specific function, show that prominently
+    if (selectedFunction) {
+      if (selectedSponsorsLead === ALL_VALUE && selectedReportingOwner === ALL_VALUE && selectedGoal === ALL_VALUE) {
+        return `${selectedFunction} Table View`
+      }
+      
+      const parts = [selectedFunction]
+      if (selectedSponsorsLead !== ALL_VALUE) parts.push(selectedSponsorsLead)
+      if (selectedReportingOwner !== ALL_VALUE) parts.push(selectedReportingOwner)
+      if (selectedGoal !== ALL_VALUE) {
+        const goalOption = goalOptions.find(opt => opt.value === selectedGoal)
+        if (goalOption) parts.push(goalOption.label)
+      }
+      
+      return parts.join(" → ")
+    }
+    
+    // Default behavior for ORD view
     if (selectedOrdLtSponsor === ALL_VALUE && selectedSponsorsLead === ALL_VALUE && selectedReportingOwner === ALL_VALUE && selectedGoal === ALL_VALUE) {
       return "All Programs"
     }
@@ -350,7 +425,7 @@ export default function DetailsPage() {
     }
     
     return parts.length > 0 ? parts.join(" → ") : "Filtered Programs"
-  }, [selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, goalOptions])
+  }, [selectedFunction, selectedOrdLtSponsor, selectedSponsorsLead, selectedReportingOwner, selectedGoal, goalOptions])
 
   // Function to capture the screen
   const captureScreen = async () => {
@@ -391,11 +466,12 @@ export default function DetailsPage() {
         const date = new Date()
         const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}_${date.getHours().toString().padStart(2, "0")}-${date.getMinutes().toString().padStart(2, "0")}`
 
-        // Use the selected goal name in the filename
+        // Use the selected goal name and function in the filename
         const goalName = goalOptions.find((option) => option.value === selectedGoal)?.label || "scorecard"
         const safeGoalName = goalName.replace(/[^a-z0-9]/gi, "_").substring(0, 30)
+        const functionPrefix = selectedFunction ? `${selectedFunction.replace(/[^a-z0-9]/gi, "_")}_` : ""
 
-        link.download = `scorecard_${safeGoalName}_${formattedDate}.png`
+        link.download = `${functionPrefix}scorecard_${safeGoalName}_${formattedDate}.png`
 
         // Trigger download
         document.body.appendChild(link)
@@ -810,6 +886,8 @@ export default function DetailsPage() {
         <div className="flex items-center gap-4">
           <GoalViewsDropdown />
 
+          <TableViewsDropdown />
+
           <button
             onClick={() => setFiltersVisible(!filtersVisible)}
             className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
@@ -850,9 +928,10 @@ export default function DetailsPage() {
                 options={ordLtSponsorOptions}
                 value={selectedOrdLtSponsor}
                 onChange={handleOrdLtSponsorChange}
-                label="ORD LT Sponsor:"
-                placeholder="Select an ORD LT Sponsor..."
+                label={selectedFunction && selectedFunction !== 'all-functions' ? "Function:" : "ORD LT Sponsor:"}
+                placeholder={selectedFunction && selectedFunction !== 'all-functions' ? "Function is locked" : "Select an ORD LT Sponsor..."}
                 labelWidth="w-36"
+                disabled={selectedFunction !== null && selectedFunction !== 'all-functions'}
               />
             </div>
           </div>
@@ -1135,5 +1214,24 @@ export default function DetailsPage() {
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-700 mx-auto mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function DetailsPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <DetailsPageContent />
+    </Suspense>
   )
 }

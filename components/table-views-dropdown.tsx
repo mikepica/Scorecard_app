@@ -4,11 +4,11 @@ import { useState, useRef, useEffect } from "react"
 import { ChevronDown, BarChart2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 
-interface GoalViewsDropdownProps {
+interface TableViewsDropdownProps {
   className?: string
 }
 
-export function GoalViewsDropdown({ className = "" }: GoalViewsDropdownProps) {
+export function TableViewsDropdown({ className = "" }: TableViewsDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [functions, setFunctions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
@@ -55,24 +55,28 @@ export function GoalViewsDropdown({ className = "" }: GoalViewsDropdownProps) {
     }
   }, [])
 
-  const handleViewSelect = (viewType: 'ord' | 'functional' | 'function', selectedFunction?: string) => {
-    setIsOpen(false)
-    
-    switch (viewType) {
-      case 'ord':
-        // Navigate to ORD view (homepage)
-        router.push('/')
-        break
-      case 'functional':
-        // Navigate to functional view with all functions
-        router.push('/functional')
-        break
-      case 'function':
-        // Navigate to functional view with specific function
-        if (selectedFunction) {
-          router.push(`/functional?function=${encodeURIComponent(selectedFunction)}`)
-        }
-        break
+  const handleViewSelect = (viewType: 'ord-table' | 'all-functions-table' | 'function-table', selectedFunction?: string) => {
+    try {
+      setIsOpen(false)
+      
+      switch (viewType) {
+        case 'ord-table':
+          // Navigate to ORD table view (details page)
+          router.push('/details')
+          break
+        case 'all-functions-table':
+          // Navigate to all functions table view
+          router.push('/details?function=all-functions')
+          break
+        case 'function-table':
+          // Navigate to specific function table view
+          if (selectedFunction) {
+            router.push(`/details?function=${encodeURIComponent(selectedFunction)}`)
+          }
+          break
+      }
+    } catch (error) {
+      console.error('Error during navigation:', error)
     }
   }
 
@@ -99,7 +103,7 @@ export function GoalViewsDropdown({ className = "" }: GoalViewsDropdownProps) {
         className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
       >
         <BarChart2 size={20} />
-        <span className="whitespace-nowrap">Goal-Views</span>
+        <span className="whitespace-nowrap">Table View</span>
         <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
@@ -107,45 +111,48 @@ export function GoalViewsDropdown({ className = "" }: GoalViewsDropdownProps) {
         <div
           className="absolute z-50 top-full left-0 mt-1 bg-white border border-gray-300 rounded-md shadow-lg min-w-full whitespace-nowrap"
         >
-          {/* Oncology R&D (ORD view) option */}
+          {/* ORD Table option */}
           <div
             className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-gray-900 font-medium"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              handleViewSelect('ord')
+              handleViewSelect('ord-table')
             }}
           >
-            Oncology R&D
+            ORD Table
           </div>
           
           {/* Separator */}
           <div className="border-t border-gray-200"></div>
           
-          {/* All Functions option */}
+          {/* All Functions Table option */}
           <div
             className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-gray-900"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              handleViewSelect('functional')
+              handleViewSelect('all-functions-table')
             }}
           >
-            All Functions
+            All Functions Table
           </div>
           
-          {/* Individual function options */}
+          {/* Separator */}
+          <div className="border-t border-gray-200"></div>
+          
+          {/* Individual function table options */}
           {functions.map((func) => (
             <div
-              key={func}
+              key={`table-${func}`}
               className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-gray-900"
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                handleViewSelect('function', func)
+                handleViewSelect('function-table', func)
               }}
             >
-              {func}
+              {func} Table
             </div>
           ))}
         </div>
