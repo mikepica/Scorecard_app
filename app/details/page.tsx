@@ -1086,7 +1086,7 @@ function DetailsPageContent() {
                         value={(program as StrategicProgram & Record<string, unknown>)[selectedComparisonQuarter.columnName] as string || ""}
                         onSave={(newProgress) => handleQuarterProgressUpdate(program.id, selectedComparisonQuarter.columnName, newProgress)}
                         className="text-base"
-                        placeholder={`Enter ${selectedComparisonQuarter.label} progress...`}
+                        placeholder="Data not yet entered"
                       />
                     </td>
                     <td className="border border-gray-300 p-3 relative border-r-2 border-gray-400" style={{width: '14.3%'}}>
@@ -1095,7 +1095,7 @@ function DetailsPageContent() {
                           value={(program as StrategicProgram & Record<string, unknown>)[currentQuarter.columnName] as string || ""}
                           onSave={(newProgress) => handleQuarterProgressUpdate(program.id, currentQuarter.columnName, newProgress)}
                           className="text-base"
-                          placeholder={`Enter ${currentQuarter.label} progress...`}
+                          placeholder="Data not yet entered"
                         />
                       </div>
                       <button
@@ -1119,7 +1119,7 @@ function DetailsPageContent() {
                               value={(program as StrategicProgram & Record<string, unknown>)[objectiveField] as string || ""}
                               onSave={(newObjective) => handleObjectiveUpdate(program.id, quarterKey, newObjective)}
                               className="text-base"
-                              placeholder={`Enter ${quarter.label} objective...`}
+                              placeholder="Data not yet entered"
                             />
                           </div>
                           <div className="status-dot-container">

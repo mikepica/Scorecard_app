@@ -397,7 +397,7 @@ export function DataTable({
         value={(value as string) || ''}
         onSave={(newValue) => handleUpdateCell(row.id as string, column.key, newValue)}
         type={column.type === 'textarea' ? 'textarea' : 'text'}
-        placeholder={`Enter ${column.label.toLowerCase()}`}
+        placeholder="Data not yet entered"
       />
     );
   };
@@ -566,7 +566,7 @@ export function DataTable({
                         onChange={(e) => 
                           setNewRowData(prev => ({ ...prev, [column.key]: e.target.value }))
                         }
-                        placeholder={`Enter ${column.label.toLowerCase()}`}
+                        placeholder="Data not yet entered"
                         disabled={column.type === 'timestamp'}
                       />
                     )}

@@ -341,7 +341,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
               value={program[selectedComparisonQuarter.columnName as keyof StrategicProgram] as string || ""}
               onSave={(newProgress) => handleProgressUpdate(selectedComparisonQuarter.columnName, newProgress)}
               className="text-sm"
-              placeholder={`Enter ${selectedComparisonQuarter.label} progress...`}
+              placeholder="Data not yet entered"
             />
           </div>
 
@@ -361,7 +361,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
               value={program[currentQuarter.columnName as keyof StrategicProgram] as string || ""}
               onSave={(newProgress) => handleProgressUpdate(currentQuarter.columnName, newProgress)}
               className="text-sm"
-              placeholder={`Enter ${currentQuarter.label} progress...`}
+              placeholder="Data not yet entered"
             />
           </div>
 
@@ -416,7 +416,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
                     value={program[objectiveField as keyof StrategicProgram] as string || ""}
                     onSave={(newObjective) => handleObjectiveUpdate(quarterKey, newObjective)}
                     className="text-sm"
-                    placeholder={`Enter ${quarterInfo.label} objective...`}
+                    placeholder="Data not yet entered"
                   />
                 </div>
               )
