@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+import { getDbConnection } from '@/lib/database';
 
 export async function GET() {
   try {
-    const client = await pool.connect();
+    const client = await getDbConnection();
     
     try {
       const result = await client.query(`
@@ -48,10 +44,10 @@ export async function POST(req: Request) {
       );
     }
     
-    const client = await pool.connect();
+    const client = await getDbConnection();
     
     try {
-      const threadId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const threadId = `thread_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       
       const result = await client.query(`
         INSERT INTO chat_threads (id, name)
@@ -84,7 +80,7 @@ export async function DELETE(req: Request) {
       );
     }
     
-    const client = await pool.connect();
+    const client = await getDbConnection();
     
     try {
       const result = await client.query(`

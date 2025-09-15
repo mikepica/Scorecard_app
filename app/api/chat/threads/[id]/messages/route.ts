@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+import { getDbConnection } from '@/lib/database';
 
 export async function POST(
   req: Request,
@@ -20,7 +16,7 @@ export async function POST(
       );
     }
     
-    const client = await pool.connect();
+    const client = await getDbConnection();
     
     try {
       // Verify thread exists
@@ -36,7 +32,7 @@ export async function POST(
       }
       
       // Create message
-      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
       
       const result = await client.query(`
         INSERT INTO chat_messages (id, thread_id, text, sender)

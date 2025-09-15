@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server';
-import { Pool } from 'pg';
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+import { getDbConnection } from '@/lib/database';
 
 export async function GET(
   req: Request,
@@ -11,7 +7,7 @@ export async function GET(
 ) {
   try {
     const threadId = params.id;
-    const client = await pool.connect();
+    const client = await getDbConnection();
     
     try {
       // Get thread info
@@ -72,7 +68,7 @@ export async function PATCH(
       );
     }
     
-    const client = await pool.connect();
+    const client = await getDbConnection();
     
     try {
       // Dynamically build update statement
