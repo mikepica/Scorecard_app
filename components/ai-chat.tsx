@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, Send, ChevronDown, Edit3, Trash2, Plus } from "lucide-react"
+import { X, Send, ChevronDown, Edit3, Trash2, Plus, CheckSquare } from "lucide-react"
 import { Overlay } from "./overlay"
 import type { ScoreCardData } from "@/types/scorecard"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
+import { useChatContext, ContextSelection } from "@/components/chat-context"
 
 type Message = {
   id: string
@@ -22,6 +23,7 @@ type ChatThread = {
   updated_at: string
   message_count?: number
   last_message_at?: string
+  context_selection?: ContextSelection
 }
 
 type AIChatProps = {
@@ -30,9 +32,13 @@ type AIChatProps = {
   context: ScoreCardData
   isReprioritizationMode?: boolean
   onReset?: () => void
+  onOpenContextSelection?: () => void
+  isSelectingContext?: boolean
+  onCancelContextSelection?: () => void
+  onSaveContextSelection?: () => void
 }
 
-export function AIChat({ isOpen, onClose, context, isReprioritizationMode = false, onReset }: AIChatProps) {
+export function AIChat({ isOpen, onClose, context, isReprioritizationMode = false, onReset, onOpenContextSelection, isSelectingContext, onCancelContextSelection, onSaveContextSelection }: AIChatProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -41,6 +47,7 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
   const [showThreadDropdown, setShowThreadDropdown] = useState(false)
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
   const [editingThreadName, setEditingThreadName] = useState("")
+  const chat = useChatContext()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -114,6 +121,12 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
         }))
         setMessages(threadMessages)
         setCurrentThreadId(threadId)
+        chat.setCurrentThreadId(threadId)
+        if (data.thread && data.thread.context_selection) {
+          chat.setContextSelection(data.thread.context_selection as ContextSelection)
+        } else {
+          chat.setContextSelection({ allSelected: true, pillars: [], categories: [], goals: [], programs: [] })
+        }
       }
     } catch (error) {
       console.error('Error loading thread:', error)
@@ -125,6 +138,8 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
     setCurrentThreadId(null)
     setMessages([])
     setShowThreadDropdown(false)
+    // New threads default handled by chat context (all selected)
+    chat.setContextSelection({ allSelected: true, pillars: [], categories: [], goals: [], programs: [] })
   }
 
   // Save message to current thread
@@ -255,6 +270,8 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
           const data = await response.json()
           threadId = data.thread.id
           setCurrentThreadId(threadId)
+          chat.setCurrentThreadId(threadId)
+          await chat.applyPendingSelection(threadId)
           loadThreads()
         }
       } catch (error) {
@@ -268,6 +285,9 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
     }
 
     try {
+      // Prepare effective context based on saved selection for the thread
+      const effectiveSelection = chat.contextSelection
+      const effectiveContext = filterContextBySelection(context, effectiveSelection)
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -284,7 +304,7 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
               content: input
             }
           ],
-          context
+          context: effectiveContext
         }),
         signal: abortControllerRef.current.signal
       })
@@ -363,6 +383,19 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
               )}
             </div>
             <div className="flex items-center gap-2">
+              {onOpenContextSelection && (
+                <button
+                  onClick={onOpenContextSelection}
+                  className="inline-flex items-center gap-2 bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-md text-sm"
+                  title="Select Context"
+                >
+                  <CheckSquare size={16} />
+                  <span>Select Context</span>
+                </button>
+              )}
+              {onOpenContextSelection && !chat.contextSelection.allSelected && (
+                <span className="inline-block text-xs bg-black/20 px-2 py-1 rounded">Custom context</span>
+              )}
               <button 
                 onClick={handleReset} 
                 className="p-1 rounded-full hover:bg-purple-700"
@@ -375,6 +408,8 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
               </button>
             </div>
           </div>
+
+          {/* Context selection is controlled on main page. */}
           
           {/* Thread Selector */}
           <div className="relative" ref={dropdownRef}>
@@ -463,67 +498,113 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
           </div>
         </div>
 
+        {/* Selection Mode Bar (mirrors main page) */}
+        {isSelectingContext && (
+          <div className="bg-yellow-50 border-b border-yellow-200 text-yellow-900 px-4 py-3 flex items-center justify-between">
+            <div className="text-sm font-medium">Context Selection Mode — tick rows to include in AI context</div>
+            <div className="flex items-center gap-2">
+              {onCancelContextSelection && (
+                <button onClick={onCancelContextSelection} className="px-3 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
+              )}
+              {onSaveContextSelection && (
+                <button onClick={onSaveContextSelection} className="px-3 py-2 text-sm rounded bg-purple-600 text-white hover:bg-purple-700">Add selections to context</button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`flex flex-col ${message.sender === "user" ? "items-end" : "items-start"}`}
-            >
+            {messages.map((message) => (
               <div
-                className={`max-w-[80%] p-3 rounded-lg ${
-                  message.sender === "user" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-800"
-                }`}
+                key={message.id}
+                className={`flex flex-col ${message.sender === "user" ? "items-end" : "items-start"}`}
               >
-                {message.sender === "ai" ? (
-                  <div className="prose prose-sm max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                      {message.text}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  message.text
-                )}
+                <div
+                  className={`max-w-[80%] p-3 rounded-lg ${
+                    message.sender === "user" ? "bg-purple-600 text-white" : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {message.sender === "ai" ? (
+                    <div className="prose prose-sm max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                        {message.text}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    message.text
+                  )}
+                </div>
+                <span className="text-xs text-gray-500 mt-1">{formatTime(message.timestamp)}</span>
               </div>
-              <span className="text-xs text-gray-500 mt-1">{formatTime(message.timestamp)}</span>
-            </div>
-          ))}
-          {isLoading && (
-            <div className="flex items-start">
-              <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
-                <div className="flex space-x-2">
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+            ))}
+            {isLoading && (
+              <div className="flex items-start">
+                <div className="bg-gray-100 text-gray-800 p-3 rounded-lg">
+                  <div className="flex space-x-2">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
 
         {/* Input */}
         <div className="p-4 border-t">
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-              placeholder="Type your message..."
-              className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
-              disabled={isLoading}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={!input.trim() || isLoading}
-              className="p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
-            >
-              <Send size={20} />
-            </button>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                placeholder="Type your message..."
+                className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-600"
+                disabled={isLoading}
+              />
+              <button
+                onClick={handleSendMessage}
+                disabled={!input.trim() || isLoading}
+                className="p-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
+              >
+                <Send size={20} />
+              </button>
+            </div>
           </div>
-        </div>
       </div>
     </>
   )
 }
+
+// Types and helpers for context selection
+type ContextSelection = {
+  allSelected: boolean
+  pillars: string[]
+  categories: string[]
+  goals: string[]
+  programs: string[]
+}
+
+function filterContextBySelection(context: ScoreCardData, sel: ContextSelection): ScoreCardData {
+  if (sel.allSelected) return context
+  const sets = {
+    pillars: new Set(sel.pillars || []),
+    categories: new Set(sel.categories || []),
+    goals: new Set(sel.goals || []),
+    programs: new Set(sel.programs || []),
+  }
+  const filteredPillars = (context.pillars || []).filter(p => sets.pillars.has(p.id)).map(p => ({
+    ...p,
+    categories: (p.categories || []).filter(c => sets.categories.has(c.id)).map(c => ({
+      ...c,
+      goals: (c.goals || []).filter(g => sets.goals.has(g.id)).map(g => ({
+        ...g,
+        programs: (g.programs || []).filter(pr => sets.programs.has(pr.id))
+      }))
+    }))
+  }))
+  return { pillars: filteredPillars }
+}
+ 

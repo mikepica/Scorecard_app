@@ -17,6 +17,7 @@ import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 import BragStatusTable from "@/components/brag-status-table"
+import { ChatContextProvider } from "@/components/chat-context"
 import { GoalViewsDropdown } from "@/components/goal-views-dropdown"
 import { TableViewsDropdown } from "@/components/table-views-dropdown"
 import { MenuDropdown } from "@/components/menu-dropdown"
@@ -882,6 +883,7 @@ function DetailsPageContent() {
   }
 
   return (
+    <ChatContextProvider>
     <div className="min-h-screen flex flex-col">
       <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-black">ORD Scorecard: {displayName}</h1>
@@ -1216,6 +1218,7 @@ function DetailsPageContent() {
       {/* Toast notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
     </div>
+    </ChatContextProvider>
   )
 }
 

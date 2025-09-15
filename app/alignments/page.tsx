@@ -7,6 +7,7 @@ import { UnalignedItemsSidebar } from "@/components/unaligned-items-sidebar"
 import { AIAlignmentInbox } from "@/components/ai-alignment-inbox"
 import { AIChat } from "@/components/ai-chat"
 import { Header } from "@/components/header"
+import { ChatContextProvider } from "@/components/chat-context"
 import { HierarchicalSelect } from "@/components/ui/hierarchical-select"
 
 interface Alignment {
@@ -529,6 +530,7 @@ export default function AlignmentsPage() {
   }
 
   return (
+    <ChatContextProvider>
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <Header
@@ -700,5 +702,6 @@ export default function AlignmentsPage() {
         context={{ pillars: [] }}
       />
     </div>
+    </ChatContextProvider>
   )
 }

@@ -3,6 +3,7 @@
 import { PillarIcon } from "@/components/pillar-icon"
 import type { ScoreCardData, Pillar, Category, StrategicGoal, StrategicProgram } from "@/types/scorecard"
 import { ChevronDown, ChevronRight, Eye } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
 import { useState } from "react"
 import { EditableField } from "@/components/ui/editable-field"
 // import { useEditableField } from "@/hooks/use-editable-field"
@@ -12,6 +13,7 @@ import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
 import { getPillarConfig } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { filterVisibleItems } from "@/lib/quarter-visibility"
+import { AlignmentIndicator } from "@/components/alignment-indicator"
 
 // const STATUS_OPTIONS = [
 //   { value: "exceeded", label: "Exceeded" },
@@ -25,7 +27,11 @@ export function Scorecard({
   onDataUpdate, 
   selectedQuarter = "q3_2025", 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick,
+  selectionMode = false,
+  selectionDraft,
+  onSelectionDraftChange,
 }: { 
   data: ScoreCardData; 
   onDataUpdate: (newData: ScoreCardData) => void; 
@@ -36,6 +42,10 @@ export function Scorecard({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick?: (itemType: 'pillar' | 'category' | 'goal' | 'program', itemId: string, itemName: string, itemPath: string) => void;
+  selectionMode?: boolean;
+  selectionDraft?: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null;
+  onSelectionDraftChange?: (s: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null) => void;
 }) {
   // Check if data and data.pillars exist before mapping
   if (!data || !data.pillars || !Array.isArray(data.pillars)) {
@@ -56,6 +66,10 @@ export function Scorecard({
             selectedQuarter={selectedQuarter}
             onProgramSelect={onProgramSelect}
             isFunctionalView={isFunctionalView}
+            onAlignmentClick={onAlignmentClick}
+            selectionMode={selectionMode}
+            selectionDraft={selectionDraft}
+            onSelectionDraftChange={onSelectionDraftChange}
           />
         ))}
       </div>
@@ -68,7 +82,11 @@ function PillarCard({
   onDataUpdate, 
   selectedQuarter, 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick,
+  selectionMode = false,
+  selectionDraft,
+  onSelectionDraftChange,
 }: { 
   pillar: Pillar; 
   onDataUpdate: (newData: ScoreCardData) => void; 
@@ -79,6 +97,10 @@ function PillarCard({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick?: (itemType: 'pillar' | 'category' | 'goal' | 'program', itemId: string, itemName: string, itemPath: string) => void;
+  selectionMode?: boolean;
+  selectionDraft?: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null;
+  onSelectionDraftChange?: (s: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null) => void;
 }) {
 
   return (
@@ -86,8 +108,52 @@ function PillarCard({
       <div className={`p-3 ${getPillarColorWithText(pillar)}`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {selectionMode && selectionDraft && onSelectionDraftChange && (
+              <Checkbox
+                checked={selectionDraft.pillars.has(pillar.id)}
+                onCheckedChange={(c) => {
+                  const checked = Boolean(c)
+                  const next = {
+                    pillars: new Set(selectionDraft.pillars),
+                    categories: new Set(selectionDraft.categories),
+                    goals: new Set(selectionDraft.goals),
+                    programs: new Set(selectionDraft.programs),
+                  }
+                  if (checked) {
+                    next.pillars.add(pillar.id)
+                    for (const cat of pillar.categories || []) {
+                      next.categories.add(cat.id)
+                      for (const g of cat.goals || []) {
+                        next.goals.add(g.id)
+                        for (const pr of g.programs || []) next.programs.add(pr.id)
+                      }
+                    }
+                  } else {
+                    next.pillars.delete(pillar.id)
+                    for (const cat of pillar.categories || []) {
+                      next.categories.delete(cat.id)
+                      for (const g of cat.goals || []) {
+                        next.goals.delete(g.id)
+                        for (const pr of g.programs || []) next.programs.delete(pr.id)
+                      }
+                    }
+                  }
+                  onSelectionDraftChange(next)
+                }}
+              />
+            )}
             <PillarIcon pillar={pillar} />
             <h2 className="text-xl font-bold">{pillar.name}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            {onAlignmentClick && (
+              <AlignmentIndicator
+                itemType="pillar"
+                itemId={pillar.id}
+                onClick={() => onAlignmentClick('pillar', pillar.id, pillar.name, pillar.name)}
+                className="text-white hover:text-blue-200"
+              />
+            )}
           </div>
         </div>
       </div>
@@ -102,6 +168,10 @@ function PillarCard({
               selectedQuarter={selectedQuarter}
               onProgramSelect={onProgramSelect}
               isFunctionalView={isFunctionalView}
+              onAlignmentClick={onAlignmentClick}
+              selectionMode={selectionMode}
+              selectionDraft={selectionDraft}
+              onSelectionDraftChange={onSelectionDraftChange}
               />
           ))}
       </div>
@@ -117,7 +187,11 @@ function CategorySection({
   onDataUpdate, 
   selectedQuarter, 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick,
+  selectionMode = false,
+  selectionDraft,
+  onSelectionDraftChange,
 }: { 
   category: Category; 
   pillar: Pillar; 
@@ -129,6 +203,10 @@ function CategorySection({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick?: (itemType: 'pillar' | 'category' | 'goal' | 'program', itemId: string, itemName: string, itemPath: string) => void;
+  selectionMode?: boolean;
+  selectionDraft?: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null;
+  onSelectionDraftChange?: (s: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null) => void;
 }) {
 
   // Handler for category name update
@@ -151,11 +229,53 @@ function CategorySection({
   return (
     <div className="mb-4 last:mb-0">
       <div className="flex items-center justify-between mb-2 gap-2">
-        <EditableField
-          value={category.name}
-          onSave={handleCategoryNameSave}
-          className={`text-base font-medium ${getCategoryColor(pillar)}`}
-        />
+        <div className="flex items-center gap-2">
+          {selectionMode && selectionDraft && onSelectionDraftChange && (
+            <Checkbox
+              className="mt-0.5 border-gray-400"
+              checked={selectionDraft.categories.has(category.id)}
+              onCheckedChange={(c) => {
+                const checked = Boolean(c)
+                const next = {
+                  pillars: new Set(selectionDraft.pillars),
+                  categories: new Set(selectionDraft.categories),
+                  goals: new Set(selectionDraft.goals),
+                  programs: new Set(selectionDraft.programs),
+                }
+                if (checked) {
+                  next.categories.add(category.id)
+                  next.pillars.add(pillar.id)
+                  for (const g of category.goals || []) {
+                    next.goals.add(g.id)
+                    for (const pr of g.programs || []) next.programs.add(pr.id)
+                  }
+                } else {
+                  next.categories.delete(category.id)
+                  for (const g of category.goals || []) {
+                    next.goals.delete(g.id)
+                    for (const pr of g.programs || []) next.programs.delete(pr.id)
+                  }
+                  const hasAnySelected = (pillar.categories || []).some(c => next.categories.has(c.id))
+                  if (!hasAnySelected) next.pillars.delete(pillar.id)
+                }
+                onSelectionDraftChange(next)
+              }}
+            />
+          )}
+          <EditableField
+            value={category.name}
+            onSave={handleCategoryNameSave}
+            className={`text-base font-medium ${getCategoryColor(pillar)}`}
+          />
+        </div>
+        {onAlignmentClick && (
+          <AlignmentIndicator
+            itemType="category"
+            itemId={category.id}
+            onClick={() => onAlignmentClick('category', category.id, category.name, `${pillar.name} > ${category.name}`)}
+            className="text-gray-500 hover:text-blue-600"
+          />
+        )}
       </div>
       <ul className="space-y-2">
         {category.goals && filterVisibleItems(category.goals, selectedQuarter).map((goal) => (
@@ -168,6 +288,10 @@ function CategorySection({
             selectedQuarter={selectedQuarter}
             onProgramSelect={onProgramSelect}
             isFunctionalView={isFunctionalView}
+            onAlignmentClick={onAlignmentClick}
+            selectionMode={selectionMode}
+            selectionDraft={selectionDraft}
+            onSelectionDraftChange={onSelectionDraftChange}
           />
         ))}
       </ul>
@@ -182,7 +306,11 @@ function GoalItem({
   onDataUpdate, 
   selectedQuarter, 
   onProgramSelect,
-  isFunctionalView = false
+  isFunctionalView = false,
+  onAlignmentClick,
+  selectionMode = false,
+  selectionDraft,
+  onSelectionDraftChange,
 }: { 
   goal: StrategicGoal; 
   pillar: Pillar; 
@@ -195,6 +323,10 @@ function GoalItem({
     pillarName?: string
   }) => void;
   isFunctionalView?: boolean;
+  onAlignmentClick?: (itemType: 'pillar' | 'category' | 'goal' | 'program', itemId: string, itemName: string, itemPath: string) => void;
+  selectionMode?: boolean;
+  selectionDraft?: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null;
+  onSelectionDraftChange?: (s: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null) => void;
 }) {
   const [expanded, setExpanded] = useState(false)
   const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
@@ -308,7 +440,38 @@ function GoalItem({
   return (
     <li>
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-start gap-1">
+        <div className="flex items-start gap-2">
+          {selectionMode && selectionDraft && onSelectionDraftChange && (
+            <Checkbox
+              className="mt-0.5 border-gray-400"
+              checked={selectionDraft.goals.has(goal.id)}
+              onCheckedChange={(c) => {
+                const checked = Boolean(c)
+                const next = {
+                  pillars: new Set(selectionDraft.pillars),
+                  categories: new Set(selectionDraft.categories),
+                  goals: new Set(selectionDraft.goals),
+                  programs: new Set(selectionDraft.programs),
+                }
+                if (checked) {
+                  next.goals.add(goal.id)
+                  next.categories.add(category.id)
+                  next.pillars.add(pillar.id)
+                  for (const pr of goal.programs || []) next.programs.add(pr.id)
+                } else {
+                  next.goals.delete(goal.id)
+                  for (const pr of goal.programs || []) next.programs.delete(pr.id)
+                  const catHas = (category.goals || []).some(g => next.goals.has(g.id))
+                  if (!catHas) {
+                    next.categories.delete(category.id)
+                    const pilHas = (pillar.categories || []).some(c => next.categories.has(c.id))
+                    if (!pilHas) next.pillars.delete(pillar.id)
+                  }
+                }
+                onSelectionDraftChange(next)
+              }}
+            />
+          )}
           {hasPrograms && (
             <button onClick={() => setExpanded(!expanded)} className="mt-0.5 text-gray-500 hover:text-gray-700">
               {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -321,6 +484,14 @@ function GoalItem({
           />
         </div>
         <div className="flex items-center gap-2">
+          {onAlignmentClick && (
+            <AlignmentIndicator
+              itemType="goal"
+              itemId={goal.id}
+              onClick={() => onAlignmentClick('goal', goal.id, goal.text, `${pillar.name} > ${category.name} > ${goal.text}`)}
+              className="text-gray-500 hover:text-blue-600"
+            />
+          )}
           <StatusCircle
             status={displayStatus}
             onStatusChange={handleGoalStatusChange}
@@ -333,6 +504,40 @@ function GoalItem({
           {visiblePrograms.map((program) => (
             <li key={program.id} className="flex items-start justify-between gap-2 group">
               <div className="flex-1 flex items-start gap-2">
+                {selectionMode && selectionDraft && onSelectionDraftChange && (
+                  <Checkbox
+                    className="mt-0.5 border-gray-400"
+                    checked={selectionDraft.programs.has(program.id)}
+                    onCheckedChange={(c) => {
+                      const checked = Boolean(c)
+                      const next = {
+                        pillars: new Set(selectionDraft.pillars),
+                        categories: new Set(selectionDraft.categories),
+                        goals: new Set(selectionDraft.goals),
+                        programs: new Set(selectionDraft.programs),
+                      }
+                      if (checked) {
+                        next.programs.add(program.id)
+                        next.goals.add(goal.id)
+                        next.categories.add(category.id)
+                        next.pillars.add(pillar.id)
+                      } else {
+                        next.programs.delete(program.id)
+                        const goalHas = (goal.programs || []).some(pr => next.programs.has(pr.id))
+                        if (!goalHas) {
+                          next.goals.delete(goal.id)
+                          const catHas = (category.goals || []).some(g => next.goals.has(g.id))
+                          if (!catHas) {
+                            next.categories.delete(category.id)
+                            const pilHas = (pillar.categories || []).some(c => next.categories.has(c.id))
+                            if (!pilHas) next.pillars.delete(pillar.id)
+                          }
+                        }
+                      }
+                      onSelectionDraftChange(next)
+                    }}
+                  />
+                )}
                 <div 
                   className="flex-1"
                   onMouseEnter={(e) => {
@@ -353,6 +558,14 @@ function GoalItem({
                   />
                 </div>
                 <div className="flex items-center gap-1">
+                  {onAlignmentClick && (
+                    <AlignmentIndicator
+                      itemType="program"
+                      itemId={program.id}
+                      onClick={() => onAlignmentClick('program', program.id, program.text, `${pillar.name} > ${category.name} > ${goal.text} > ${program.text}`)}
+                      className="opacity-30 hover:opacity-100 transition-opacity group-hover:opacity-60"
+                    />
+                  )}
                   <button
                     onClick={() => {
                       if (onProgramSelect) {

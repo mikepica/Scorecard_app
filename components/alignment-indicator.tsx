@@ -37,8 +37,8 @@ export function AlignmentIndicator({
     fetchAlignmentCount()
   }, [itemType, itemId])
 
-  // Don't render if still loading
-  if (isLoading) {
+  // Don't render if still loading or if no alignments
+  if (isLoading || alignmentCount === 0) {
     return null
   }
 
@@ -47,35 +47,25 @@ export function AlignmentIndicator({
       onClick={onClick}
       className={`
         relative inline-flex items-center justify-center
-        ${alignmentCount === 0 ? 'text-gray-300 hover:text-blue-500' : 'text-gray-500 hover:text-blue-600'}
+        text-gray-500 hover:text-blue-600
         transition-colors duration-200
         ${className}
       `}
-      title={
-        alignmentCount === 0 
-          ? 'Create alignment' 
-          : `${alignmentCount} alignment${alignmentCount !== 1 ? 's' : ''}`
-      }
-      aria-label={
-        alignmentCount === 0 
-          ? 'Create alignment' 
-          : `View ${alignmentCount} alignment${alignmentCount !== 1 ? 's' : ''}`
-      }
+      title={`${alignmentCount} alignment${alignmentCount !== 1 ? 's' : ''}`}
+      aria-label={`View ${alignmentCount} alignment${alignmentCount !== 1 ? 's' : ''}`}
     >
       <Link size={14} />
-      {alignmentCount > 0 && (
-        <span className="
-          absolute -top-1 -right-1 
-          bg-blue-500 text-white 
-          text-xs font-bold 
-          rounded-full 
-          min-w-[16px] h-4 
-          flex items-center justify-center 
-          leading-none px-1
-        ">
-          {alignmentCount > 9 ? '9+' : alignmentCount}
-        </span>
-      )}
+      <span className="
+        absolute -top-1 -right-1 
+        bg-blue-500 text-white 
+        text-xs font-bold 
+        rounded-full 
+        min-w-[16px] h-4 
+        flex items-center justify-center 
+        leading-none px-1
+      ">
+        {alignmentCount > 9 ? '9+' : alignmentCount}
+      </span>
     </button>
   )
 }

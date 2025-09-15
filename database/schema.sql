@@ -228,6 +228,7 @@ CREATE TRIGGER track_functional_progress_updates_changes
 CREATE TABLE chat_threads (
     id VARCHAR(255) PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
+    context_selection JSONB DEFAULT '{"allSelected": true}'::jsonb,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

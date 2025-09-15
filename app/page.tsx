@@ -12,8 +12,18 @@ import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
 import { FilterModal } from "@/components/filter-modal"
 import { Header } from "@/components/header"
+import { ChatContextProvider, useChatContext } from "@/components/chat-context"
+import { AlignmentModal } from "@/components/alignment-modal"
 
 export default function Home() {
+  return (
+    <ChatContextProvider>
+      <HomeInner />
+    </ChatContextProvider>
+  )
+}
+
+function HomeInner() {
   const [data, setData] = useState<ScoreCardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null)
@@ -37,6 +47,15 @@ export default function Home() {
     categoryName?: string
     pillarName?: string
   }) | null>(null)
+  
+  // Alignment modal state
+  const [isAlignmentModalOpen, setIsAlignmentModalOpen] = useState(false)
+  const [alignmentModalData, setAlignmentModalData] = useState<{
+    itemType: 'pillar' | 'category' | 'goal' | 'program'
+    itemId: string
+    itemName: string
+    itemPath: string
+  } | null>(null)
   // Function to get current quarter based on today's date
   const getCurrentQuarter = () => {
     const today = new Date()
@@ -195,6 +214,17 @@ export default function Home() {
     setSelectedProgram(null)
   }
 
+  // Alignment modal handlers
+  const handleAlignmentClick = (itemType: 'pillar' | 'category' | 'goal' | 'program', itemId: string, itemName: string, itemPath: string) => {
+    setAlignmentModalData({ itemType, itemId, itemName, itemPath })
+    setIsAlignmentModalOpen(true)
+  }
+
+  const handleAlignmentModalClose = () => {
+    setIsAlignmentModalOpen(false)
+    setAlignmentModalData(null)
+  }
+
   // Handler for program updates from sidebar
   const handleProgramUpdate = (programId: string, updatedData: ScoreCardData) => {
     setData(updatedData)
@@ -298,6 +328,88 @@ export default function Home() {
     }
   }
 
+  // Context selection mode state (draft lives here while selecting)
+  type SelectionSets = { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> }
+  const [isContextSelectionMode, setIsContextSelectionMode] = useState(false)
+  const [draftSelection, setDraftSelection] = useState<SelectionSets | null>(null)
+
+  function buildAllSets(ctx: ScoreCardData | null): SelectionSets {
+    const result: SelectionSets = { pillars: new Set(), categories: new Set(), goals: new Set(), programs: new Set() }
+    if (!ctx) return result
+    for (const p of ctx.pillars || []) {
+      result.pillars.add(p.id)
+      for (const c of p.categories || []) {
+        result.categories.add(c.id)
+        for (const g of c.goals || []) {
+          result.goals.add(g.id)
+          for (const pr of g.programs || []) result.programs.add(pr.id)
+        }
+      }
+    }
+    return result
+  }
+
+  function setsEqual(a: Set<string>, b: Set<string>) {
+    if (a.size !== b.size) return false
+    for (const v of a) if (!b.has(v)) return false
+    return true
+  }
+
+  // Helper to start selection mode with current saved selection
+  const startContextSelection = () => {
+    const full = buildAllSets(data)
+    let selSets: SelectionSets
+    const contextSelection = chat.contextSelection
+    if (contextSelection.allSelected) {
+      selSets = full
+    } else {
+      selSets = {
+        pillars: new Set(contextSelection.pillars || []),
+        categories: new Set(contextSelection.categories || []),
+        goals: new Set(contextSelection.goals || []),
+        programs: new Set(contextSelection.programs || []),
+      }
+    }
+    setDraftSelection(selSets)
+    setIsContextSelectionMode(true)
+  }
+
+  const cancelContextSelection = () => {
+    setIsContextSelectionMode(false)
+    setDraftSelection(null)
+  }
+
+  const saveContextSelection = async () => {
+    if (!draftSelection) return
+    const full = buildAllSets(data)
+    const all = setsEqual(draftSelection.pillars, full.pillars) &&
+                setsEqual(draftSelection.categories, full.categories) &&
+                setsEqual(draftSelection.goals, full.goals) &&
+                setsEqual(draftSelection.programs, full.programs)
+
+    const newSelection = all ? {
+      allSelected: true, pillars: [], categories: [], goals: [], programs: []
+    } : {
+      allSelected: false,
+      pillars: Array.from(draftSelection.pillars),
+      categories: Array.from(draftSelection.categories),
+      goals: Array.from(draftSelection.goals),
+      programs: Array.from(draftSelection.programs),
+    }
+
+    try {
+      await chat.saveSelection(newSelection)
+      setToast({ message: 'Context selection saved', type: 'success' })
+    } catch (e) {
+      console.error('Failed to save context selection', e)
+      setToast({ message: 'Failed to save context selection', type: 'error' })
+    }
+    setIsContextSelectionMode(false)
+    setDraftSelection(null)
+  }
+
+  const chat = useChatContext()
+
   return (
     <main className="min-h-screen flex flex-col">
       <Header 
@@ -311,7 +423,25 @@ export default function Home() {
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
       />
 
-      <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data || { pillars: [] }} />
+      <AIChat 
+        isOpen={isChatOpen} 
+        onClose={() => setIsChatOpen(false)} 
+        context={data || { pillars: [] }} 
+        onOpenContextSelection={startContextSelection}
+        isSelectingContext={isContextSelectionMode}
+        onCancelContextSelection={cancelContextSelection}
+        onSaveContextSelection={saveContextSelection}
+      />
+
+      {isContextSelectionMode && (
+        <div className="bg-yellow-50 border-b border-yellow-200 text-yellow-900 px-4 py-3 flex items-center justify-between">
+          <div className="text-sm font-medium">Context Selection Mode — tick rows to include in AI context</div>
+          <div className="flex items-center gap-2">
+            <button onClick={cancelContextSelection} className="px-3 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
+            <button onClick={saveContextSelection} className="px-3 py-2 text-sm rounded bg-purple-600 text-white hover:bg-purple-700">Add selections to context</button>
+          </div>
+        </div>
+      )}
 
       <div className={`flex flex-1 transition-all duration-300`} style={{
         paddingLeft: isProgramSidebarOpen ? (window.innerWidth >= 1024 ? '640px' : window.innerWidth >= 768 ? '512px' : '0') : '0'
@@ -331,6 +461,10 @@ export default function Home() {
                 onDataUpdate={handleDataUpdate} 
                 selectedQuarter={selectedQuarter}
                 onProgramSelect={handleProgramSelect}
+                onAlignmentClick={handleAlignmentClick}
+                selectionMode={isContextSelectionMode}
+                selectionDraft={draftSelection}
+                onSelectionDraftChange={setDraftSelection}
               />
             </div>
           ) : (
@@ -401,6 +535,18 @@ export default function Home() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Alignment Modal */}
+      {alignmentModalData && (
+        <AlignmentModal
+          isOpen={isAlignmentModalOpen}
+          onClose={handleAlignmentModalClose}
+          itemType={alignmentModalData.itemType}
+          itemId={alignmentModalData.itemId}
+          itemName={alignmentModalData.itemName}
+          itemPath={alignmentModalData.itemPath}
+        />
       )}
 
       {/* Toast notification */}

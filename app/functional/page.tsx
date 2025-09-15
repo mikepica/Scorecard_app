@@ -11,6 +11,7 @@ import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
 import { FilterModal } from "@/components/filter-modal"
 import { Header } from "@/components/header"
+import { ChatContextProvider } from "@/components/chat-context"
 import { useSearchParams } from "next/navigation"
 import { useMemo } from "react"
 
@@ -425,8 +426,10 @@ function LoadingFallback() {
 
 export default function FunctionalView() {
   return (
-    <Suspense fallback={<LoadingFallback />}>
-      <FunctionalViewContent />
-    </Suspense>
+    <ChatContextProvider>
+      <Suspense fallback={<LoadingFallback />}>
+        <FunctionalViewContent />
+      </Suspense>
+    </ChatContextProvider>
   )
 }

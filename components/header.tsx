@@ -17,6 +17,7 @@ export function Header({
   selectedQuarter,
   onQuarterChange,
   onToggleChat,
+  onToggleContextSelectionMode,
 }: {
   title?: string
   onCaptureScreen?: () => void
@@ -26,6 +27,7 @@ export function Header({
   selectedQuarter?: string
   onQuarterChange?: (value: string) => void
   onToggleChat?: () => void
+  onToggleContextSelectionMode?: () => void
 }) {
   const [showStatusModal, setShowStatusModal] = useState(false)
 
@@ -74,6 +76,15 @@ export function Header({
           <GoalViewsDropdown />
 
           <TableViewsDropdown />
+
+          {onToggleContextSelectionMode && (
+            <button
+              onClick={onToggleContextSelectionMode}
+              className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
+            >
+              <span className="whitespace-nowrap">Select Context</span>
+            </button>
+          )}
 
           {onToggleChat && (
             <button

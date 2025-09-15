@@ -55,11 +55,19 @@ export async function PATCH(
 ) {
   try {
     const threadId = params.id;
-    const { name } = await req.json();
+    const body = await req.json();
+    const { name, contextSelection } = body as { name?: string; contextSelection?: unknown };
     
-    if (!name || typeof name !== 'string') {
+    if (name !== undefined && typeof name !== 'string') {
       return NextResponse.json(
-        { error: 'Thread name is required' },
+        { error: 'Invalid name' },
+        { status: 400 }
+      );
+    }
+    
+    if (name === undefined && contextSelection === undefined) {
+      return NextResponse.json(
+        { error: 'Nothing to update' },
         { status: 400 }
       );
     }
@@ -67,12 +75,30 @@ export async function PATCH(
     const client = await pool.connect();
     
     try {
-      const result = await client.query(`
-        UPDATE chat_threads 
-        SET name = $1, updated_at = CURRENT_TIMESTAMP
-        WHERE id = $2
+      // Dynamically build update statement
+      const sets: string[] = [];
+      const values: unknown[] = [];
+      let idx = 1;
+      
+      if (name !== undefined) {
+        sets.push(`name = $${idx++}`);
+        values.push(name);
+      }
+      if (contextSelection !== undefined) {
+        sets.push(`context_selection = $${idx++}`);
+        values.push(contextSelection);
+      }
+      sets.push(`updated_at = CURRENT_TIMESTAMP`);
+      
+      const query = `
+        UPDATE chat_threads
+        SET ${sets.join(', ')}
+        WHERE id = $${idx}
         RETURNING *
-      `, [name, threadId]);
+      `;
+      values.push(threadId);
+      
+      const result = await client.query(query, values);
       
       if (result.rows.length === 0) {
         return NextResponse.json(
