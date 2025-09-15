@@ -1,10 +1,11 @@
 "use client"
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { X, ChevronDown, ChevronUp } from 'lucide-react'
+import { X, ChevronDown, ChevronUp, Pencil } from 'lucide-react'
 import type { StrategicProgram, ScoreCardData } from '@/types/scorecard'
 import { StatusCircle } from '@/components/status-circle'
 import { EditableField } from '@/components/ui/editable-field'
+import { GenerateUpdateModal } from '@/components/generate-update-modal'
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from '@/lib/quarter-utils'
 import type { QuarterInfo } from '@/lib/quarter-utils'
 
@@ -54,6 +55,9 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
   
   // State for program dropdown
   const [isProgramDropdownOpen, setIsProgramDropdownOpen] = useState(false)
+  
+  // State for generate update modal
+  const [isGenerateUpdateModalOpen, setIsGenerateUpdateModalOpen] = useState(false)
   
   const currentQuarter = getCurrentQuarter()
   const availableQuarters = getAvailableQuarters()
@@ -343,7 +347,16 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
 
           {/* Current Progress Update Section */}
           <div className="bg-blue-50 rounded-lg p-4">
-            <h4 className="font-medium text-gray-800 mb-3">Current Progress Update ({currentQuarter.label})</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-800">Current Progress Update ({currentQuarter.label})</h4>
+              <button
+                onClick={() => setIsGenerateUpdateModalOpen(true)}
+                className="p-1 hover:bg-blue-100 rounded transition-colors"
+                title="Edit progress update"
+              >
+                <Pencil size={16} className="text-gray-600" />
+              </button>
+            </div>
             <EditableField
               value={program[currentQuarter.columnName as keyof StrategicProgram] as string || ""}
               onSave={(newProgress) => handleProgressUpdate(currentQuarter.columnName, newProgress)}
@@ -411,6 +424,40 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
           </div>
 
         </div>
+        )}
+
+        {/* Generate Update Modal */}
+        {program && (
+          <GenerateUpdateModal
+            isOpen={isGenerateUpdateModalOpen}
+            onClose={() => setIsGenerateUpdateModalOpen(false)}
+            initialContent={program[currentQuarter.columnName as keyof StrategicProgram] as string || ""}
+            quarterInfo={currentQuarter}
+            onGenerate={async (content, instructions, files) => {
+              try {
+                const response = await fetch('/api/generate-update', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    existingContent: content,
+                    instructions,
+                    files: files.map(file => ({ name: file.name, size: file.size }))
+                  }),
+                })
+                
+                if (!response.ok) {
+                  throw new Error('Failed to generate update')
+                }
+                
+                const result = await response.json()
+                return result.generatedContent || content
+              } catch (error) {
+                console.error('Error generating update:', error)
+                return content
+              }
+            }}
+            onApply={(content) => handleProgressUpdate(currentQuarter.columnName, content)}
+          />
         )}
       </div>
     </>
