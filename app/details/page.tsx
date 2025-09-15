@@ -1,11 +1,10 @@
 "use client"
 
 import { useState, useMemo, useEffect } from "react"
-import Link from "next/link"
 // Database-only mode - load data from API
 import { Dropdown } from "@/components/dropdown"
 import { StatusCircle } from "@/components/status-circle"
-import { Eye, EyeOff, Info, Pencil, X, BarChart2, Menu } from "lucide-react"
+import { Eye, EyeOff, Info, Pencil, X, Menu } from "lucide-react"
 import { AIChat } from "@/components/ai-chat"
 import type { StrategicProgram, ScoreCardData } from "@/types/scorecard"
 import { Toast } from "@/components/toast"
@@ -17,7 +16,7 @@ import { getPillarConfigById } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from "@/lib/quarter-utils"
 import BragStatusTable from "@/components/brag-status-table"
-import { FunctionDropdown } from "@/components/function-dropdown"
+import { GoalViewsDropdown } from "@/components/goal-views-dropdown"
 import { MenuDropdown } from "@/components/menu-dropdown"
 
 // Special value to represent "All" selection
@@ -809,7 +808,7 @@ export default function DetailsPage() {
       <header className="bg-gray-200 py-2 px-4 flex justify-between items-center">
         <h1 className="text-2xl font-bold text-black">ORD Scorecard: {displayName}</h1>
         <div className="flex items-center gap-4">
-          <FunctionDropdown />
+          <GoalViewsDropdown />
 
           <button
             onClick={() => setFiltersVisible(!filtersVisible)}
@@ -818,14 +817,6 @@ export default function DetailsPage() {
             {filtersVisible ? <Eye size={20} /> : <EyeOff size={20} />}
             <span className="whitespace-nowrap">Show/Hide Filters</span>
           </button>
-
-          <Link
-            href="/"
-            className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-          >
-            <BarChart2 size={20} />
-            <span className="whitespace-nowrap">Goal-level view</span>
-          </Link>
 
           <button
             onClick={() => setIsChatOpen(!isChatOpen)}

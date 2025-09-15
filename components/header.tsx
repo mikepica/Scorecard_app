@@ -1,10 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Menu, BarChart2, X, Users, Filter, Link as LinkIcon } from "lucide-react"
+import { Menu, BarChart2, X, Filter } from "lucide-react"
 import BragStatusTable from "./brag-status-table"
 import { Dropdown } from "./dropdown"
-import { FunctionDropdown } from "./function-dropdown"
+import { GoalViewsDropdown } from "./goal-views-dropdown"
 import { MenuDropdown } from "./menu-dropdown"
 import Link from "next/link"
 
@@ -16,9 +16,7 @@ export function Header({
   quarterOptions,
   selectedQuarter,
   onQuarterChange,
-  isFunctionalView = false,
   onToggleChat,
-  showScorecardLink = false,
 }: {
   title?: string
   onCaptureScreen?: () => void
@@ -27,9 +25,7 @@ export function Header({
   quarterOptions?: { value: string; label: string }[]
   selectedQuarter?: string
   onQuarterChange?: (value: string) => void
-  isFunctionalView?: boolean
   onToggleChat?: () => void
-  showScorecardLink?: boolean
 }) {
   const [showStatusModal, setShowStatusModal] = useState(false)
 
@@ -75,27 +71,7 @@ export function Header({
             />
           )}
 
-          <FunctionDropdown />
-
-          {isFunctionalView && (
-            <Link
-              href="/"
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-            >
-              <Users size={20} />
-              <span className="whitespace-nowrap">ORD View</span>
-            </Link>
-          )}
-
-          {showScorecardLink && (
-            <Link
-              href="/"
-              className="flex items-center gap-2 bg-gray-600 hover:bg-gray-700 text-white px-5 py-3 rounded-lg transition-colors text-base min-h-[48px]"
-            >
-              <BarChart2 size={20} />
-              <span className="whitespace-nowrap">Scorecard</span>
-            </Link>
-          )}
+          <GoalViewsDropdown />
 
           <Link
             href="/details"

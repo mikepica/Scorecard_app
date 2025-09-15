@@ -309,7 +309,6 @@ function FunctionalViewContent() {
         quarterOptions={QUARTER_OPTIONS}
         selectedQuarter={selectedQuarter}
         onQuarterChange={setSelectedQuarter}
-        isFunctionalView={true}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
       />
 

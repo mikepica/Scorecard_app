@@ -534,8 +534,6 @@ export default function AlignmentsPage() {
       <Header
         title="Alignments Dashboard"
         onToggleChat={() => setIsChatOpen(true)}
-        isFunctionalView={false}
-        showScorecardLink={true}
       />
       
       {/* Sub-header with alignment count */}

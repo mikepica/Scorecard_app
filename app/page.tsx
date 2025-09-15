@@ -308,7 +308,6 @@ export default function Home() {
         quarterOptions={QUARTER_OPTIONS}
         selectedQuarter={selectedQuarter}
         onQuarterChange={setSelectedQuarter}
-        isFunctionalView={false}
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
       />
 
