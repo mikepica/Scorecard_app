@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { X, Send, RefreshCw } from "lucide-react"
+import { X, Send, ChevronDown, Edit3, Trash2, Plus } from "lucide-react"
 import { Overlay } from "./overlay"
 import type { ScoreCardData } from "@/types/scorecard"
 import ReactMarkdown from 'react-markdown'
@@ -13,6 +13,15 @@ type Message = {
   text: string
   sender: "user" | "ai"
   timestamp: Date
+}
+
+type ChatThread = {
+  id: string
+  name: string
+  created_at: string
+  updated_at: string
+  message_count?: number
+  last_message_at?: string
 }
 
 type AIChatProps = {
@@ -27,12 +36,25 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [threads, setThreads] = useState<ChatThread[]>([])
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+  const [showThreadDropdown, setShowThreadDropdown] = useState(false)
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
+  const [editingThreadName, setEditingThreadName] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
-  // Initialize chat with context
+  // Load threads when chat opens
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
+    if (isOpen) {
+      loadThreads()
+    }
+  }, [isOpen])
+
+  // Initialize chat with context when no thread selected
+  useEffect(() => {
+    if (isOpen && !currentThreadId && messages.length === 0) {
       setMessages([
         {
           id: "welcome",
@@ -42,7 +64,21 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
         },
       ])
     }
-  }, [isOpen, messages.length])
+  }, [isOpen, currentThreadId, messages.length])
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowThreadDropdown(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [])
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -50,6 +86,77 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
     }
   }, [messages])
+
+  // Load threads
+  const loadThreads = async () => {
+    try {
+      const response = await fetch('/api/chat/threads')
+      if (response.ok) {
+        const data = await response.json()
+        setThreads(data.threads)
+      }
+    } catch (error) {
+      console.error('Error loading threads:', error)
+    }
+  }
+
+  // Load thread messages
+  const loadThread = async (threadId: string) => {
+    try {
+      const response = await fetch(`/api/chat/threads/${threadId}`)
+      if (response.ok) {
+        const data = await response.json()
+        const threadMessages = data.messages.map((msg: { id: string; text: string; sender: string; timestamp: string }) => ({
+          id: msg.id,
+          text: msg.text,
+          sender: msg.sender,
+          timestamp: new Date(msg.timestamp)
+        }))
+        setMessages(threadMessages)
+        setCurrentThreadId(threadId)
+      }
+    } catch (error) {
+      console.error('Error loading thread:', error)
+    }
+  }
+
+  // Create new thread
+  const createNewThread = async () => {
+    setCurrentThreadId(null)
+    setMessages([])
+    setShowThreadDropdown(false)
+  }
+
+  // Save message to current thread
+  const saveMessageToThread = async (threadId: string, text: string, sender: string) => {
+    try {
+      await fetch(`/api/chat/threads/${threadId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, sender })
+      })
+    } catch (error) {
+      console.error('Error saving message:', error)
+    }
+  }
+
+  // Generate thread name
+  const generateThreadName = async (messages: Message[]) => {
+    try {
+      const response = await fetch('/api/chat/threads/generate-name', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages })
+      })
+      if (response.ok) {
+        const data = await response.json()
+        return data.name
+      }
+    } catch (error) {
+      console.error('Error generating thread name:', error)
+    }
+    return 'New Chat'
+  }
 
   // Reset chat
   const handleReset = () => {
@@ -60,10 +167,54 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
     setMessages([])
     setInput("")
     setIsLoading(false)
+    setCurrentThreadId(null)
     // Notify parent component of reset
     if (onReset) {
       onReset()
     }
+  }
+
+  // Delete thread
+  const deleteThread = async (threadId: string) => {
+    if (confirm('Are you sure you want to delete this chat thread?')) {
+      try {
+        await fetch(`/api/chat/threads?id=${threadId}`, { method: 'DELETE' })
+        if (currentThreadId === threadId) {
+          handleReset()
+        }
+        loadThreads()
+      } catch (error) {
+        console.error('Error deleting thread:', error)
+      }
+    }
+  }
+
+  // Rename thread
+  const startRenaming = (thread: ChatThread) => {
+    setEditingThreadId(thread.id)
+    setEditingThreadName(thread.name)
+  }
+
+  const saveThreadName = async () => {
+    if (!editingThreadId || !editingThreadName.trim()) return
+    
+    try {
+      await fetch(`/api/chat/threads/${editingThreadId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editingThreadName.trim() })
+      })
+      setEditingThreadId(null)
+      setEditingThreadName("")
+      loadThreads()
+    } catch (error) {
+      console.error('Error renaming thread:', error)
+    }
+  }
+
+  const cancelRenaming = () => {
+    setEditingThreadId(null)
+    setEditingThreadName("")
   }
 
   // Handle sending a message
@@ -84,9 +235,37 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
       sender: "user",
       timestamp: new Date(),
     }
+    const currentInput = input
     setMessages((prev) => [...prev, userMessage])
     setInput("")
     setIsLoading(true)
+
+    // Handle thread creation and saving
+    let threadId = currentThreadId
+    if (!threadId) {
+      // Create new thread if none selected
+      try {
+        const threadName = await generateThreadName([userMessage])
+        const response = await fetch('/api/chat/threads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: threadName })
+        })
+        if (response.ok) {
+          const data = await response.json()
+          threadId = data.thread.id
+          setCurrentThreadId(threadId)
+          loadThreads()
+        }
+      } catch (error) {
+        console.error('Error creating thread:', error)
+      }
+    }
+
+    // Save user message to thread
+    if (threadId) {
+      await saveMessageToThread(threadId, currentInput, 'user')
+    }
 
     try {
       const response = await fetch('/api/chat', {
@@ -123,6 +302,12 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
         timestamp: new Date(),
       }
       setMessages((prev) => [...prev, aiResponse])
+      
+      // Save AI response to thread
+      if (threadId) {
+        await saveMessageToThread(threadId, data.response, 'ai')
+        loadThreads() // Refresh thread list to update last message time
+      }
     } catch (error: unknown) {
       // Only show error if it's not an abort error
       if (error instanceof Error && error.name !== 'AbortError') {
@@ -133,6 +318,11 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
           timestamp: new Date(),
         }
         setMessages((prev) => [...prev, errorMessage])
+        
+        // Save error message to thread
+        if (threadId) {
+          await saveMessageToThread(threadId, errorMessage.text, 'ai')
+        }
       }
     } finally {
       setIsLoading(false)
@@ -162,26 +352,114 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
         }`}
       >
         {/* Header */}
-        <div className="p-4 border-b flex justify-between items-center bg-purple-600 text-white">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">AI Chat</h2>
-            {isReprioritizationMode && (
-              <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
-                Reprioritization Mode
-              </span>
-            )}
+        <div className="p-4 border-b bg-purple-600 text-white">
+          <div className="flex justify-between items-center mb-3">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">AI Chat</h2>
+              {isReprioritizationMode && (
+                <span className="bg-orange-500 text-white text-xs px-2 py-1 rounded-full font-medium">
+                  Reprioritization Mode
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleReset} 
+                className="p-1 rounded-full hover:bg-purple-700"
+                title="New Chat"
+              >
+                <Plus size={20} />
+              </button>
+              <button onClick={onClose} className="p-1 rounded-full hover:bg-purple-700">
+                <X size={20} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={handleReset} 
-              className="p-1 rounded-full hover:bg-purple-700"
-              title="Reset Chat"
+          
+          {/* Thread Selector */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowThreadDropdown(!showThreadDropdown)}
+              className="w-full flex items-center justify-between bg-purple-500 hover:bg-purple-400 px-3 py-2 rounded-md text-sm"
             >
-              <RefreshCw size={20} />
+              <span className="truncate">
+                {currentThreadId 
+                  ? threads.find(t => t.id === currentThreadId)?.name || 'Select Thread'
+                  : 'New Chat'
+                }
+              </span>
+              <ChevronDown size={16} className={`transition-transform ${showThreadDropdown ? 'rotate-180' : ''}`} />
             </button>
-            <button onClick={onClose} className="p-1 rounded-full hover:bg-purple-700">
-              <X size={20} />
-            </button>
+            
+            {showThreadDropdown && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 max-h-64 overflow-y-auto">
+                <button
+                  onClick={createNewThread}
+                  className="w-full px-3 py-2 text-left text-gray-700 hover:bg-gray-100 border-b border-gray-200 flex items-center gap-2"
+                >
+                  <Plus size={16} />
+                  <span>New Chat</span>
+                </button>
+                
+                {threads.map((thread) => (
+                  <div key={thread.id} className="border-b border-gray-100 last:border-b-0">
+                    {editingThreadId === thread.id ? (
+                      <div className="p-2">
+                        <input
+                          type="text"
+                          value={editingThreadName}
+                          onChange={(e) => setEditingThreadName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveThreadName()
+                            if (e.key === 'Escape') cancelRenaming()
+                          }}
+                          onBlur={saveThreadName}
+                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded text-gray-900"
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex items-center group">
+                        <button
+                          onClick={() => {
+                            loadThread(thread.id)
+                            setShowThreadDropdown(false)
+                          }}
+                          className="flex-1 px-3 py-2 text-left text-gray-700 hover:bg-gray-100"
+                        >
+                          <div className="truncate text-sm font-medium">{thread.name}</div>
+                          <div className="text-xs text-gray-500">
+                            {thread.message_count} messages • {new Date(thread.last_message_at || thread.updated_at).toLocaleDateString()}
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-1 px-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => startRenaming(thread)}
+                            className="p-1 text-gray-400 hover:text-gray-600"
+                            title="Rename"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            onClick={() => deleteThread(thread.id)}
+                            className="p-1 text-gray-400 hover:text-red-600"
+                            title="Delete"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {threads.length === 0 && (
+                  <div className="px-3 py-4 text-center text-gray-500 text-sm">
+                    No chat threads yet
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

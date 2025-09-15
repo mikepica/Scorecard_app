@@ -223,3 +223,28 @@ CREATE TRIGGER track_functional_progress_updates_changes
     BEFORE UPDATE ON functional_programs
     FOR EACH ROW
     EXECUTE FUNCTION record_progress_update_change();
+
+-- Chat Threads table
+CREATE TABLE chat_threads (
+    id VARCHAR(255) PRIMARY KEY,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Chat Messages table
+CREATE TABLE chat_messages (
+    id VARCHAR(255) PRIMARY KEY,
+    thread_id VARCHAR(255) NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+    text TEXT NOT NULL,
+    sender VARCHAR(20) NOT NULL CHECK (sender IN ('user', 'ai')),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for chat tables
+CREATE INDEX idx_chat_messages_thread_id ON chat_messages(thread_id);
+CREATE INDEX idx_chat_messages_timestamp ON chat_messages(timestamp);
+CREATE INDEX idx_chat_threads_updated_at ON chat_threads(updated_at);
+
+-- Apply update trigger to chat_threads
+CREATE TRIGGER update_chat_threads_updated_at BEFORE UPDATE ON chat_threads FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
