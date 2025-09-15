@@ -183,7 +183,7 @@ export function GoalsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -194,7 +194,7 @@ export function GoalsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -205,7 +205,7 @@ export function GoalsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -329,7 +329,7 @@ export function ProgramsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -340,7 +340,7 @@ export function ProgramsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -351,7 +351,7 @@ export function ProgramsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -514,7 +514,7 @@ export function FunctionalProgramsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -525,7 +525,7 @@ export function FunctionalProgramsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
@@ -536,7 +536,7 @@ export function FunctionalProgramsEditor() {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
-        return value || '';
+        return String(value || '');
       }
     },
     {
