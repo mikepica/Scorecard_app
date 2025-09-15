@@ -261,7 +261,7 @@ export class AdminDatabaseService {
       if (data) {
         Object.entries(data).forEach(([key, value]) => {
           columns.push(key);
-          values.push(value);
+          values.push(Array.isArray(value) ? value.join(',') : String(value));
           placeholders.push(`$${values.length}`);
         });
       }
@@ -383,7 +383,7 @@ export class AdminDatabaseService {
       if (data) {
         Object.entries(data).forEach(([key, value]) => {
           columns.push(key);
-          values.push(value);
+          values.push(Array.isArray(value) ? value.join(',') : String(value));
           placeholders.push(`$${values.length}`);
         });
       }
@@ -456,7 +456,7 @@ export class AdminDatabaseService {
       if (data) {
         Object.entries(data).forEach(([key, value]) => {
           columns.push(key);
-          values.push(value);
+          values.push(Array.isArray(value) ? value.join(',') : String(value));
           placeholders.push(`$${values.length}`);
         });
       }

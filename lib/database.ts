@@ -398,18 +398,6 @@ export class DatabaseService {
     }
   }
 
-  // Get distinct functions from functional_programs table
-  static async getDistinctFunctions(): Promise<string[]> {
-    const client = await getDbConnection();
-    
-    try {
-      const result = await client.query('SELECT DISTINCT function FROM functional_programs WHERE function IS NOT NULL ORDER BY function');
-      return result.rows.map(row => row.function);
-      
-    } finally {
-      client.release();
-    }
-  }
 
   // Get functional scorecard data filtered by function
   static async getFunctionalScoreCardDataByFunction(selectedFunction: string): Promise<ScoreCardData> {
@@ -1339,8 +1327,8 @@ export class DatabaseService {
       };
       
       // Set the appropriate ID fields based on type
-      insertData[`functional_${alignmentData.functionalType}_id`] = alignmentData.functionalId;
-      insertData[`ord_${alignmentData.ordType}_id`] = alignmentData.ordId;
+      (insertData as any)[`functional_${alignmentData.functionalType}_id`] = alignmentData.functionalId;
+      (insertData as any)[`ord_${alignmentData.ordType}_id`] = alignmentData.ordId;
       
       const columns = Object.keys(insertData).join(', ');
       const placeholders = Object.keys(insertData).map((_, i) => `$${i + 1}`).join(', ');

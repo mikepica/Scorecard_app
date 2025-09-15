@@ -25,8 +25,16 @@ import { MenuDropdown } from "@/components/menu-dropdown"
 // Special value to represent "All" selection
 const ALL_VALUE = "all"
 
+// Extended StrategicProgram type with additional context
+type StrategicProgramWithContext = StrategicProgram & { 
+  goalText: string; 
+  categoryName: string; 
+  pillarName: string;
+  strategicGoalText: string;
+}
+
 // Utility function to get unique values from all programs for a sponsor field
-const getUniqueSponsorValues = (programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }>, fieldName: 'ordLtSponsors' | 'sponsorsLeads' | 'reportingOwners'): string[] => {
+const getUniqueSponsorValues = (programs: Array<StrategicProgramWithContext>, fieldName: 'ordLtSponsors' | 'sponsorsLeads' | 'reportingOwners'): string[] => {
   const allValues = new Set<string>()
   
   programs.forEach(program => {
@@ -103,11 +111,11 @@ function DetailsPageContent() {
 
   // State for Generate Update modal
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false)
-  const [currentProgram, setCurrentProgram] = useState<StrategicProgram | null>(null)
+  const [currentProgram, setCurrentProgram] = useState<StrategicProgramWithContext | null>(null)
 
   // State for Generate Insights modal
   const [isInsightsModalOpen, setIsInsightsModalOpen] = useState(false)
-  const [currentInsightsProgram, setCurrentInsightsProgram] = useState<StrategicProgram | null>(null)
+  const [currentInsightsProgram, setCurrentInsightsProgram] = useState<StrategicProgramWithContext | null>(null)
   const [isReprioritizationMode, setIsReprioritizationMode] = useState(false)
   // const [, setIsAIFlowsDropdownOpen] = useState(false)
   const [isAIFlowsModalOpen, setIsAIFlowsModalOpen] = useState(false)
@@ -142,7 +150,7 @@ function DetailsPageContent() {
 
   // Extract all programs for filter processing
   const allPrograms = useMemo(() => {
-    const programs: Array<StrategicProgram & { goalText: string; categoryName: string; pillarName: string }> = []
+    const programs: Array<StrategicProgramWithContext> = []
 
     if (!data) {
       return programs
@@ -158,6 +166,7 @@ function DetailsPageContent() {
                 goalText: goal.text,
                 categoryName: category.name,
                 pillarName: pillar.name,
+                strategicGoalText: goal.text,
               })
             })
           }
@@ -656,7 +665,7 @@ function DetailsPageContent() {
   }
 
   // Handle opening the Generate Update modal
-  const handleOpenGenerateModal = (program: StrategicProgram) => {
+  const handleOpenGenerateModal = (program: StrategicProgramWithContext) => {
     setCurrentProgram(program)
     setIsGenerateModalOpen(true)
   }
@@ -737,8 +746,7 @@ function DetailsPageContent() {
     try {
       setToast({ message: 'Analyzing goals for reprioritization...', type: 'info' })
       
-      // Reset chat and close modal
-      setMessages([])
+      // Close modal
       setIsInsightsModalOpen(false)
       setCurrentInsightsProgram(null)
       
@@ -788,8 +796,6 @@ function DetailsPageContent() {
           sender: "ai" as const,
           timestamp: new Date(),
         }
-        setMessages([aiMessage])
-        
         // Set reprioritization mode and open AI Chat
         setIsReprioritizationMode(true)
         setIsChatOpen(true)
@@ -811,12 +817,11 @@ function DetailsPageContent() {
   }
   */
 
-  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: number[], categories: number[], goals: number[], programs: number[] }) => {
+  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: string[], categories: string[], goals: string[], programs: string[] }) => {
     try {
       setToast({ message: 'Analyzing selected data...', type: 'info' })
       
-      // Reset chat
-      setMessages([])
+      // Close chat
       setIsChatOpen(false)
       
       // Create FormData for AI Flows request
@@ -847,8 +852,6 @@ function DetailsPageContent() {
           sender: "ai" as const,
           timestamp: new Date(),
         }
-        setMessages([aiMessage])
-        
         // Open AI Chat
         setIsChatOpen(true)
         setToast({ message: 'Analysis complete! Check AI Chat for results.', type: 'success' })
@@ -1085,7 +1088,7 @@ function DetailsPageContent() {
                     </td>
                     <td className="border border-gray-300 p-3 border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <EditableField
-                        value={(program as StrategicProgram & Record<string, unknown>)[selectedComparisonQuarter.columnName] as string || ""}
+                        value={(program as any)[selectedComparisonQuarter.columnName] as string || ""}
                         onSave={(newProgress) => handleQuarterProgressUpdate(program.id, selectedComparisonQuarter.columnName, newProgress)}
                         className="text-base"
                         placeholder="Data not yet entered"
@@ -1094,7 +1097,7 @@ function DetailsPageContent() {
                     <td className="border border-gray-300 p-3 relative border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <div className="pb-8">
                         <EditableField
-                          value={(program as StrategicProgram & Record<string, unknown>)[currentQuarter.columnName] as string || ""}
+                          value={(program as any)[currentQuarter.columnName] as string || ""}
                           onSave={(newProgress) => handleQuarterProgressUpdate(program.id, currentQuarter.columnName, newProgress)}
                           className="text-base"
                           placeholder="Data not yet entered"
@@ -1118,7 +1121,7 @@ function DetailsPageContent() {
                         <td key={quarter.columnName} className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                           <div className="mb-2">
                             <EditableField
-                              value={(program as StrategicProgram & Record<string, unknown>)[objectiveField] as string || ""}
+                              value={(program as any)[objectiveField] as string || ""}
                               onSave={(newObjective) => handleObjectiveUpdate(program.id, quarterKey, newObjective)}
                               className="text-base"
                               placeholder="Data not yet entered"
@@ -1126,7 +1129,7 @@ function DetailsPageContent() {
                           </div>
                           <div className="status-dot-container">
                             <StatusCircle
-                              status={(program as StrategicProgram & Record<string, unknown>)[statusField] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
+                              status={(program as any)[statusField] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
                               onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? null)}
                             />
                           </div>
@@ -1155,7 +1158,7 @@ function DetailsPageContent() {
             setIsGenerateModalOpen(false)
             setCurrentProgram(null)
           }}
-          initialContent={(currentProgram as StrategicProgram & Record<string, unknown>)?.[currentQuarter.columnName] as string || ""}
+          initialContent={(currentProgram as any)?.[currentQuarter.columnName] as string || ""}
           quarterInfo={currentQuarter}
           onGenerate={handleGenerateUpdate}
           onApply={handleApplyUpdate}

@@ -288,7 +288,7 @@ function HomeInner() {
   //   setIsAIFlowsModalOpen(true)
   // }
 
-  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: number[], categories: number[], goals: number[], programs: number[] }) => {
+  const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: string[], categories: string[], goals: string[], programs: string[] }) => {
     try {
       setToast({ message: 'Analyzing selected data...', type: 'info' })
       

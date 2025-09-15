@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     } catch (dbError) {
       console.error('Database update error:', dbError)
       return NextResponse.json(
-        { error: `Database update failed: ${dbError.message}` },
+        { error: `Database update failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}` },
         { status: 500 }
       )
     }

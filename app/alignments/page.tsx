@@ -640,7 +640,7 @@ export default function AlignmentsPage() {
                       />
                     ))}
                   </div>
-                )}}
+                )}
               </div>
             ) : (
               <AIAlignmentInbox

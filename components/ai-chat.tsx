@@ -7,7 +7,7 @@ import type { ScoreCardData } from "@/types/scorecard"
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
-import { useChatContext, ContextSelection } from "@/components/chat-context"
+import { useChatContext } from "@/components/chat-context"
 
 type Message = {
   id: string
@@ -271,7 +271,9 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
           threadId = data.thread.id
           setCurrentThreadId(threadId)
           chat.setCurrentThreadId(threadId)
-          await chat.applyPendingSelection(threadId)
+          if (threadId) {
+            await chat.applyPendingSelection(threadId)
+          }
           loadThreads()
         }
       } catch (error) {

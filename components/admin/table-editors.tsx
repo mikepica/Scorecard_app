@@ -81,7 +81,7 @@ export function CategoriesEditor() {
       required: true,
       optionsEndpoint: '/api/admin/options?type=pillars',
       render: (value) => {
-        return <span className="text-sm font-mono">{value}</span>;
+        return <span className="text-sm font-mono">{String(value)}</span>;
       }
     },
     {
@@ -140,7 +140,7 @@ export function GoalsEditor() {
       type: 'select',
       required: true,
       optionsEndpoint: '/api/admin/options?type=pillars',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'category_id',
@@ -149,7 +149,7 @@ export function GoalsEditor() {
       required: true,
       optionsEndpoint: '/api/admin/options?type=categories',
       dependsOn: 'pillar_id',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'q1_2025_status',
@@ -179,7 +179,7 @@ export function GoalsEditor() {
       key: 'ord_lt_sponsors',
       label: 'ORD LT Sponsors',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -190,7 +190,7 @@ export function GoalsEditor() {
       key: 'sponsors_leads',
       label: 'Sponsor Leads',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -201,7 +201,7 @@ export function GoalsEditor() {
       key: 'reporting_owners',
       label: 'Reporting Owners',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -257,7 +257,7 @@ export function ProgramsEditor() {
       type: 'select',
       required: true,
       optionsEndpoint: '/api/admin/options?type=pillars',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'category_id',
@@ -266,7 +266,7 @@ export function ProgramsEditor() {
       required: true,
       optionsEndpoint: '/api/admin/options?type=categories',
       dependsOn: 'pillar_id',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'goal_id',
@@ -275,7 +275,7 @@ export function ProgramsEditor() {
       required: true,
       optionsEndpoint: '/api/admin/options?type=goals',
       dependsOn: 'category_id',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'q1_2025_objective',
@@ -325,7 +325,7 @@ export function ProgramsEditor() {
       key: 'ord_lt_sponsors',
       label: 'ORD LT Sponsors',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -336,7 +336,7 @@ export function ProgramsEditor() {
       key: 'sponsors_leads',
       label: 'Sponsor Leads',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -347,7 +347,7 @@ export function ProgramsEditor() {
       key: 'reporting_owners',
       label: 'Reporting Owners',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -436,7 +436,7 @@ export function FunctionalProgramsEditor() {
       type: 'select',
       required: true,
       optionsEndpoint: '/api/admin/options?type=pillars',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'category_id',
@@ -445,7 +445,7 @@ export function FunctionalProgramsEditor() {
       required: true,
       optionsEndpoint: '/api/admin/options?type=categories',
       dependsOn: 'pillar_id',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'goal_id',
@@ -454,7 +454,7 @@ export function FunctionalProgramsEditor() {
       required: true,
       optionsEndpoint: '/api/admin/options?type=goals',
       dependsOn: 'category_id',
-      render: (value) => <span className="text-sm font-mono">{value}</span>
+      render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
       key: 'linked_ord_strategic_program_id',
@@ -510,7 +510,7 @@ export function FunctionalProgramsEditor() {
       key: 'ord_lt_sponsors',
       label: 'ORD LT Sponsors',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -521,7 +521,7 @@ export function FunctionalProgramsEditor() {
       key: 'sponsors_leads',
       label: 'Sponsor Leads',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -532,7 +532,7 @@ export function FunctionalProgramsEditor() {
       key: 'reporting_owners',
       label: 'Reporting Owners',
       type: 'array',
-      render: (value) => {
+      render: (value, row): React.ReactNode => {
         if (Array.isArray(value)) {
           return value.join(', ');
         }
