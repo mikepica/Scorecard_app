@@ -289,7 +289,7 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
     try {
       // Prepare effective context based on saved selection for the thread
       const effectiveSelection = chat.contextSelection
-      const effectiveContext = filterContextBySelection(context, effectiveSelection)
+      const effectiveContext = await filterContextBySelection(context, effectiveSelection)
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
@@ -589,7 +589,28 @@ type ContextSelection = {
   programs: string[]
 }
 
-function filterContextBySelection(context: ScoreCardData, sel: ContextSelection): ScoreCardData {
+interface AlignmentData {
+  id: string
+  functional_type: string
+  functional_pillar_id?: string
+  functional_category_id?: string
+  functional_goal_id?: string
+  functional_program_id?: string
+  ord_type: string
+  ord_pillar_id?: string
+  ord_category_id?: string
+  ord_goal_id?: string
+  ord_program_id?: string
+  alignment_strength: 'strong' | 'moderate' | 'weak' | 'informational'
+  alignment_rationale?: string
+  functional_name: string
+  functional_path: string
+  ord_name: string
+  ord_path: string
+  created_at: string
+}
+
+async function filterContextBySelection(context: ScoreCardData, sel: ContextSelection): Promise<ScoreCardData & { alignments?: AlignmentData[] }> {
   if (sel.allSelected) return context
 
   const sets = {
@@ -599,19 +620,76 @@ function filterContextBySelection(context: ScoreCardData, sel: ContextSelection)
     programs: new Set(sel.programs || []),
   }
 
-  // Filter based on selections - include items that are explicitly selected
-  // or whose parents are selected (for hierarchical inclusion)
-  const filteredPillars = (context.pillars || []).filter(p => sets.pillars.has(p.id)).map(p => ({
+  // Get all selected item IDs and types for alignment queries
+  const selectedItems = [
+    ...sel.pillars.map(id => ({ id, type: 'pillar' })),
+    ...sel.categories.map(id => ({ id, type: 'category' })),
+    ...sel.goals.map(id => ({ id, type: 'goal' })),
+    ...sel.programs.map(id => ({ id, type: 'program' }))
+  ]
+
+  // Query alignments for all selected items
+  const allAlignments: AlignmentData[] = []
+  const alignedItemIds = {
+    pillars: new Set<string>(),
+    categories: new Set<string>(),
+    goals: new Set<string>(),
+    programs: new Set<string>(),
+  }
+
+  try {
+    for (const item of selectedItems) {
+      const response = await fetch(`/api/alignments?itemType=${item.type}&itemId=${item.id}`)
+      if (response.ok) {
+        const data = await response.json()
+        allAlignments.push(...data.alignments)
+
+        // Extract aligned item IDs to include in context
+        data.alignments.forEach((alignment: AlignmentData) => {
+          // Include the "other side" of the alignment
+          if (alignment.functional_type === item.type) {
+            // Selected item is functional, include ORD side
+            if (alignment.ord_pillar_id) alignedItemIds.pillars.add(alignment.ord_pillar_id)
+            if (alignment.ord_category_id) alignedItemIds.categories.add(alignment.ord_category_id)
+            if (alignment.ord_goal_id) alignedItemIds.goals.add(alignment.ord_goal_id)
+            if (alignment.ord_program_id) alignedItemIds.programs.add(alignment.ord_program_id)
+          } else {
+            // Selected item is ORD, include functional side
+            if (alignment.functional_pillar_id) alignedItemIds.pillars.add(alignment.functional_pillar_id)
+            if (alignment.functional_category_id) alignedItemIds.categories.add(alignment.functional_category_id)
+            if (alignment.functional_goal_id) alignedItemIds.goals.add(alignment.functional_goal_id)
+            if (alignment.functional_program_id) alignedItemIds.programs.add(alignment.functional_program_id)
+          }
+        })
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching alignments for context:', error)
+  }
+
+  // Merge selected IDs with aligned IDs
+  const expandedSets = {
+    pillars: new Set([...sets.pillars, ...alignedItemIds.pillars]),
+    categories: new Set([...sets.categories, ...alignedItemIds.categories]),
+    goals: new Set([...sets.goals, ...alignedItemIds.goals]),
+    programs: new Set([...sets.programs, ...alignedItemIds.programs]),
+  }
+
+  // Filter based on expanded selections (original + aligned items)
+  const filteredPillars = (context.pillars || []).filter(p => expandedSets.pillars.has(p.id)).map(p => ({
     ...p,
-    categories: (p.categories || []).filter(c => sets.categories.has(c.id)).map(c => ({
+    categories: (p.categories || []).filter(c => expandedSets.categories.has(c.id)).map(c => ({
       ...c,
-      goals: (c.goals || []).filter(g => sets.goals.has(g.id)).map(g => ({
+      goals: (c.goals || []).filter(g => expandedSets.goals.has(g.id)).map(g => ({
         ...g,
-        programs: (g.programs || []).filter(pr => sets.programs.has(pr.id))
+        programs: (g.programs || []).filter(pr => expandedSets.programs.has(pr.id))
       }))
     }))
   }))
 
-  return { pillars: filteredPillars }
+  return {
+    pillars: filteredPillars,
+    alignments: allAlignments.length > 0 ? allAlignments : undefined
+  }
 }
  
