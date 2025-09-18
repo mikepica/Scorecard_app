@@ -1,9 +1,15 @@
 import { Pillar } from '@/types/scorecard'
-import { getPillarConfig } from '@/config/pillar-config'
+import { getPillarConfig, getPillarConfigByName } from '@/config/pillar-config'
 import Image from 'next/image'
 
 export function PillarIcon({ pillar }: { pillar: Pillar }) {
-  const config = getPillarConfig(pillar)
+  // First try the standard ID-based lookup
+  let config = getPillarConfig(pillar)
+
+  // If that fails, try name-based lookup (for functional pillars)
+  if (!config) {
+    config = getPillarConfigByName(pillar.id)
+  }
   
   const getIconSrc = () => {
     return config?.iconPath || null

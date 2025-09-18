@@ -29,6 +29,14 @@ interface AlignmentInsertData {
   alignment_strength: string
   alignment_rationale: string | null
   created_by: string
+  functional_pillar_id?: string
+  functional_category_id?: string
+  functional_goal_id?: string
+  functional_program_id?: string
+  ord_pillar_id?: string
+  ord_category_id?: string
+  ord_goal_id?: string
+  ord_program_id?: string
 }
 
 // Database connection pool
@@ -1327,8 +1335,35 @@ export class DatabaseService {
       };
       
       // Set the appropriate ID fields based on type
-      (insertData as any)[`functional_${alignmentData.functionalType}_id`] = alignmentData.functionalId;
-      (insertData as any)[`ord_${alignmentData.ordType}_id`] = alignmentData.ordId;
+      switch (alignmentData.functionalType) {
+        case 'pillar':
+          insertData.functional_pillar_id = alignmentData.functionalId;
+          break;
+        case 'category':
+          insertData.functional_category_id = alignmentData.functionalId;
+          break;
+        case 'goal':
+          insertData.functional_goal_id = alignmentData.functionalId;
+          break;
+        case 'program':
+          insertData.functional_program_id = alignmentData.functionalId;
+          break;
+      }
+
+      switch (alignmentData.ordType) {
+        case 'pillar':
+          insertData.ord_pillar_id = alignmentData.ordId;
+          break;
+        case 'category':
+          insertData.ord_category_id = alignmentData.ordId;
+          break;
+        case 'goal':
+          insertData.ord_goal_id = alignmentData.ordId;
+          break;
+        case 'program':
+          insertData.ord_program_id = alignmentData.ordId;
+          break;
+      }
       
       const columns = Object.keys(insertData).join(', ');
       const placeholders = Object.keys(insertData).map((_, i) => `$${i + 1}`).join(', ');
@@ -1354,7 +1389,7 @@ export class DatabaseService {
     functionalId?: string;
     ordType?: string;
     ordId?: string;
-  }): Promise<any> {
+  }): Promise<{ success: boolean }> {
     const client = await getDbConnection();
     
     try {
@@ -1432,7 +1467,7 @@ export class DatabaseService {
       values.push(id);
       
       const result = await client.query(
-        `UPDATE scorecard_alignments SET ${setParts.join(', ')} WHERE id = $${paramIndex} RETURNING *`,
+        `UPDATE scorecard_alignments SET ${setParts.join(', ')} WHERE id = $${paramIndex} RETURNING id`,
         values
       );
       
@@ -1440,7 +1475,7 @@ export class DatabaseService {
         throw new Error(`Alignment with ID ${id} not found`);
       }
       
-      return result.rows[0];
+      return { success: true };
       
     } finally {
       client.release();

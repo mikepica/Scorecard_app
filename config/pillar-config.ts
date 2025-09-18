@@ -41,3 +41,27 @@ export function getPillarConfig(pillar: { id: string }): PillarConfig | null {
 export function getPillarConfigById(pillarId: string): PillarConfig | null {
   return PILLAR_CONFIGS[pillarId] || null
 }
+
+// Mapping from functional pillar names to ORD pillar IDs
+// This ensures functional views use the same colors as ORD views
+export const FUNCTIONAL_PILLAR_MAPPINGS: Record<string, string> = {
+  "Precision Medicine": "SPill100",
+  "Pipeline Acceleration": "SPill101",
+  "Patient Engagement": "SPill102"
+}
+
+// Helper function to get config by functional pillar name
+export function getPillarConfigByName(pillarName: string): PillarConfig | null {
+  // First check if it's already an ORD pillar ID
+  if (PILLAR_CONFIGS[pillarName]) {
+    return PILLAR_CONFIGS[pillarName]
+  }
+
+  // Then check if it's a functional pillar name
+  const ordPillarId = FUNCTIONAL_PILLAR_MAPPINGS[pillarName]
+  if (ordPillarId) {
+    return PILLAR_CONFIGS[ordPillarId]
+  }
+
+  return null
+}

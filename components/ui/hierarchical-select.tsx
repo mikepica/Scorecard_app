@@ -66,12 +66,9 @@ export function HierarchicalSelect({
 
   const colors = themeClasses[theme]
 
-  // Initialize expanded state with all nodes collapsed by default
+  // Reset expanded state when data changes
   useEffect(() => {
-    if (data.length > 0 && expandedNodes.size === 0) {
-      // Start with empty set - all nodes collapsed
-      setExpandedNodes(new Set())
-    }
+    setExpandedNodes(new Set())
   }, [data])
 
   // Close dropdown when clicking outside
@@ -212,7 +209,10 @@ export function HierarchicalSelect({
         type="button"
         onClick={(e) => {
           e.stopPropagation()
-          !disabled && setIsOpen(!isOpen)
+          if (disabled) {
+            return
+          }
+          setIsOpen((prev) => !prev)
         }}
         disabled={disabled}
         className={`w-full px-3 py-2 text-left border rounded-lg focus:ring-2 focus:outline-none transition-colors ${

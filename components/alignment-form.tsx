@@ -79,6 +79,23 @@ export function AlignmentForm({
   )
   const [isLoading, setIsLoading] = useState(true)
 
+  const effectiveFunctionalItem = functionalItem || initialFunctionalSelection
+  const effectiveOrdItem = ordItem || initialOrdSelection
+
+  const functionalSelectedItem = effectiveFunctionalItem?.source === 'functional'
+    ? effectiveFunctionalItem
+    : effectiveOrdItem?.source === 'functional'
+      ? effectiveOrdItem
+      : null
+
+  const ordSelectedItem = effectiveFunctionalItem?.source === 'ord'
+    ? effectiveFunctionalItem
+    : effectiveOrdItem?.source === 'ord'
+      ? effectiveOrdItem
+      : null
+
+  const isSubmitDisabled = !functionalSelectedItem || !ordSelectedItem || functionalSelectedItem.source === ordSelectedItem.source
+
   // Fetch hierarchical data on mount
   useEffect(() => {
     const fetchHierarchicalData = async () => {
@@ -225,16 +242,9 @@ export function AlignmentForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    const effectiveFunctionalItem = functionalItem || initialFunctionalSelection
-    const effectiveOrdItem = ordItem || initialOrdSelection
-
-    if (!effectiveFunctionalItem || !effectiveOrdItem) {
+    if (!functionalSelectedItem || !ordSelectedItem) {
       return
     }
-
-    // Determine which item is functional and which is ORD
-    const functionalSelectedItem = effectiveFunctionalItem.source === 'functional' ? effectiveFunctionalItem : effectiveOrdItem
-    const ordSelectedItem = effectiveFunctionalItem.source === 'ord' ? effectiveFunctionalItem : effectiveOrdItem
 
     // If both items are from the same source, we can't create an alignment
     if (functionalSelectedItem.source === ordSelectedItem.source) {
@@ -337,7 +347,7 @@ export function AlignmentForm({
         <div className="flex space-x-3">
           <button
             type="submit"
-            disabled={!functionalItem || !ordItem || functionalItem.source === ordItem.source}
+            disabled={isSubmitDisabled}
             className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             {isEditMode ? 'Save Changes' : 'Create Alignment'}
