@@ -40,27 +40,56 @@ interface ScorecardData {
 // Filter scorecard data based on user selections
 function filterScorecardData(fullData: ScorecardData, selections: FilterSelections) {
   const filtered = {
-    pillars: fullData.pillars.filter((pillar) => 
+    pillars: fullData.pillars.filter((pillar) =>
       selections.pillars.includes(pillar.id)
     ).map((pillar) => ({
       ...pillar,
-      categories: pillar.categories.filter((category) => 
+      categories: pillar.categories.filter((category) =>
         selections.categories.includes(category.id)
       ).map((category) => ({
         ...category,
-        strategicGoals: category.strategicGoals.filter((goal) => 
+        strategicGoals: category.strategicGoals.filter((goal) =>
           selections.goals.includes(goal.id)
         ).map((goal) => ({
           ...goal,
-          strategicPrograms: goal.strategicPrograms.filter((program) => 
+          strategicPrograms: goal.strategicPrograms.filter((program) =>
             selections.programs.includes(program.id)
           )
         }))
       }))
     }))
   };
-  
+
   return filtered;
+}
+
+// Extract AI context from selected programs
+function extractAIContext(data: ScorecardData): string {
+  const aiContexts: string[] = [];
+
+  if (data && data.pillars) {
+    data.pillars.forEach(pillar => {
+      if (pillar && pillar.categories) {
+        pillar.categories.forEach(category => {
+          if (category && category.strategicGoals) {
+            category.strategicGoals.forEach(goal => {
+              if (goal && goal.strategicPrograms) {
+                goal.strategicPrograms.forEach(program => {
+                  if (program && program.aiContext && program.aiContext.trim()) {
+                    aiContexts.push(`${program.text}: ${program.aiContext}`);
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  return aiContexts.length > 0
+    ? `\n\nAI Context for Selected Programs:\n${aiContexts.join('\n')}`
+    : '';
 }
 
 export async function POST(req: Request) {
@@ -186,10 +215,13 @@ export async function POST(req: Request) {
     }
     const systemPrompt = await fs.readFile(promptPath, 'utf-8');
 
+    // Extract AI context from selected programs
+    const aiContext = extractAIContext(context);
+
     // Limit context size to prevent token overflow
     const contextString = JSON.stringify(context);
     const maxContextLength = 50000; // Adjust based on needs
-    const truncatedContext = contextString.length > maxContextLength 
+    const truncatedContext = contextString.length > maxContextLength
       ? contextString.substring(0, maxContextLength) + '...[truncated]'
       : contextString;
 
@@ -199,7 +231,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "system",
-          content: `${systemPrompt}\n\nHere is the context of the scorecard data: ${truncatedContext}`
+          content: `${systemPrompt}\n\nHere is the context of the scorecard data: ${truncatedContext}${aiContext}`
         },
         ...messages
       ],

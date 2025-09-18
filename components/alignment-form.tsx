@@ -82,19 +82,12 @@ export function AlignmentForm({
   const effectiveFunctionalItem = functionalItem || initialFunctionalSelection
   const effectiveOrdItem = ordItem || initialOrdSelection
 
-  const functionalSelectedItem = effectiveFunctionalItem?.source === 'functional'
-    ? effectiveFunctionalItem
-    : effectiveOrdItem?.source === 'functional'
-      ? effectiveOrdItem
-      : null
-
-  const ordSelectedItem = effectiveFunctionalItem?.source === 'ord'
-    ? effectiveFunctionalItem
-    : effectiveOrdItem?.source === 'ord'
-      ? effectiveOrdItem
-      : null
-
-  const isSubmitDisabled = !functionalSelectedItem || !ordSelectedItem || functionalSelectedItem.source === ordSelectedItem.source
+  const isSubmitDisabled =
+    !effectiveFunctionalItem ||
+    !effectiveOrdItem ||
+    (effectiveFunctionalItem.source &&
+      effectiveOrdItem.source &&
+      effectiveFunctionalItem.source === effectiveOrdItem.source)
 
   // Fetch hierarchical data on mount
   useEffect(() => {
@@ -210,14 +203,25 @@ export function AlignmentForm({
         source: 'functional'
       }
 
-      setInitialFunctionalSelection(fallbackFunctionalItem)
+      const hierarchicalFunctionalItem = findSelectedItem(functionalId, 'functional')
+      const preferredFunctionalItem = hierarchicalFunctionalItem || fallbackFunctionalItem
 
-      if (hierarchicalData.combined.length > 0) {
-        const hierarchicalFunctionalItem = findSelectedItem(functionalId, 'functional')
-        setFunctionalItem(hierarchicalFunctionalItem || fallbackFunctionalItem)
-      } else {
-        setFunctionalItem(fallbackFunctionalItem)
-      }
+      setInitialFunctionalSelection((prev) => {
+        if (!prev) {
+          return preferredFunctionalItem
+        }
+        if (hierarchicalFunctionalItem && prev.id === fallbackFunctionalItem.id) {
+          return hierarchicalFunctionalItem
+        }
+        return prev
+      })
+
+      setFunctionalItem((prev) => {
+        if (!prev || prev.id === fallbackFunctionalItem.id) {
+          return preferredFunctionalItem
+        }
+        return prev
+      })
     }
 
     if (ordId) {
@@ -229,33 +233,55 @@ export function AlignmentForm({
         source: 'ord'
       }
 
-      setInitialOrdSelection(fallbackOrdItem)
+      const hierarchicalOrdItem = findSelectedItem(ordId, 'ord')
+      const preferredOrdItem = hierarchicalOrdItem || fallbackOrdItem
 
-      if (hierarchicalData.combined.length > 0) {
-        const hierarchicalOrdItem = findSelectedItem(ordId, 'ord')
-        setOrdItem(hierarchicalOrdItem || fallbackOrdItem)
-      } else {
-        setOrdItem(fallbackOrdItem)
-      }
+      setInitialOrdSelection((prev) => {
+        if (!prev) {
+          return preferredOrdItem
+        }
+        if (hierarchicalOrdItem && prev.id === fallbackOrdItem.id) {
+          return hierarchicalOrdItem
+        }
+        return prev
+      })
+
+      setOrdItem((prev) => {
+        if (!prev || prev.id === fallbackOrdItem.id) {
+          return preferredOrdItem
+        }
+        return prev
+      })
     }
-  }, [isEditMode, initialAlignment, hierarchicalData, findSelectedItem, getFunctionalId, getOrdId])
+  }, [
+    isEditMode,
+    initialAlignment,
+    hierarchicalData,
+    findSelectedItem,
+    getFunctionalId,
+    getOrdId
+  ])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!functionalSelectedItem || !ordSelectedItem) {
+    if (!effectiveFunctionalItem || !effectiveOrdItem) {
       return
     }
 
     // If both items are from the same source, we can't create an alignment
-    if (functionalSelectedItem.source === ordSelectedItem.source) {
+    if (
+      effectiveFunctionalItem.source &&
+      effectiveOrdItem.source &&
+      effectiveFunctionalItem.source === effectiveOrdItem.source
+    ) {
       return
     }
 
     onSave({
-      functionalType: functionalSelectedItem.type,
-      functionalId: extractOriginalId(functionalSelectedItem.id),
-      ordType: ordSelectedItem.type,
-      ordId: extractOriginalId(ordSelectedItem.id),
+      functionalType: effectiveFunctionalItem.type,
+      functionalId: extractOriginalId(effectiveFunctionalItem.id),
+      ordType: effectiveOrdItem.type,
+      ordId: extractOriginalId(effectiveOrdItem.id),
       strength,
       rationale: rationale.trim() || undefined
     })
@@ -287,7 +313,7 @@ export function AlignmentForm({
           <HierarchicalSelect
             data={hierarchicalData.combined}
             placeholder="Select first item..."
-            selectedItem={functionalItem}
+            selectedItem={functionalItem || initialFunctionalSelection}
             onSelect={setFunctionalItem}
             theme="green"
           />
@@ -298,7 +324,7 @@ export function AlignmentForm({
           <HierarchicalSelect
             data={hierarchicalData.combined}
             placeholder="Select second item..."
-            selectedItem={ordItem}
+            selectedItem={ordItem || initialOrdSelection}
             onSelect={setOrdItem}
             theme="blue"
           />

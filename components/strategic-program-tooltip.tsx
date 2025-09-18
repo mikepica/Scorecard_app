@@ -78,6 +78,13 @@ export const StrategicProgramTooltip: React.FC<StrategicProgramTooltipProps> = (
           <span className="text-white ml-2">{program.reportingOwners?.join(', ') || "Not specified"}</span>
         </div>
         
+        {program.aiContext && (
+          <div>
+            <span className="text-lime-400 font-medium">AI Context:</span>
+            <span className="text-white ml-2">{program.aiContext}</span>
+          </div>
+        )}
+
         <div>
           <span className="text-lime-400 font-medium">Last Modified:</span>
           <span className="text-white ml-2">{formatDate(program.updatedAt)}</span>

@@ -212,7 +212,10 @@ export class DatabaseService {
         q2_2026_progress: row.q2_2026_progress,
         q3_2026_progress: row.q3_2026_progress,
         q4_2026_progress: row.q4_2026_progress,
-        
+
+        // AI Context
+        aiContext: row.ai_context,
+
         updatedAt: row.updated_at,
         strategicGoalId: row.goal_id,
         categoryId: row.category_id,
@@ -320,7 +323,10 @@ export class DatabaseService {
         q2_2026_progress: row.q2_2026_progress,
         q3_2026_progress: row.q3_2026_progress,
         q4_2026_progress: row.q4_2026_progress,
-        
+
+        // AI Context
+        aiContext: row.ai_context,
+
         updatedAt: row.updated_at,
         // Store text values for functional hierarchy
         strategicGoalId: row.strategic_goal || 'Unspecified Goal',
@@ -467,7 +473,10 @@ export class DatabaseService {
         q2_2026_progress: row.q2_2026_progress,
         q3_2026_progress: row.q3_2026_progress,
         q4_2026_progress: row.q4_2026_progress,
-        
+
+        // AI Context
+        aiContext: row.ai_context,
+
         updatedAt: row.updated_at,
         // Store text values for functional hierarchy
         strategicGoalId: row.strategic_goal || 'Unspecified Goal',
@@ -749,6 +758,40 @@ export class DatabaseService {
     }
   }
 
+  // Update strategic program AI context
+  static async updateProgramAIContext(programId: string, aiContext: string): Promise<void> {
+    const client = await getDbConnection();
+    try {
+      const result = await client.query(
+        'UPDATE strategic_programs SET ai_context = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [aiContext, programId]
+      );
+
+      if (result.rowCount === 0) {
+        throw new Error(`Program with ID ${programId} not found`);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  // Update functional program AI context
+  static async updateFunctionalProgramAIContext(programId: string, aiContext: string): Promise<void> {
+    const client = await getDbConnection();
+    try {
+      const result = await client.query(
+        'UPDATE functional_programs SET ai_context = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+        [aiContext, programId]
+      );
+
+      if (result.rowCount === 0) {
+        throw new Error(`Functional program with ID ${programId} not found`);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
   // Note: updateCategoryStatus removed - categories no longer have status column
 
   // Update category name
@@ -889,8 +932,17 @@ export class DatabaseService {
           );
           if (result.rowCount === 0) throw new Error(`Program with ID ${programQuarterProgressId} not found`);
           break;
-          
-          
+
+        case 'program-ai-context':
+          const [,,, programAiContextId] = fieldPath;
+          result = await client.query(
+            'UPDATE strategic_programs SET ai_context = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [newValue, programAiContextId]
+          );
+          if (result.rowCount === 0) throw new Error(`Program with ID ${programAiContextId} not found`);
+          break;
+
+
         case 'category-name':
           const [, categoryNameId] = fieldPath;
           result = await client.query(
@@ -1056,7 +1108,16 @@ export class DatabaseService {
           );
           if (result.rowCount === 0) throw new Error(`Functional program with ID ${programQuarterProgressId} not found`);
           break;
-          
+
+        case 'functional-program-ai-context':
+          const [,,, functionalProgramAiContextId] = fieldPath;
+          result = await client.query(
+            'UPDATE functional_programs SET ai_context = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+            [newValue, functionalProgramAiContextId]
+          );
+          if (result.rowCount === 0) throw new Error(`Functional program with ID ${functionalProgramAiContextId} not found`);
+          break;
+
         // Reuse the same category and goal update logic since they share the same tables
         case 'category-name':
           const [, categoryNameId] = fieldPath;
@@ -1659,7 +1720,7 @@ export class DatabaseService {
         LEFT JOIN categories c ON sg.category_id = c.id
         LEFT JOIN scorecard_alignments sa ON sa.functional_goal_id = sg.id
         WHERE sa.id IS NULL
-        AND EXISTS (SELECT 1 FROM strategic_programs WHERE strategic_goal_id = sg.id)
+        AND EXISTS (SELECT 1 FROM strategic_programs WHERE goal_id = sg.id)
         
         ORDER BY path
         LIMIT 50
@@ -1672,8 +1733,11 @@ export class DatabaseService {
           'program' as type,
           'ord' as source,
           sp.text as name,
-          COALESCE(sp.pillar, 'Unknown') || ' > ' || COALESCE(sp.category, 'Unknown') || ' > ' || COALESCE(sp.strategic_goal, 'Unknown') || ' > ' || sp.text as path
+          COALESCE(sp_pillar.name, 'Unknown') || ' > ' || COALESCE(c.name, 'Unknown') || ' > ' || COALESCE(sg.text, 'Unknown') || ' > ' || sp.text as path
         FROM strategic_programs sp
+        LEFT JOIN strategic_pillars sp_pillar ON sp.pillar_id = sp_pillar.id
+        LEFT JOIN categories c ON sp.category_id = c.id
+        LEFT JOIN strategic_goals sg ON sp.goal_id = sg.id
         LEFT JOIN scorecard_alignments sa ON sa.ord_program_id = sp.id
         WHERE sa.id IS NULL
         
@@ -1690,7 +1754,7 @@ export class DatabaseService {
         LEFT JOIN categories c ON sg.category_id = c.id
         LEFT JOIN scorecard_alignments sa ON sa.ord_goal_id = sg.id
         WHERE sa.id IS NULL
-        AND EXISTS (SELECT 1 FROM strategic_programs WHERE strategic_goal_id = sg.id)
+        AND EXISTS (SELECT 1 FROM strategic_programs WHERE goal_id = sg.id)
         
         ORDER BY path
         LIMIT 50

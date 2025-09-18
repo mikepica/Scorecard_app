@@ -6,6 +6,7 @@ import type { StrategicProgram, ScoreCardData } from '@/types/scorecard'
 import { StatusCircle } from '@/components/status-circle'
 import { EditableField } from '@/components/ui/editable-field'
 import { GenerateUpdateModal } from '@/components/generate-update-modal'
+import { AIContextModal } from '@/components/ai-context-modal'
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from '@/lib/quarter-utils'
 import type { QuarterInfo } from '@/lib/quarter-utils'
 
@@ -58,6 +59,9 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
   
   // State for generate update modal
   const [isGenerateUpdateModalOpen, setIsGenerateUpdateModalOpen] = useState(false)
+
+  // State for AI context modal
+  const [isAIContextModalOpen, setIsAIContextModalOpen] = useState(false)
   
   const currentQuarter = getCurrentQuarter()
   const availableQuarters = getAvailableQuarters()
@@ -183,7 +187,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
   // Handle objective update
   const handleObjectiveUpdate = async (quarter: string, newObjective: string) => {
     if (!program) return
-    
+
     try {
       const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
       const response = await fetch(apiEndpoint, {
@@ -196,15 +200,42 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
           quarter,
         }),
       })
-      
+
       if (!response.ok) {
         throw new Error('Failed to update objective')
       }
-      
+
       const updatedData = await response.json()
       onUpdate(program.id, updatedData)
     } catch (error) {
       console.error('Error updating objective:', error)
+    }
+  }
+
+  // Handle AI context update
+  const handleAIContextUpdate = async (newAiContext: string) => {
+    if (!program) return
+
+    try {
+      const apiEndpoint = isFunctionalView ? '/api/functional-scorecard/update' : '/api/scorecard/update'
+      const response = await fetch(apiEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fieldPath: [program.strategicPillarId, program.categoryId, program.strategicGoalId, program.id],
+          newValue: newAiContext,
+          type: isFunctionalView ? 'functional-program-ai-context' : 'program-ai-context',
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to update AI context')
+      }
+
+      const updatedData = await response.json()
+      onUpdate(program.id, updatedData)
+    } catch (error) {
+      console.error('Error updating AI context:', error)
     }
   }
 
@@ -423,6 +454,34 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
             })}
           </div>
 
+          {/* AI Context Section */}
+          <div className="bg-purple-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="font-medium text-gray-800">AI Context</h4>
+              <button
+                onClick={() => setIsAIContextModalOpen(true)}
+                className="p-1 hover:bg-purple-100 rounded transition-colors"
+                title="Edit AI context"
+              >
+                <Pencil size={16} className="text-gray-600" />
+              </button>
+            </div>
+            <div className="text-sm text-gray-700 min-h-[40px]">
+              {program.aiContext ? (
+                <p className="whitespace-pre-wrap break-words">
+                  {program.aiContext.length > 200 ?
+                    `${program.aiContext.substring(0, 200)}...` :
+                    program.aiContext
+                  }
+                </p>
+              ) : (
+                <p className="text-gray-500 italic">
+                  No AI context added yet. Click the pencil icon to add AI-specific instructions.
+                </p>
+              )}
+            </div>
+          </div>
+
         </div>
         )}
 
@@ -435,14 +494,31 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
             quarterInfo={currentQuarter}
             onGenerate={async (content, instructions, files) => {
               try {
+                // Build program context including AI context
+                const programContext = {
+                  text: program.text,
+                  pillarName: program.pillarName,
+                  categoryName: program.categoryName,
+                  goalText: program.goalText,
+                  aiContext: program.aiContext,
+                  ordLtSponsors: program.ordLtSponsors,
+                  sponsorsLeads: program.sponsorsLeads,
+                  reportingOwners: program.reportingOwners
+                };
+
+                const formData = new FormData();
+                formData.append('content', content);
+                formData.append('instructions', instructions);
+                formData.append('programContext', JSON.stringify(programContext));
+
+                // Add files to formData
+                files.forEach(file => {
+                  formData.append('files', file);
+                });
+
                 const response = await fetch('/api/generate-update', {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    existingContent: content,
-                    instructions,
-                    files: files.map(file => ({ name: file.name, size: file.size }))
-                  }),
+                  body: formData,
                 })
                 
                 if (!response.ok) {
@@ -450,13 +526,24 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
                 }
                 
                 const result = await response.json()
-                return result.generatedContent || content
+                return result.update || content
               } catch (error) {
                 console.error('Error generating update:', error)
                 return content
               }
             }}
             onApply={(content) => handleProgressUpdate(currentQuarter.columnName, content)}
+          />
+        )}
+
+        {/* AI Context Modal */}
+        {program && (
+          <AIContextModal
+            isOpen={isAIContextModalOpen}
+            onClose={() => setIsAIContextModalOpen(false)}
+            initialContent={program.aiContext || ""}
+            programTitle={program.text}
+            onSave={handleAIContextUpdate}
           />
         )}
       </div>

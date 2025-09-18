@@ -46,3 +46,30 @@ export async function PATCH(request: NextRequest) {
     );
   }
 }
+
+export async function POST(request: Request) {
+  try {
+    const { fieldPath, newValue, type, quarter }: {
+      fieldPath: string[],
+      newValue: string | null,
+      type: string,
+      quarter?: 'q1' | 'q2' | 'q3' | 'q4',
+    } = await request.json()
+
+    console.log('🗄️  Processing functional database update operation:', type)
+    try {
+      const updatedData = await DatabaseService.performFunctionalUpdate(type, fieldPath, newValue, quarter)
+      return NextResponse.json(updatedData)
+    } catch (dbError) {
+      console.error('Functional database update error:', dbError)
+      return NextResponse.json(
+        { error: `Functional database update failed: ${dbError instanceof Error ? dbError.message : 'Unknown error'}` },
+        { status: 500 }
+      )
+    }
+
+  } catch (error) {
+    console.error('Functional update error:', error)
+    return NextResponse.json({ error: "Failed to update functional data" }, { status: 500 })
+  }
+}

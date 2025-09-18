@@ -37,7 +37,10 @@ export interface StrategicProgram {
   q2_2026_progress?: string
   q3_2026_progress?: string
   q4_2026_progress?: string
-  
+
+  // AI Context
+  aiContext?: string
+
   updatedAt?: string
   
   // Quarter visibility controls

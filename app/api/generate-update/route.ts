@@ -50,7 +50,13 @@ export async function POST(req: Request) {
     }
     
     if (programContext) {
+      const context = JSON.parse(programContext);
       userMessage += `Strategic program context:\n${programContext}\n\n`;
+
+      // Add specific AI context section if available
+      if (context.aiContext && context.aiContext.trim()) {
+        userMessage += `AI-specific context and instructions:\n${context.aiContext}\n\n`;
+      }
     }
     
     if (fileContents) {
