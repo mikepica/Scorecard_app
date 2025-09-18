@@ -179,7 +179,7 @@ export function GoalsEditor() {
       key: 'ord_lt_sponsors',
       label: 'ORD LT Sponsors',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -190,7 +190,7 @@ export function GoalsEditor() {
       key: 'sponsors_leads',
       label: 'Sponsor Leads',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -201,7 +201,7 @@ export function GoalsEditor() {
       key: 'reporting_owners',
       label: 'Reporting Owners',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -325,7 +325,7 @@ export function ProgramsEditor() {
       key: 'ord_lt_sponsors',
       label: 'ORD LT Sponsors',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -336,7 +336,7 @@ export function ProgramsEditor() {
       key: 'sponsors_leads',
       label: 'Sponsor Leads',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -347,7 +347,7 @@ export function ProgramsEditor() {
       key: 'reporting_owners',
       label: 'Reporting Owners',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -510,7 +510,7 @@ export function FunctionalProgramsEditor() {
       key: 'ord_lt_sponsors',
       label: 'ORD LT Sponsors',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -521,7 +521,7 @@ export function FunctionalProgramsEditor() {
       key: 'sponsors_leads',
       label: 'Sponsor Leads',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }
@@ -532,7 +532,7 @@ export function FunctionalProgramsEditor() {
       key: 'reporting_owners',
       label: 'Reporting Owners',
       type: 'array',
-      render: (value, row): React.ReactNode => {
+      render: (value, _row): React.ReactNode => { // eslint-disable-line @typescript-eslint/no-unused-vars
         if (Array.isArray(value)) {
           return value.join(', ');
         }

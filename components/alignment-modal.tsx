@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { X, Link } from "lucide-react"
 import { AlignmentCard } from "@/components/alignment-card"
 
@@ -40,13 +40,7 @@ export function AlignmentModal({
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (isOpen && itemId) {
-      fetchAlignments()
-    }
-  }, [isOpen, itemId])
-
-  const fetchAlignments = async () => {
+  const fetchAlignments = useCallback(async () => {
     setIsLoading(true)
     setError(null)
     
@@ -63,7 +57,13 @@ export function AlignmentModal({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [itemType, itemId])
+
+  useEffect(() => {
+    if (isOpen && itemId) {
+      fetchAlignments()
+    }
+  }, [isOpen, itemId, fetchAlignments])
 
   const handleEdit = (alignment: Alignment) => {
     // Close the current modal and trigger edit in parent
@@ -150,7 +150,7 @@ export function AlignmentModal({
               <div className="text-gray-400 mb-4">
                 <Link size={48} className="mx-auto mb-2" />
                 <p className="font-medium">No alignments found</p>
-                <p className="text-sm">This item doesn't have any alignments yet.</p>
+                <p className="text-sm">This item doesn&apos;t have any alignments yet.</p>
               </div>
             </div>
           ) : (

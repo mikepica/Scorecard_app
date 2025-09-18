@@ -100,7 +100,7 @@ function DetailsPageContent() {
       setSelectedReportingOwner(ALL_VALUE)
       setSelectedGoal(ALL_VALUE)
     }
-  }, [selectedFunction, ALL_VALUE])
+  }, [selectedFunction])
 
   // State for AI Chat
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -789,13 +789,7 @@ function DetailsPageContent() {
       const result = await response.json()
       
       if (result.response) {
-        // Add AI response to chat
-        const aiMessage = {
-          id: Date.now().toString(),
-          text: result.response,
-          sender: "ai" as const,
-          timestamp: new Date(),
-        }
+        // Add AI response to chat (implementation pending)
         // Set reprioritization mode and open AI Chat
         setIsReprioritizationMode(true)
         setIsChatOpen(true)
@@ -845,13 +839,7 @@ function DetailsPageContent() {
       const result = await response.json()
       
       if (result.response) {
-        // Add AI response to chat
-        const aiMessage = {
-          id: Date.now().toString(),
-          text: result.response,
-          sender: "ai" as const,
-          timestamp: new Date(),
-        }
+        // Add AI response to chat (implementation pending)
         // Open AI Chat
         setIsChatOpen(true)
         setToast({ message: 'Analysis complete! Check AI Chat for results.', type: 'success' })
@@ -1088,7 +1076,7 @@ function DetailsPageContent() {
                     </td>
                     <td className="border border-gray-300 p-3 border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <EditableField
-                        value={(program as any)[selectedComparisonQuarter.columnName] as string || ""}
+                        value={program[selectedComparisonQuarter.columnName as keyof StrategicProgram] as string || ""}
                         onSave={(newProgress) => handleQuarterProgressUpdate(program.id, selectedComparisonQuarter.columnName, newProgress)}
                         className="text-base"
                         placeholder="Data not yet entered"
@@ -1097,7 +1085,7 @@ function DetailsPageContent() {
                     <td className="border border-gray-300 p-3 relative border-r-2 border-gray-400" style={{width: '14.3%'}}>
                       <div className="pb-8">
                         <EditableField
-                          value={(program as any)[currentQuarter.columnName] as string || ""}
+                          value={program[currentQuarter.columnName as keyof StrategicProgram] as string || ""}
                           onSave={(newProgress) => handleQuarterProgressUpdate(program.id, currentQuarter.columnName, newProgress)}
                           className="text-base"
                           placeholder="Data not yet entered"
@@ -1121,7 +1109,7 @@ function DetailsPageContent() {
                         <td key={quarter.columnName} className="border border-gray-300 p-3 pr-10 relative" style={{width: '14.3%'}}>
                           <div className="mb-2">
                             <EditableField
-                              value={(program as any)[objectiveField] as string || ""}
+                              value={program[objectiveField as keyof StrategicProgram] as string || ""}
                               onSave={(newObjective) => handleObjectiveUpdate(program.id, quarterKey, newObjective)}
                               className="text-base"
                               placeholder="Data not yet entered"
@@ -1129,7 +1117,7 @@ function DetailsPageContent() {
                           </div>
                           <div className="status-dot-container">
                             <StatusCircle
-                              status={(program as any)[statusField] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
+                              status={program[statusField as keyof StrategicProgram] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
                               onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? null)}
                             />
                           </div>
@@ -1158,7 +1146,7 @@ function DetailsPageContent() {
             setIsGenerateModalOpen(false)
             setCurrentProgram(null)
           }}
-          initialContent={(currentProgram as any)?.[currentQuarter.columnName] as string || ""}
+          initialContent={currentProgram?.[currentQuarter.columnName as keyof StrategicProgram] as string || ""}
           quarterInfo={currentQuarter}
           onGenerate={handleGenerateUpdate}
           onApply={handleApplyUpdate}

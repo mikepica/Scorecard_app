@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Pencil, Bot } from "lucide-react"
+import { Bot } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -58,7 +58,7 @@ export function AIContextModal({ isOpen, onClose, initialContent, programTitle, 
             Edit AI Context
           </DialogTitle>
           <DialogDescription>
-            Add AI-specific context and instructions for "{programTitle}". This will enhance AI chat conversations and progress update generation.
+            Add AI-specific context and instructions for &ldquo;{programTitle}&rdquo;. This will enhance AI chat conversations and progress update generation.
           </DialogDescription>
         </DialogHeader>
 

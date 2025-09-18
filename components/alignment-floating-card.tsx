@@ -64,7 +64,6 @@ export function AlignmentFloatingCard({
   const [isSearching, setIsSearching] = useState(false)
   const [selectedStrength, setSelectedStrength] = useState<'strong' | 'moderate' | 'weak' | 'informational'>('moderate')
   const [rationale, setRationale] = useState("")
-  const [editingAlignment, setEditingAlignment] = useState<string | null>(null)
 
   const cardRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
