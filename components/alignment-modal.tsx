@@ -24,6 +24,7 @@ interface AlignmentModalProps {
   itemId: string
   itemName: string
   itemPath: string
+  onEdit?: (alignment: Alignment) => void
 }
 
 export function AlignmentModal({
@@ -32,7 +33,8 @@ export function AlignmentModal({
   itemType,
   itemId,
   itemName,
-  itemPath
+  itemPath,
+  onEdit
 }: AlignmentModalProps) {
   const [alignments, setAlignments] = useState<Alignment[]>([])
   const [isLoading, setIsLoading] = useState(false)
@@ -64,8 +66,12 @@ export function AlignmentModal({
   }
 
   const handleEdit = (alignment: Alignment) => {
-    // For now, just log - could be extended to open edit modal
-    console.log('Edit alignment:', alignment)
+    // Close the current modal and trigger edit in parent
+    onClose()
+    // Pass alignment data to parent for editing
+    if (onEdit) {
+      onEdit(alignment)
+    }
   }
 
   const handleDelete = async (alignmentId: string) => {

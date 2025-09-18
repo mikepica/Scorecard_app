@@ -111,7 +111,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json()
-    const { strength, rationale } = body
+    const { strength, rationale, functionalType, functionalId, ordType, ordId } = body
 
     // Validate strength if provided
     if (strength) {
@@ -124,9 +124,43 @@ export async function PATCH(request: Request) {
       }
     }
 
+    const validTypes = ['pillar', 'category', 'goal', 'program']
+
+    if ((functionalType && !functionalId) || (!functionalType && functionalId)) {
+      return NextResponse.json(
+        { error: 'Both functionalType and functionalId are required when updating the functional target' },
+        { status: 400 }
+      )
+    }
+
+    if ((ordType && !ordId) || (!ordType && ordId)) {
+      return NextResponse.json(
+        { error: 'Both ordType and ordId are required when updating the ORD target' },
+        { status: 400 }
+      )
+    }
+
+    if (functionalType && !validTypes.includes(functionalType)) {
+      return NextResponse.json(
+        { error: 'Invalid functionalType. Must be one of: ' + validTypes.join(', ') },
+        { status: 400 }
+      )
+    }
+
+    if (ordType && !validTypes.includes(ordType)) {
+      return NextResponse.json(
+        { error: 'Invalid ordType. Must be one of: ' + validTypes.join(', ') },
+        { status: 400 }
+      )
+    }
+
     const alignment = await DatabaseService.updateAlignment(alignmentId, {
       strength,
-      rationale
+      rationale,
+      functionalType,
+      functionalId,
+      ordType,
+      ordId
     })
 
     return NextResponse.json({ alignment })

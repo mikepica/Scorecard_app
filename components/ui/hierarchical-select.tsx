@@ -77,15 +77,17 @@ export function HierarchicalSelect({
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (isOpen && dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false)
         setSearchTerm("")
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
 
   const toggleExpanded = (nodeId: string) => {
     const newExpanded = new Set(expandedNodes)
@@ -165,6 +167,7 @@ export function HierarchicalSelect({
           <div className="flex items-center flex-1 min-w-0">
             {hasChildren && (
               <button
+                type="button"
                 onClick={(e) => {
                   e.stopPropagation()
                   toggleExpanded(item.id)
@@ -207,7 +210,10 @@ export function HierarchicalSelect({
       {/* Dropdown button */}
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={(e) => {
+          e.stopPropagation()
+          !disabled && setIsOpen(!isOpen)
+        }}
         disabled={disabled}
         className={`w-full px-3 py-2 text-left border rounded-lg focus:ring-2 focus:outline-none transition-colors ${
           disabled
@@ -230,7 +236,10 @@ export function HierarchicalSelect({
 
       {/* Dropdown content */}
       {isOpen && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-hidden">
+        <div
+          className="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-80 overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Search */}
           <div className="p-3 border-b border-gray-200">
             <div className="relative">

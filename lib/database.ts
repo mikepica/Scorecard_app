@@ -1350,14 +1350,26 @@ export class DatabaseService {
   static async updateAlignment(id: string, updates: {
     strength?: string;
     rationale?: string;
-  }): Promise<{ success: boolean }> {
+    functionalType?: string;
+    functionalId?: string;
+    ordType?: string;
+    ordId?: string;
+  }): Promise<any> {
     const client = await getDbConnection();
     
     try {
+      if ((updates.functionalType && !updates.functionalId) || (!updates.functionalType && updates.functionalId)) {
+        throw new Error('Both functionalType and functionalId are required to update the functional target');
+      }
+
+      if ((updates.ordType && !updates.ordId) || (!updates.ordType && updates.ordId)) {
+        throw new Error('Both ordType and ordId are required to update the ORD target');
+      }
+
       const setParts = [];
       const values = [];
       let paramIndex = 1;
-      
+
       if (updates.strength) {
         setParts.push(`alignment_strength = $${paramIndex}`);
         values.push(updates.strength);
@@ -1369,7 +1381,53 @@ export class DatabaseService {
         values.push(updates.rationale);
         paramIndex++;
       }
-      
+
+      const functionalColumns: Record<string, string> = {
+        pillar: 'functional_pillar_id',
+        category: 'functional_category_id',
+        goal: 'functional_goal_id',
+        program: 'functional_program_id'
+      };
+
+      if (updates.functionalType && updates.functionalId) {
+        setParts.push(`functional_type = $${paramIndex}`);
+        values.push(updates.functionalType);
+        paramIndex++;
+
+        Object.entries(functionalColumns).forEach(([type, column]) => {
+          if (type === updates.functionalType) {
+            setParts.push(`${column} = $${paramIndex}`);
+            values.push(updates.functionalId);
+            paramIndex++;
+          } else {
+            setParts.push(`${column} = NULL`);
+          }
+        });
+      }
+
+      const ordColumns: Record<string, string> = {
+        pillar: 'ord_pillar_id',
+        category: 'ord_category_id',
+        goal: 'ord_goal_id',
+        program: 'ord_program_id'
+      };
+
+      if (updates.ordType && updates.ordId) {
+        setParts.push(`ord_type = $${paramIndex}`);
+        values.push(updates.ordType);
+        paramIndex++;
+
+        Object.entries(ordColumns).forEach(([type, column]) => {
+          if (type === updates.ordType) {
+            setParts.push(`${column} = $${paramIndex}`);
+            values.push(updates.ordId);
+            paramIndex++;
+          } else {
+            setParts.push(`${column} = NULL`);
+          }
+        });
+      }
+
       setParts.push(`updated_at = CURRENT_TIMESTAMP`);
       values.push(id);
       
@@ -1466,26 +1524,61 @@ export class DatabaseService {
         return [];
       }
       
-      // Start with a simpler query to debug
-      const simpleQuery = `
-        SELECT 
-          id,
-          functional_type,
-          ord_type,
-          alignment_strength,
-          alignment_rationale,
-          created_at,
-          'Test Functional' as functional_name,
-          'Functional > Path' as functional_path,
-          'Test ORD' as ord_name,
-          'ORD > Path' as ord_path
-        FROM scorecard_alignments 
-        ORDER BY created_at DESC
-        LIMIT 10
+      // Full query with proper JOINs to get actual names
+      const fullQuery = `
+        SELECT
+          sa.*,
+          -- Functional item details
+          CASE
+            WHEN sa.functional_type = 'pillar' THEN sp_func.name
+            WHEN sa.functional_type = 'category' THEN c_func.name
+            WHEN sa.functional_type = 'goal' THEN sg_func.text
+            WHEN sa.functional_type = 'program' THEN fp.text
+          END as functional_name,
+          CASE
+            WHEN sa.functional_type = 'pillar' THEN sp_func.name
+            WHEN sa.functional_type = 'category' THEN COALESCE(sp_func_cat.name, 'Unknown') || ' > ' || c_func.name
+            WHEN sa.functional_type = 'goal' THEN COALESCE(sp_func_goal.name, 'Unknown') || ' > ' || COALESCE(c_func_goal.name, 'Unknown') || ' > ' || sg_func.text
+            WHEN sa.functional_type = 'program' THEN COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') || ' > ' || fp.text
+          END as functional_path,
+          -- ORD item details
+          CASE
+            WHEN sa.ord_type = 'pillar' THEN sp_ord.name
+            WHEN sa.ord_type = 'category' THEN c_ord.name
+            WHEN sa.ord_type = 'goal' THEN sg_ord.text
+            WHEN sa.ord_type = 'program' THEN sp_ord_prog.text
+          END as ord_name,
+          CASE
+            WHEN sa.ord_type = 'pillar' THEN sp_ord.name
+            WHEN sa.ord_type = 'category' THEN COALESCE(sp_ord_cat.name, 'Unknown') || ' > ' || c_ord.name
+            WHEN sa.ord_type = 'goal' THEN COALESCE(sp_ord_goal.name, 'Unknown') || ' > ' || COALESCE(c_ord_goal.name, 'Unknown') || ' > ' || sg_ord.text
+            WHEN sa.ord_type = 'program' THEN COALESCE(sp_ord_prog_pillar.name, 'Unknown') || ' > ' || COALESCE(c_ord_prog_cat.name, 'Unknown') || ' > ' || COALESCE(sg_ord_prog_goal.text, 'Unknown') || ' > ' || sp_ord_prog.text
+          END as ord_path
+        FROM scorecard_alignments sa
+        -- Functional joins
+        LEFT JOIN strategic_pillars sp_func ON sa.functional_pillar_id = sp_func.id AND sa.functional_type = 'pillar'
+        LEFT JOIN categories c_func ON sa.functional_category_id = c_func.id AND sa.functional_type = 'category'
+        LEFT JOIN strategic_pillars sp_func_cat ON c_func.pillar_id = sp_func_cat.id
+        LEFT JOIN strategic_goals sg_func ON sa.functional_goal_id = sg_func.id AND sa.functional_type = 'goal'
+        LEFT JOIN strategic_pillars sp_func_goal ON sg_func.pillar_id = sp_func_goal.id
+        LEFT JOIN categories c_func_goal ON sg_func.category_id = c_func_goal.id
+        LEFT JOIN functional_programs fp ON sa.functional_program_id = fp.id AND sa.functional_type = 'program'
+        -- ORD joins
+        LEFT JOIN strategic_pillars sp_ord ON sa.ord_pillar_id = sp_ord.id AND sa.ord_type = 'pillar'
+        LEFT JOIN categories c_ord ON sa.ord_category_id = c_ord.id AND sa.ord_type = 'category'
+        LEFT JOIN strategic_pillars sp_ord_cat ON c_ord.pillar_id = sp_ord_cat.id
+        LEFT JOIN strategic_goals sg_ord ON sa.ord_goal_id = sg_ord.id AND sa.ord_type = 'goal'
+        LEFT JOIN strategic_pillars sp_ord_goal ON sg_ord.pillar_id = sp_ord_goal.id
+        LEFT JOIN categories c_ord_goal ON sg_ord.category_id = c_ord_goal.id
+        LEFT JOIN strategic_programs sp_ord_prog ON sa.ord_program_id = sp_ord_prog.id AND sa.ord_type = 'program'
+        LEFT JOIN strategic_pillars sp_ord_prog_pillar ON sp_ord_prog.pillar_id = sp_ord_prog_pillar.id
+        LEFT JOIN categories c_ord_prog_cat ON sp_ord_prog.category_id = c_ord_prog_cat.id
+        LEFT JOIN strategic_goals sg_ord_prog_goal ON sp_ord_prog.goal_id = sg_ord_prog_goal.id
+        ORDER BY sa.created_at DESC
       `;
-      
-      console.log('Executing simplified query...');
-      const result = await client.query(simpleQuery);
+
+      console.log('Executing full query with proper JOINs...');
+      const result = await client.query(fullQuery);
       console.log('Query returned rows:', result.rows.length);
       
       return result.rows;

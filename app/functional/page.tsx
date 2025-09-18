@@ -12,8 +12,23 @@ import BragStatusTable from "@/components/brag-status-table"
 import { FilterModal } from "@/components/filter-modal"
 import { Header } from "@/components/header"
 import { ChatContextProvider, useChatContext } from "@/components/chat-context"
+import { AlignmentModal } from "@/components/alignment-modal"
+import { AlignmentForm } from "@/components/alignment-form"
 import { useSearchParams } from "next/navigation"
 import { useMemo } from "react"
+
+interface Alignment {
+  id: string
+  functional_type: string
+  ord_type: string
+  alignment_strength: 'strong' | 'moderate' | 'weak' | 'informational'
+  alignment_rationale?: string
+  functional_name: string
+  functional_path: string
+  ord_name: string
+  ord_path: string
+  created_at: string
+}
 
 function FunctionalViewContent() {
   const searchParams = useSearchParams()
@@ -42,7 +57,19 @@ function FunctionalViewContent() {
     categoryName?: string
     pillarName?: string
   }) | null>(null)
-  
+
+  // Alignment modal state
+  const [isAlignmentModalOpen, setIsAlignmentModalOpen] = useState(false)
+  const [alignmentModalData, setAlignmentModalData] = useState<{
+    itemType: 'pillar' | 'category' | 'goal' | 'program'
+    itemId: string
+    itemName: string
+    itemPath: string
+  } | null>(null)
+
+  // Edit alignment state
+  const [editingAlignment, setEditingAlignment] = useState<Alignment | null>(null)
+
   // Function to get current quarter based on today's date
   const getCurrentQuarter = () => {
     const today = new Date()
@@ -207,6 +234,68 @@ function FunctionalViewContent() {
   const handleProgramUpdate = (programId: string, updatedData: ScoreCardData) => {
     setData(updatedData)
     setToast({ message: "Functional program updated successfully", type: "success" })
+  }
+
+  // Alignment modal handlers
+  const handleAlignmentClick = (itemType: 'pillar' | 'category' | 'goal' | 'program', itemId: string, itemName: string, itemPath: string) => {
+    setAlignmentModalData({ itemType, itemId, itemName, itemPath })
+    setIsAlignmentModalOpen(true)
+  }
+
+  const handleAlignmentModalClose = () => {
+    setIsAlignmentModalOpen(false)
+    setAlignmentModalData(null)
+  }
+
+  // Edit alignment handlers
+  const handleEditAlignment = (alignment: Alignment) => {
+    setEditingAlignment(alignment)
+  }
+
+  const handleEditAlignmentSave = async (alignmentData: {
+    functionalType: string;
+    functionalId: string;
+    ordType: string;
+    ordId: string;
+    strength: string;
+    rationale?: string;
+  }) => {
+    if (!editingAlignment) return
+
+    try {
+      const response = await fetch(`/api/alignments?id=${editingAlignment.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strength: alignmentData.strength,
+          rationale: alignmentData.rationale
+        })
+      })
+
+      if (response.ok) {
+        setEditingAlignment(null)
+        setToast({ message: "Alignment updated successfully", type: "success" })
+
+        // Refresh data if needed
+        if (data) {
+          const refreshResponse = await fetch('/api/functional-scorecard')
+          if (refreshResponse.ok) {
+            const refreshedData = await refreshResponse.json()
+            setData(refreshedData)
+          }
+        }
+      } else {
+        console.error('Failed to update alignment')
+        setToast({ message: "Failed to update alignment", type: "error" })
+      }
+    } catch (error) {
+      console.error('Error updating alignment:', error)
+      setToast({ message: "Error updating alignment", type: "error" })
+    }
+  }
+
+  const handleEditAlignmentCancel = () => {
+    setEditingAlignment(null)
   }
 
   // Function to capture the screen
@@ -437,6 +526,7 @@ function FunctionalViewContent() {
                 selectionMode={isContextSelectionMode}
                 selectionDraft={draftSelection}
                 onSelectionDraftChange={setDraftSelection}
+                onAlignmentClick={handleAlignmentClick}
               />
             </div>
           ) : (
@@ -506,6 +596,43 @@ function FunctionalViewContent() {
             <div className="p-6 overflow-y-auto">
               <BragStatusTable />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alignment Modal */}
+      {alignmentModalData && (
+        <AlignmentModal
+          isOpen={isAlignmentModalOpen}
+          onClose={handleAlignmentModalClose}
+          itemType={alignmentModalData.itemType}
+          itemId={alignmentModalData.itemId}
+          itemName={alignmentModalData.itemName}
+          itemPath={alignmentModalData.itemPath}
+          onEdit={handleEditAlignment}
+        />
+      )}
+
+      {/* Edit Alignment Modal */}
+      {editingAlignment && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4"
+          onClick={handleEditAlignmentCancel}
+        >
+          <div
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">Edit Alignment</h3>
+            </div>
+
+            <AlignmentForm
+              onSave={handleEditAlignmentSave}
+              onCancel={handleEditAlignmentCancel}
+              initialAlignment={editingAlignment}
+              isEditMode={true}
+            />
           </div>
         </div>
       )}

@@ -396,7 +396,7 @@ export function AIChat({ isOpen, onClose, context, isReprioritizationMode = fals
                 </button>
               )}
               {onOpenContextSelection && !chat.contextSelection.allSelected && (
-                <span className="inline-block text-xs bg-black/20 px-2 py-1 rounded">Custom context</span>
+                <span className="inline-flex items-center gap-2 bg-orange-500 text-white px-3 py-2 rounded-md text-sm">Customized Context Set</span>
               )}
               <button 
                 onClick={handleReset} 
