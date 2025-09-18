@@ -77,6 +77,7 @@ interface DataTableProps {
   allowDelete?: boolean;
   allowBulkDelete?: boolean;
   searchPlaceholder?: string;
+  customActions?: React.ReactNode;
 }
 
 export function DataTable({
@@ -88,7 +89,8 @@ export function DataTable({
   allowCreate = true,
   allowDelete = true,
   allowBulkDelete = true,
-  searchPlaceholder = "Search..."
+  searchPlaceholder = "Search...",
+  customActions
 }: DataTableProps) {
   const [data, setData] = useState<PaginatedData>({
     data: [],
@@ -424,6 +426,7 @@ export function DataTable({
               <Download className="w-4 h-4" />
               Export
             </Button>
+            {customActions}
             {allowCreate && (
               <Button
                 onClick={() => setIsCreatingNew(true)}

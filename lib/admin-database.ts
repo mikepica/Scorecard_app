@@ -1,5 +1,9 @@
 import { getDbConnection } from '@/lib/database';
 
+interface DatabaseClient {
+  query: (sql: string, params?: unknown[]) => Promise<{ rows: Record<string, unknown>[]; rowCount: number | null }>;
+}
+
 export interface TableColumn {
   name: string;
   type: string;
@@ -608,25 +612,179 @@ export class AdminDatabaseService {
   // Get progress update history
   static async getProgressUpdateHistory(programId?: string, limit: number = 50): Promise<Record<string, unknown>[]> {
     const client = await getDbConnection();
-    
+
     try {
       let query = `
-        SELECT h.*, p.text as program_text 
-        FROM progress_updates_history h 
+        SELECT h.*, p.text as program_text
+        FROM progress_updates_history h
         LEFT JOIN strategic_programs p ON h.program_id = p.id
       `;
       const params: unknown[] = [];
-      
+
       if (programId) {
         query += ' WHERE h.program_id = $1';
         params.push(programId);
       }
-      
+
       query += ` ORDER BY h.changed_at DESC LIMIT $${params.length + 1}`;
       params.push(limit);
-      
+
       const result = await client.query(query, params);
       return result.rows;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Bulk upsert strategic programs
+  static async bulkUpsertPrograms(programs: Array<Record<string, unknown>>): Promise<{created: number, updated: number}> {
+    const client = await getDbConnection();
+
+    try {
+      await client.query('BEGIN');
+
+      let created = 0;
+      let updated = 0;
+
+      for (const program of programs) {
+        const { id, ...programData } = program;
+
+        if (id) {
+          // Check if program exists
+          const existingProgram = await client.query(
+            'SELECT id FROM strategic_programs WHERE id = $1',
+            [id]
+          );
+
+          if (existingProgram.rows.length > 0) {
+            // Update existing program
+            await this.updateProgramInternal(client, id as string, programData);
+            updated++;
+          } else {
+            // Insert with provided ID
+            await this.insertProgramInternal(client, id as string, programData);
+            created++;
+          }
+        } else {
+          // Create new program with generated ID
+          const newId = await this.getNextIdInternal(client, 'strategic_programs', 'program');
+          await this.insertProgramInternal(client, newId, programData);
+          created++;
+        }
+      }
+
+      await client.query('COMMIT');
+      return { created, updated };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Internal method for inserting a program within a transaction
+  private static async insertProgramInternal(client: DatabaseClient, id: string, data: Record<string, unknown>): Promise<void> {
+    // Remove system fields that shouldn't be inserted via Excel
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { updated_at, created_at, ...insertData } = data;
+
+    // Prepare columns and values
+    const columns = ['id'];
+    const values = [id];
+    const placeholders = ['$1'];
+
+    // Convert array fields to PostgreSQL array format
+    Object.entries(insertData).forEach(([key, value]) => {
+      columns.push(key);
+
+      if (Array.isArray(value)) {
+        // Convert to PostgreSQL array format
+        values.push(`{${value.map(item => `"${String(item).replace(/"/g, '\\"')}"`).join(',')}}`);
+      } else if (value !== undefined && value !== null) {
+        values.push(String(value));
+      } else {
+        values.push(null);
+      }
+
+      placeholders.push(`$${values.length}`);
+    });
+
+    await client.query(
+      `INSERT INTO strategic_programs (${columns.join(', ')}) VALUES (${placeholders.join(', ')})`,
+      values
+    );
+  }
+
+  // Internal method for updating a program within a transaction
+  private static async updateProgramInternal(client: DatabaseClient, id: string, data: Record<string, unknown>): Promise<void> {
+    // Remove system fields that shouldn't be updated via Excel
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { updated_at, created_at, ...updateData } = data;
+
+    const setClause = Object.keys(updateData)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
+
+    const values = Object.values(updateData).map(value => {
+      if (Array.isArray(value)) {
+        // Convert to PostgreSQL array format
+        return `{${value.map(item => `"${String(item).replace(/"/g, '\\"')}"`).join(',')}}`;
+      } else if (value !== undefined && value !== null) {
+        return String(value);
+      } else {
+        return null;
+      }
+    });
+
+    await client.query(
+      `UPDATE strategic_programs SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [id, ...values]
+    );
+  }
+
+  // Internal method for generating next ID within a transaction
+  private static async getNextIdInternal(client: DatabaseClient, tableName: string, prefix: string): Promise<string> {
+    try {
+      // Get the highest current ID with the prefix
+      const result = await client.query(
+        `SELECT id FROM ${tableName} WHERE id LIKE $1 ORDER BY
+         CAST(SUBSTRING(id FROM ${prefix.length + 2}) AS INTEGER) DESC LIMIT 1`,
+        [`${prefix}-%`]
+      );
+
+      let nextNumber = 1;
+      if (result.rows.length > 0) {
+        const currentId = result.rows[0].id;
+        const numberPart = currentId.split('-')[1];
+        if (numberPart && !isNaN(parseInt(numberPart))) {
+          nextNumber = parseInt(numberPart) + 1;
+        }
+      }
+
+      return `${prefix}-${String(nextNumber).padStart(3, '0')}`;
+    } catch {
+      // Fallback to timestamp-based ID if sequential parsing fails
+      return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    }
+  }
+
+  // Validate that IDs exist in the specified table
+  static async validateIds(tableName: string, ids: string[]): Promise<string[]> {
+    const client = await getDbConnection();
+
+    try {
+      if (ids.length === 0) {
+        return [];
+      }
+
+      const placeholders = ids.map((_, index) => `$${index + 1}`).join(',');
+      const result = await client.query(
+        `SELECT id FROM ${tableName} WHERE id IN (${placeholders})`,
+        ids
+      );
+
+      return result.rows.map(row => row.id);
     } finally {
       client.release();
     }

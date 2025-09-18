@@ -1,7 +1,10 @@
 "use client"
 
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { DataTable, DataTableColumn } from './data-table';
+import { Button } from '@/components/ui/button';
+import { Upload, Download } from 'lucide-react';
+import { toast } from 'sonner';
 
 const statusOptions = [
   { value: 'exceeded', label: 'Exceeded' },
@@ -9,6 +12,133 @@ const statusOptions = [
   { value: 'delayed', label: 'Delayed' },
   { value: 'missed', label: 'Missed' }
 ];
+
+// Excel Upload Component for Strategic Programs
+function ExcelUploadActions({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/admin/programs/upload');
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'strategic_programs_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ];
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+      toast.error('Only Excel files (.xlsx, .xls) are supported');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/admin/programs/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok && response.status >= 500) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error(`Invalid response from server: ${response.status} ${response.statusText}`);
+      }
+
+      if (!response.ok) {
+        console.error('Upload API Error:', result);
+        const errorMessage = result.error || 'Upload failed';
+
+        // Special handling for foreign key validation errors
+        if (result.error === 'Foreign key validation failed' && result.details) {
+          const detailsText = Array.isArray(result.details) ? result.details.join('\n') : result.details;
+          throw new Error(`${errorMessage}\n\n${detailsText}\n\nTo get valid IDs:\n• Go to the Pillars tab to find Pillar IDs\n• Go to the Categories tab to find Category IDs\n• Go to the Goals tab to find Goal IDs`);
+        }
+
+        const errorDetails = result.details ? `\nDetails: ${Array.isArray(result.details) ? result.details.join('\n') : result.details}` : '';
+        throw new Error(`${errorMessage}${errorDetails}`);
+      }
+
+      toast.success(`Upload successful! Created: ${result.details.created}, Updated: ${result.details.updated}`);
+
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
+      <Button
+        onClick={downloadTemplate}
+        variant="outline"
+        size="sm"
+      >
+        <Download className="w-4 h-4" />
+        Template
+      </Button>
+
+      <Button
+        onClick={() => fileInputRef.current?.click()}
+        variant="outline"
+        size="sm"
+        disabled={uploading}
+      >
+        <Upload className="w-4 h-4" />
+        {uploading ? 'Uploading...' : 'Upload Excel'}
+      </Button>
+    </>
+  );
+}
 
 // Strategic Pillars Editor
 export function PillarsEditor() {
@@ -401,12 +531,20 @@ export function ProgramsEditor() {
     }
   ];
 
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleUploadSuccess = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   return (
     <DataTable
+      key={refreshKey}
       title="Strategic Programs"
       apiEndpoint="/api/admin/programs"
       columns={columns}
       searchPlaceholder="Search programs..."
+      customActions={<ExcelUploadActions onUploadSuccess={handleUploadSuccess} />}
     />
   );
 }
