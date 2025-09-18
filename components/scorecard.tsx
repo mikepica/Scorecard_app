@@ -14,6 +14,7 @@ import { getPillarConfig } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
 import { filterVisibleItems } from "@/lib/quarter-visibility"
 import { AlignmentIndicator } from "@/components/alignment-indicator"
+import { getCurrentQuarter } from "@/lib/quarter-utils"
 
 // const STATUS_OPTIONS = [
 //   { value: "exceeded", label: "Exceeded" },
@@ -22,19 +23,19 @@ import { AlignmentIndicator } from "@/components/alignment-indicator"
 //   { value: "missed", label: "Missed" },
 // ]
 
-export function Scorecard({ 
-  data, 
-  onDataUpdate, 
-  selectedQuarter = "q3_2025", 
+export function Scorecard({
+  data,
+  onDataUpdate,
+  selectedQuarter = "q3_2025",
   onProgramSelect,
   isFunctionalView = false,
   onAlignmentClick,
   selectionMode = false,
   selectionDraft,
   onSelectionDraftChange,
-}: { 
-  data: ScoreCardData; 
-  onDataUpdate: (newData: ScoreCardData) => void; 
+}: {
+  data: ScoreCardData;
+  onDataUpdate: (newData: ScoreCardData) => void;
   selectedQuarter?: string;
   onProgramSelect?: (program: StrategicProgram & {
     goalText?: string
@@ -52,6 +53,11 @@ export function Scorecard({
     return <div className="w-full p-4 text-center">No scorecard data available</div>
   }
 
+  // Calculate if selected quarter is the current quarter
+  const currentQuarter = getCurrentQuarter()
+  const currentQuarterKey = `q${currentQuarter.quarter}_${currentQuarter.year}`
+  const isCurrentQuarter = selectedQuarter === currentQuarterKey
+
   // Filter pillars based on quarter visibility
   const visiblePillars = filterVisibleItems(data.pillars, selectedQuarter)
 
@@ -59,11 +65,12 @@ export function Scorecard({
     <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
         {visiblePillars.map((pillar) => (
-          <PillarCard 
-            key={pillar.id} 
-            pillar={pillar} 
-            onDataUpdate={onDataUpdate} 
+          <PillarCard
+            key={pillar.id}
+            pillar={pillar}
+            onDataUpdate={onDataUpdate}
             selectedQuarter={selectedQuarter}
+            isCurrentQuarter={isCurrentQuarter}
             onProgramSelect={onProgramSelect}
             isFunctionalView={isFunctionalView}
             onAlignmentClick={onAlignmentClick}
@@ -77,20 +84,22 @@ export function Scorecard({
   )
 }
 
-function PillarCard({ 
-  pillar, 
-  onDataUpdate, 
-  selectedQuarter, 
+function PillarCard({
+  pillar,
+  onDataUpdate,
+  selectedQuarter,
+  isCurrentQuarter,
   onProgramSelect,
   isFunctionalView = false,
   onAlignmentClick,
   selectionMode = false,
   selectionDraft,
   onSelectionDraftChange,
-}: { 
-  pillar: Pillar; 
-  onDataUpdate: (newData: ScoreCardData) => void; 
+}: {
+  pillar: Pillar;
+  onDataUpdate: (newData: ScoreCardData) => void;
   selectedQuarter: string;
+  isCurrentQuarter: boolean;
   onProgramSelect?: (program: StrategicProgram & {
     goalText?: string
     categoryName?: string
@@ -160,12 +169,13 @@ function PillarCard({
       <div className="p-3 overflow-auto flex-1">
         {pillar.categories &&
           filterVisibleItems(pillar.categories, selectedQuarter).map((category) => (
-            <CategorySection 
-              key={category.id} 
-              category={category} 
-              pillar={pillar} 
-              onDataUpdate={onDataUpdate} 
+            <CategorySection
+              key={category.id}
+              category={category}
+              pillar={pillar}
+              onDataUpdate={onDataUpdate}
               selectedQuarter={selectedQuarter}
+              isCurrentQuarter={isCurrentQuarter}
               onProgramSelect={onProgramSelect}
               isFunctionalView={isFunctionalView}
               onAlignmentClick={onAlignmentClick}
@@ -181,22 +191,24 @@ function PillarCard({
   )
 }
 
-function CategorySection({ 
-  category, 
-  pillar, 
-  onDataUpdate, 
-  selectedQuarter, 
+function CategorySection({
+  category,
+  pillar,
+  onDataUpdate,
+  selectedQuarter,
+  isCurrentQuarter,
   onProgramSelect,
   isFunctionalView = false,
   onAlignmentClick,
   selectionMode = false,
   selectionDraft,
   onSelectionDraftChange,
-}: { 
-  category: Category; 
-  pillar: Pillar; 
-  onDataUpdate: (newData: ScoreCardData) => void; 
+}: {
+  category: Category;
+  pillar: Pillar;
+  onDataUpdate: (newData: ScoreCardData) => void;
   selectedQuarter: string;
+  isCurrentQuarter: boolean;
   onProgramSelect?: (program: StrategicProgram & {
     goalText?: string
     categoryName?: string
@@ -279,13 +291,14 @@ function CategorySection({
       </div>
       <ul className="space-y-2">
         {category.goals && filterVisibleItems(category.goals, selectedQuarter).map((goal) => (
-          <GoalItem 
-            key={goal.id} 
-            goal={goal} 
-            pillar={pillar} 
-            category={category} 
-            onDataUpdate={onDataUpdate} 
+          <GoalItem
+            key={goal.id}
+            goal={goal}
+            pillar={pillar}
+            category={category}
+            onDataUpdate={onDataUpdate}
             selectedQuarter={selectedQuarter}
+            isCurrentQuarter={isCurrentQuarter}
             onProgramSelect={onProgramSelect}
             isFunctionalView={isFunctionalView}
             onAlignmentClick={onAlignmentClick}
@@ -299,24 +312,26 @@ function CategorySection({
   )
 }
 
-function GoalItem({ 
-  goal, 
-  pillar, 
-  category, 
-  onDataUpdate, 
-  selectedQuarter, 
+function GoalItem({
+  goal,
+  pillar,
+  category,
+  onDataUpdate,
+  selectedQuarter,
+  isCurrentQuarter,
   onProgramSelect,
   isFunctionalView = false,
   onAlignmentClick,
   selectionMode = false,
   selectionDraft,
   onSelectionDraftChange,
-}: { 
-  goal: StrategicGoal; 
-  pillar: Pillar; 
-  category: Category; 
-  onDataUpdate: (newData: ScoreCardData) => void; 
+}: {
+  goal: StrategicGoal;
+  pillar: Pillar;
+  category: Category;
+  onDataUpdate: (newData: ScoreCardData) => void;
   selectedQuarter: string;
+  isCurrentQuarter: boolean;
   onProgramSelect?: (program: StrategicProgram & {
     goalText?: string
     categoryName?: string
@@ -495,6 +510,7 @@ function GoalItem({
           <StatusCircle
             status={displayStatus}
             onStatusChange={handleGoalStatusChange}
+            isCurrentQuarter={isCurrentQuarter}
           />
         </div>
       </div>
@@ -602,6 +618,7 @@ function GoalItem({
                   const updatedData = await response.json();
                   onDataUpdate(updatedData);
                 }}
+                isCurrentQuarter={isCurrentQuarter}
               />
             </li>
           ))}

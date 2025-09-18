@@ -7,9 +7,10 @@ interface StatusCircleProps {
   isCurrentQuarter?: boolean
 }
 
-export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
+export function StatusCircle({ status, onStatusChange, isCurrentQuarter = true }: StatusCircleProps) {
   const [showSelector, setShowSelector] = useState(false)
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null)
+  const [showTooltip, setShowTooltip] = useState(false)
   const circleRef = useRef<HTMLDivElement>(null)
 
   const getStatusColor = (status?: string) => {
@@ -40,8 +41,14 @@ export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
 
   const handleClick = () => {
     if (onStatusChange && circleRef.current) {
-      setAnchorRect(circleRef.current.getBoundingClientRect())
-      setShowSelector(true)
+      if (isCurrentQuarter) {
+        setAnchorRect(circleRef.current.getBoundingClientRect())
+        setShowSelector(true)
+      } else {
+        setAnchorRect(circleRef.current.getBoundingClientRect())
+        setShowTooltip(true)
+        setTimeout(() => setShowTooltip(false), 2000)
+      }
     }
   }
 
@@ -66,6 +73,28 @@ export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
           onClose={() => setShowSelector(false)}
           anchorRect={anchorRect}
         />
+      )}
+      {showTooltip && anchorRect && (
+        <div
+          className="fixed z-50 bg-gray-800 text-white text-sm px-3 py-2 rounded shadow-lg pointer-events-none"
+          style={{
+            left: anchorRect.left + anchorRect.width / 2 - 100,
+            top: anchorRect.bottom + 8,
+            transform: 'translateX(-50%)',
+          }}
+        >
+          Only the Current Quarter RAG is editable.
+          <div
+            className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-full"
+            style={{
+              width: 0,
+              height: 0,
+              borderLeft: '6px solid transparent',
+              borderRight: '6px solid transparent',
+              borderBottom: '6px solid #1f2937',
+            }}
+          />
+        </div>
       )}
     </div>
   )
