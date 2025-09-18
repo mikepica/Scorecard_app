@@ -140,6 +140,133 @@ function ExcelUploadActions({ onUploadSuccess }: { onUploadSuccess?: () => void 
   );
 }
 
+// Excel Upload Component for Functional Programs
+function FunctionalExcelUploadActions({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const downloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/admin/functional-programs/upload');
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'functional_programs_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      toast.error('Failed to download template');
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = [
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel'
+    ];
+    if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls)$/i)) {
+      toast.error('Only Excel files (.xlsx, .xls) are supported');
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/admin/functional-programs/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok && response.status >= 500) {
+        throw new Error(`Server error: ${response.status} ${response.statusText}`);
+      }
+
+      let result;
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error(`Invalid response from server: ${response.status} ${response.statusText}`);
+      }
+
+      if (!response.ok) {
+        console.error('Upload API Error:', result);
+        const errorMessage = result.error || 'Upload failed';
+
+        // Special handling for foreign key validation errors
+        if (result.error === 'Foreign key validation failed' && result.details) {
+          const detailsText = Array.isArray(result.details) ? result.details.join('\n') : result.details;
+          throw new Error(`${errorMessage}\n\n${detailsText}\n\nTo get valid IDs:\n• Go to the Pillars tab to find Pillar IDs\n• Go to the Categories tab to find Category IDs\n• Go to the Goals tab to find Goal IDs\n• Go to the Programs tab to find Strategic Program IDs for linking`);
+        }
+
+        const errorDetails = result.details ? `\nDetails: ${Array.isArray(result.details) ? result.details.join('\n') : result.details}` : '';
+        throw new Error(`${errorMessage}${errorDetails}`);
+      }
+
+      toast.success(`Upload successful! Created: ${result.details.created}, Updated: ${result.details.updated}`);
+
+      if (onUploadSuccess) {
+        onUploadSuccess();
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  return (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
+      <Button
+        onClick={downloadTemplate}
+        variant="outline"
+        size="sm"
+      >
+        <Download className="w-4 h-4" />
+        Template
+      </Button>
+
+      <Button
+        onClick={() => fileInputRef.current?.click()}
+        variant="outline"
+        size="sm"
+        disabled={uploading}
+      >
+        <Upload className="w-4 h-4" />
+        {uploading ? 'Uploading...' : 'Upload Excel'}
+      </Button>
+    </>
+  );
+}
+
 // Strategic Pillars Editor
 export function PillarsEditor() {
   const columns: DataTableColumn[] = [
@@ -551,6 +678,12 @@ export function ProgramsEditor() {
 
 // Functional Programs Editor
 export function FunctionalProgramsEditor() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleUploadSuccess = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
   const columns: DataTableColumn[] = [
     {
       key: 'id',
@@ -565,6 +698,13 @@ export function FunctionalProgramsEditor() {
       label: 'Program Text',
       type: 'textarea',
       required: true,
+      searchable: true,
+      sortable: true
+    },
+    {
+      key: 'function',
+      label: 'Function',
+      type: 'text',
       searchable: true,
       sortable: true
     },
@@ -595,7 +735,7 @@ export function FunctionalProgramsEditor() {
       render: (value) => <span className="text-sm font-mono">{String(value)}</span>
     },
     {
-      key: 'linked_ord_strategic_program_id',
+      key: 'linked_ORD_strategic_program_ID',
       label: 'Linked ORD Program',
       type: 'text',
       render: (value) => value ? <span className="text-sm font-mono">{value}</span> : <span className="text-gray-400">None</span>
@@ -704,18 +844,6 @@ export function FunctionalProgramsEditor() {
       type: 'textarea'
     },
     {
-      key: 'start_quarter',
-      label: 'Start Quarter',
-      type: 'text',
-      width: '120px'
-    },
-    {
-      key: 'end_quarter',
-      label: 'End Quarter',
-      type: 'text',
-      width: '120px'
-    },
-    {
       key: 'updated_at',
       label: 'Last Updated',
       type: 'timestamp',
@@ -726,10 +854,12 @@ export function FunctionalProgramsEditor() {
 
   return (
     <DataTable
+      key={refreshKey}
       title="Functional Programs"
       apiEndpoint="/api/admin/functional-programs"
       columns={columns}
       searchPlaceholder="Search functional programs..."
+      customActions={<FunctionalExcelUploadActions onUploadSuccess={handleUploadSuccess} />}
     />
   );
 }

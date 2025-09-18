@@ -769,6 +769,113 @@ export class AdminDatabaseService {
     }
   }
 
+  // Bulk upsert functional programs
+  static async bulkUpsertFunctionalPrograms(programs: Array<Record<string, unknown>>): Promise<{created: number, updated: number}> {
+    const client = await getDbConnection();
+
+    try {
+      await client.query('BEGIN');
+
+      let created = 0;
+      let updated = 0;
+
+      for (const program of programs) {
+        const { id, ...programData } = program;
+
+        if (id) {
+          // Check if program exists
+          const existingProgram = await client.query(
+            'SELECT id FROM functional_programs WHERE id = $1',
+            [id]
+          );
+
+          if (existingProgram.rows.length > 0) {
+            // Update existing program
+            await this.updateFunctionalProgramInternal(client, id as string, programData);
+            updated++;
+          } else {
+            // Insert with provided ID
+            await this.insertFunctionalProgramInternal(client, id as string, programData);
+            created++;
+          }
+        } else {
+          // Create new program with generated ID
+          const newId = await this.getNextIdInternal(client, 'functional_programs', 'functional');
+          await this.insertFunctionalProgramInternal(client, newId, programData);
+          created++;
+        }
+      }
+
+      await client.query('COMMIT');
+      return { created, updated };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Internal method for inserting a functional program within a transaction
+  private static async insertFunctionalProgramInternal(client: DatabaseClient, id: string, data: Record<string, unknown>): Promise<void> {
+    // Remove system fields that shouldn't be inserted via Excel
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { updated_at, created_at, ...insertData } = data;
+
+    // Prepare columns and values
+    const columns = ['id'];
+    const values = [id];
+    const placeholders = ['$1'];
+
+    // Convert array fields to PostgreSQL array format
+    Object.entries(insertData).forEach(([key, value]) => {
+      columns.push(key);
+
+      if (Array.isArray(value)) {
+        // Convert to PostgreSQL array format
+        values.push(`{${value.map(item => `"${String(item).replace(/"/g, '\\"')}"`).join(',')}}`);
+      } else if (value !== undefined && value !== null) {
+        values.push(String(value));
+      } else {
+        values.push(null);
+      }
+
+      placeholders.push(`$${values.length}`);
+    });
+
+    await client.query(
+      `INSERT INTO functional_programs (${columns.join(', ')}) VALUES (${placeholders.join(', ')})`,
+      values
+    );
+  }
+
+  // Internal method for updating a functional program within a transaction
+  private static async updateFunctionalProgramInternal(client: DatabaseClient, id: string, data: Record<string, unknown>): Promise<void> {
+    // Remove system fields that shouldn't be updated via Excel
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { updated_at, created_at, ...updateData } = data;
+
+    const setClause = Object.keys(updateData)
+      .map((key, index) => `${key} = $${index + 2}`)
+      .join(', ');
+
+    const values = Object.values(updateData).map(value => {
+      if (Array.isArray(value)) {
+        // Convert to PostgreSQL array format
+        return `{${value.map(item => `"${String(item).replace(/"/g, '\\"')}"`).join(',')}}`;
+      } else if (value !== undefined && value !== null) {
+        return String(value);
+      } else {
+        return null;
+      }
+    });
+
+    await client.query(
+      `UPDATE functional_programs SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+      [id, ...values]
+    );
+  }
+
   // Validate that IDs exist in the specified table
   static async validateIds(tableName: string, ids: string[]): Promise<string[]> {
     const client = await getDbConnection();
