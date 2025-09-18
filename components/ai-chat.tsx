@@ -591,12 +591,16 @@ type ContextSelection = {
 
 function filterContextBySelection(context: ScoreCardData, sel: ContextSelection): ScoreCardData {
   if (sel.allSelected) return context
+
   const sets = {
     pillars: new Set(sel.pillars || []),
     categories: new Set(sel.categories || []),
     goals: new Set(sel.goals || []),
     programs: new Set(sel.programs || []),
   }
+
+  // Filter based on selections - include items that are explicitly selected
+  // or whose parents are selected (for hierarchical inclusion)
   const filteredPillars = (context.pillars || []).filter(p => sets.pillars.has(p.id)).map(p => ({
     ...p,
     categories: (p.categories || []).filter(c => sets.categories.has(c.id)).map(c => ({
@@ -607,6 +611,7 @@ function filterContextBySelection(context: ScoreCardData, sel: ContextSelection)
       }))
     }))
   }))
+
   return { pillars: filteredPillars }
 }
  

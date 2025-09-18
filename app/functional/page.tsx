@@ -11,7 +11,7 @@ import { ProgramDetailsSidebar } from "@/components/program-details-sidebar"
 import BragStatusTable from "@/components/brag-status-table"
 import { FilterModal } from "@/components/filter-modal"
 import { Header } from "@/components/header"
-import { ChatContextProvider } from "@/components/chat-context"
+import { ChatContextProvider, useChatContext } from "@/components/chat-context"
 import { useSearchParams } from "next/navigation"
 import { useMemo } from "react"
 
@@ -263,30 +263,30 @@ function FunctionalViewContent() {
   const handleAIFlowsGenerate = async (prompt: string, files: File[], flowType: "goal-comparison" | "learnings-best-practices", selections: { pillars: string[], categories: string[], goals: string[], programs: string[] }) => {
     try {
       setToast({ message: 'Analyzing selected functional data...', type: 'info' })
-      
+
       // Reset chat
       setIsChatOpen(false)
-      
+
       // Create FormData for AI Flows request
       const formData = new FormData()
       formData.append('prompt', prompt)
       formData.append('flowType', flowType)
       formData.append('selections', JSON.stringify(selections))
       formData.append('scorecardData', JSON.stringify(data))
-      
+
       // Add files
       files.forEach(file => {
         formData.append('files', file)
       })
-      
+
       // Send to chat API
       const response = await fetch('/api/chat', {
         method: 'POST',
         body: formData
       })
-      
+
       const result = await response.json()
-      
+
       if (result.response) {
         // Open AI Chat with results
         setIsChatOpen(true)
@@ -299,6 +299,88 @@ function FunctionalViewContent() {
       setToast({ message: 'Error analyzing functional data', type: 'error' })
     }
   }
+
+  // Context selection mode state (same as main page)
+  type SelectionSets = { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> }
+  const [isContextSelectionMode, setIsContextSelectionMode] = useState(false)
+  const [draftSelection, setDraftSelection] = useState<SelectionSets | null>(null)
+
+  function buildAllSets(ctx: ScoreCardData | null): SelectionSets {
+    const result: SelectionSets = { pillars: new Set(), categories: new Set(), goals: new Set(), programs: new Set() }
+    if (!ctx) return result
+    for (const p of ctx.pillars || []) {
+      result.pillars.add(p.id)
+      for (const c of p.categories || []) {
+        result.categories.add(c.id)
+        for (const g of c.goals || []) {
+          result.goals.add(g.id)
+          for (const pr of g.programs || []) result.programs.add(pr.id)
+        }
+      }
+    }
+    return result
+  }
+
+  function setsEqual(a: Set<string>, b: Set<string>) {
+    if (a.size !== b.size) return false
+    for (const v of a) if (!b.has(v)) return false
+    return true
+  }
+
+  // Helper to start selection mode with current saved selection
+  const startContextSelection = () => {
+    const full = buildAllSets(data)
+    let selSets: SelectionSets
+    const contextSelection = chat.contextSelection
+    if (contextSelection.allSelected) {
+      selSets = full
+    } else {
+      selSets = {
+        pillars: new Set(contextSelection.pillars || []),
+        categories: new Set(contextSelection.categories || []),
+        goals: new Set(contextSelection.goals || []),
+        programs: new Set(contextSelection.programs || []),
+      }
+    }
+    setDraftSelection(selSets)
+    setIsContextSelectionMode(true)
+  }
+
+  const cancelContextSelection = () => {
+    setIsContextSelectionMode(false)
+    setDraftSelection(null)
+  }
+
+  const saveContextSelection = async () => {
+    if (!draftSelection) return
+    const full = buildAllSets(data)
+    const all = setsEqual(draftSelection.pillars, full.pillars) &&
+                setsEqual(draftSelection.categories, full.categories) &&
+                setsEqual(draftSelection.goals, full.goals) &&
+                setsEqual(draftSelection.programs, full.programs)
+
+    const newSelection = all ? {
+      allSelected: true, pillars: [], categories: [], goals: [], programs: []
+    } : {
+      allSelected: false,
+      pillars: Array.from(draftSelection.pillars),
+      categories: Array.from(draftSelection.categories),
+      goals: Array.from(draftSelection.goals),
+      programs: Array.from(draftSelection.programs),
+    }
+
+    try {
+      await chat.saveSelection(newSelection)
+      setToast({ message: 'Context selection saved', type: 'success' })
+    } catch (e) {
+      console.error('Failed to save context selection', e)
+      setToast({ message: 'Failed to save context selection', type: 'error' })
+    }
+    setIsContextSelectionMode(false)
+    setDraftSelection(null)
+  }
+
+  const chat = useChatContext()
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -313,7 +395,25 @@ function FunctionalViewContent() {
         onToggleChat={() => setIsChatOpen(!isChatOpen)}
       />
 
-      <AIChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} context={data || { pillars: [] }} />
+      <AIChat
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        context={data || { pillars: [] }}
+        onOpenContextSelection={startContextSelection}
+        isSelectingContext={isContextSelectionMode}
+        onCancelContextSelection={cancelContextSelection}
+        onSaveContextSelection={saveContextSelection}
+      />
+
+      {isContextSelectionMode && (
+        <div className="bg-yellow-50 border-b border-yellow-200 text-yellow-900 px-4 py-3 flex items-center justify-between">
+          <div className="text-sm font-medium">Context Selection Mode — tick rows to include in AI context</div>
+          <div className="flex items-center gap-2">
+            <button onClick={cancelContextSelection} className="px-3 py-2 text-sm rounded bg-gray-200 hover:bg-gray-300">Cancel</button>
+            <button onClick={saveContextSelection} className="px-3 py-2 text-sm rounded bg-purple-600 text-white hover:bg-purple-700">Add selections to context</button>
+          </div>
+        </div>
+      )}
 
       <div className={`flex flex-1 transition-all duration-300`} style={{
         paddingLeft: isProgramSidebarOpen ? (window.innerWidth >= 1024 ? '640px' : window.innerWidth >= 768 ? '512px' : '0') : '0'
@@ -328,12 +428,15 @@ function FunctionalViewContent() {
             </div>
           ) : filteredData ? (
             <div className="flex-1 flex flex-col">
-              <Scorecard 
-                data={filteredData} 
-                onDataUpdate={handleDataUpdate} 
+              <Scorecard
+                data={filteredData}
+                onDataUpdate={handleDataUpdate}
                 selectedQuarter={selectedQuarter}
                 onProgramSelect={handleProgramSelect}
                 isFunctionalView={true}
+                selectionMode={isContextSelectionMode}
+                selectionDraft={draftSelection}
+                onSelectionDraftChange={setDraftSelection}
               />
             </div>
           ) : (

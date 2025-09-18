@@ -6,7 +6,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const threadId = params.id;
+    const threadId = (await params).id;
     const { text, sender } = await req.json();
     
     if (!text || !sender || !['user', 'ai'].includes(sender)) {

@@ -6,7 +6,7 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const threadId = params.id;
+    const threadId = (await params).id;
     const client = await getDbConnection();
     
     try {
@@ -50,7 +50,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const threadId = params.id;
+    const threadId = (await params).id;
     const body = await req.json();
     const { name, contextSelection } = body as { name?: string; contextSelection?: unknown };
     

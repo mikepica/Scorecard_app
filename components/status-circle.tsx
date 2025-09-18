@@ -4,6 +4,7 @@ import { StatusSelector } from "./status-selector"
 interface StatusCircleProps {
   status?: string
   onStatusChange?: (newStatus: string | undefined) => void
+  isCurrentQuarter?: boolean
 }
 
 export function StatusCircle({ status, onStatusChange }: StatusCircleProps) {
