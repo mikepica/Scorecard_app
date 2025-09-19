@@ -966,27 +966,27 @@ export class DatabaseService {
         case 'goal-quarter':
           if (!quarter) throw new Error('Quarter is required for goal quarter status updates');
           const [,, goalQuarterId] = fieldPath;
-          
+
           // Support year-specific formats
           const goalColumn = quarter.includes('_') ? `${quarter}_status` : `${quarter}_status`;
-          
+
           // Validate column name for year-specific formats
           const validGoalStatusColumns = [
             'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
             'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
           ];
-          
+
           if (!validGoalStatusColumns.includes(goalColumn.replace('_status', '') + '_status')) {
             throw new Error(`Invalid quarter status column for goals: ${goalColumn}`);
           }
-          
+
           result = await client.query(
             `UPDATE strategic_goals SET ${goalColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
             [newValue, goalQuarterId]
           );
           if (result.rowCount === 0) throw new Error(`Goal with ID ${goalQuarterId} not found`);
           break;
-          
+
         default:
           throw new Error(`Invalid update type: ${updateType}`);
       }
@@ -1140,27 +1140,27 @@ export class DatabaseService {
         case 'goal-quarter':
           if (!quarter) throw new Error('Quarter is required for goal quarter status updates');
           const [,, goalQuarterId] = fieldPath;
-          
+
           // Support year-specific formats
           const goalColumn = quarter.includes('_') ? `${quarter}_status` : `${quarter}_status`;
-          
+
           // Validate column name for year-specific formats
           const validGoalStatusColumns = [
             'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
             'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
           ];
-          
+
           if (!validGoalStatusColumns.includes(goalColumn.replace('_status', '') + '_status')) {
             throw new Error(`Invalid quarter status column for goals: ${goalColumn}`);
           }
-          
+
           result = await client.query(
             `UPDATE strategic_goals SET ${goalColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
             [newValue, goalQuarterId]
           );
           if (result.rowCount === 0) throw new Error(`Goal with ID ${goalQuarterId} not found`);
           break;
-          
+
         default:
           throw new Error(`Invalid functional update type: ${updateType}`);
       }

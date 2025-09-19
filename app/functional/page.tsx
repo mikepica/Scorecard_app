@@ -507,7 +507,7 @@ function FunctionalViewContent() {
       <div className={`flex flex-1 transition-all duration-300`} style={{
         paddingLeft: isProgramSidebarOpen ? (window.innerWidth >= 1024 ? '640px' : window.innerWidth >= 768 ? '512px' : '0') : '0'
       }}>
-        <div className="container mx-auto px-4 pt-4 flex-1 flex flex-col">
+        <div className="px-2 pt-4 flex-1 flex flex-col">
           {loading ? (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">

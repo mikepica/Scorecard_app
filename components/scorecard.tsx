@@ -61,25 +61,38 @@ export function Scorecard({
   // Filter pillars based on quarter visibility
   const visiblePillars = filterVisibleItems(data.pillars, selectedQuarter)
 
+  // Determine if we need container wrapper (for ORD view or functional view with <= 3 pillars)
+  const useContainer = !isFunctionalView || visiblePillars.length <= 3
+
+  const gridContent = (
+    <div className={`grid grid-cols-1 ${isFunctionalView && visiblePillars.length > 3 ? 'md:grid-cols-4' : 'md:grid-cols-3'} ${isFunctionalView && visiblePillars.length > 3 ? 'gap-2' : 'gap-4'} w-full h-full flex-1 mt-6`}>
+      {visiblePillars.map((pillar) => (
+        <PillarCard
+          key={pillar.id}
+          pillar={pillar}
+          onDataUpdate={onDataUpdate}
+          selectedQuarter={selectedQuarter}
+          isCurrentQuarter={isCurrentQuarter}
+          onProgramSelect={onProgramSelect}
+          isFunctionalView={isFunctionalView}
+          onAlignmentClick={onAlignmentClick}
+          selectionMode={selectionMode}
+          selectionDraft={selectionDraft}
+          onSelectionDraftChange={onSelectionDraftChange}
+        />
+      ))}
+    </div>
+  )
+
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full h-full flex-1 mt-6">
-        {visiblePillars.map((pillar) => (
-          <PillarCard
-            key={pillar.id}
-            pillar={pillar}
-            onDataUpdate={onDataUpdate}
-            selectedQuarter={selectedQuarter}
-            isCurrentQuarter={isCurrentQuarter}
-            onProgramSelect={onProgramSelect}
-            isFunctionalView={isFunctionalView}
-            onAlignmentClick={onAlignmentClick}
-            selectionMode={selectionMode}
-            selectionDraft={selectionDraft}
-            onSelectionDraftChange={onSelectionDraftChange}
-          />
-        ))}
-      </div>
+      {useContainer ? (
+        <div className="container mx-auto px-4">
+          {gridContent}
+        </div>
+      ) : (
+        gridContent
+      )}
     </>
   )
 }
@@ -507,11 +520,13 @@ function GoalItem({
               className="text-gray-500 hover:text-blue-600"
             />
           )}
-          <StatusCircle
-            status={displayStatus}
-            onStatusChange={handleGoalStatusChange}
-            isCurrentQuarter={isCurrentQuarter}
-          />
+          {!isFunctionalView && (
+            <StatusCircle
+              status={displayStatus}
+              onStatusChange={handleGoalStatusChange}
+              isCurrentQuarter={isCurrentQuarter}
+            />
+          )}
         </div>
       </div>
 
