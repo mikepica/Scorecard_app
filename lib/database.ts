@@ -1626,21 +1626,21 @@ export class DatabaseService {
         return [];
       }
       
-      // Full query with proper JOINs to get actual names
+      // Full query with proper handling for functional text-based IDs
       const fullQuery = `
         SELECT
           sa.*,
           -- Functional item details
           CASE
-            WHEN sa.functional_type = 'pillar' THEN sp_func.name
-            WHEN sa.functional_type = 'category' THEN c_func.name
-            WHEN sa.functional_type = 'goal' THEN sg_func.text
+            WHEN sa.functional_type = 'pillar' THEN sa.functional_pillar_id
+            WHEN sa.functional_type = 'category' THEN SPLIT_PART(sa.functional_category_id, '|', 2)
+            WHEN sa.functional_type = 'goal' THEN SPLIT_PART(sa.functional_goal_id, '|', 3)
             WHEN sa.functional_type = 'program' THEN fp.text
           END as functional_name,
           CASE
-            WHEN sa.functional_type = 'pillar' THEN sp_func.name
-            WHEN sa.functional_type = 'category' THEN COALESCE(sp_func_cat.name, 'Unknown') || ' > ' || c_func.name
-            WHEN sa.functional_type = 'goal' THEN COALESCE(sp_func_goal.name, 'Unknown') || ' > ' || COALESCE(c_func_goal.name, 'Unknown') || ' > ' || sg_func.text
+            WHEN sa.functional_type = 'pillar' THEN sa.functional_pillar_id
+            WHEN sa.functional_type = 'category' THEN REPLACE(sa.functional_category_id, '|', ' > ')
+            WHEN sa.functional_type = 'goal' THEN REPLACE(sa.functional_goal_id, '|', ' > ')
             WHEN sa.functional_type = 'program' THEN COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') || ' > ' || fp.text
           END as functional_path,
           -- ORD item details
@@ -1657,13 +1657,7 @@ export class DatabaseService {
             WHEN sa.ord_type = 'program' THEN COALESCE(sp_ord_prog_pillar.name, 'Unknown') || ' > ' || COALESCE(c_ord_prog_cat.name, 'Unknown') || ' > ' || COALESCE(sg_ord_prog_goal.text, 'Unknown') || ' > ' || sp_ord_prog.text
           END as ord_path
         FROM scorecard_alignments sa
-        -- Functional joins
-        LEFT JOIN strategic_pillars sp_func ON sa.functional_pillar_id = sp_func.id AND sa.functional_type = 'pillar'
-        LEFT JOIN categories c_func ON sa.functional_category_id = c_func.id AND sa.functional_type = 'category'
-        LEFT JOIN strategic_pillars sp_func_cat ON c_func.pillar_id = sp_func_cat.id
-        LEFT JOIN strategic_goals sg_func ON sa.functional_goal_id = sg_func.id AND sa.functional_type = 'goal'
-        LEFT JOIN strategic_pillars sp_func_goal ON sg_func.pillar_id = sp_func_goal.id
-        LEFT JOIN categories c_func_goal ON sg_func.category_id = c_func_goal.id
+        -- Functional joins (only for programs, others are text-based)
         LEFT JOIN functional_programs fp ON sa.functional_program_id = fp.id AND sa.functional_type = 'program'
         -- ORD joins
         LEFT JOIN strategic_pillars sp_ord ON sa.ord_pillar_id = sp_ord.id AND sa.ord_type = 'pillar'
@@ -1703,7 +1697,7 @@ export class DatabaseService {
     try {
       // Get functional items that have no alignments
       const functionalQuery = `
-        SELECT 
+        SELECT
           fp.id,
           'program' as type,
           'functional' as source,
@@ -1712,22 +1706,52 @@ export class DatabaseService {
         FROM functional_programs fp
         LEFT JOIN scorecard_alignments sa ON sa.functional_program_id = fp.id
         WHERE sa.id IS NULL
-        
+
         UNION ALL
-        
-        SELECT 
-          sg.id,
+
+        -- Functional goals derived from functional_programs
+        SELECT DISTINCT
+          COALESCE(fp.pillar, 'Unknown') || '|' || COALESCE(fp.category, 'Unknown') || '|' || COALESCE(fp.strategic_goal, 'Unknown') as id,
           'goal' as type,
           'functional' as source,
-          sg.text as name,
-          COALESCE(sp.name, 'Unknown') || ' > ' || COALESCE(c.name, 'Unknown') || ' > ' || sg.text as path
-        FROM strategic_goals sg
-        LEFT JOIN strategic_pillars sp ON sg.pillar_id = sp.id
-        LEFT JOIN categories c ON sg.category_id = c.id
-        LEFT JOIN scorecard_alignments sa ON sa.functional_goal_id = sg.id
+          COALESCE(fp.strategic_goal, 'Unknown Goal') as name,
+          COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') as path
+        FROM functional_programs fp
+        LEFT JOIN scorecard_alignments sa ON sa.functional_goal_id = COALESCE(fp.pillar, 'Unknown') || '|' || COALESCE(fp.category, 'Unknown') || '|' || COALESCE(fp.strategic_goal, 'Unknown')
         WHERE sa.id IS NULL
-        AND EXISTS (SELECT 1 FROM strategic_programs WHERE goal_id = sg.id)
-        
+        AND fp.strategic_goal IS NOT NULL
+        AND fp.strategic_goal != ''
+
+        UNION ALL
+
+        -- Functional categories derived from functional_programs
+        SELECT DISTINCT
+          COALESCE(fp.pillar, 'Unknown') || '|' || COALESCE(fp.category, 'Unknown') as id,
+          'category' as type,
+          'functional' as source,
+          COALESCE(fp.category, 'Unknown Category') as name,
+          COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') as path
+        FROM functional_programs fp
+        LEFT JOIN scorecard_alignments sa ON sa.functional_category_id = COALESCE(fp.pillar, 'Unknown') || '|' || COALESCE(fp.category, 'Unknown')
+        WHERE sa.id IS NULL
+        AND fp.category IS NOT NULL
+        AND fp.category != ''
+
+        UNION ALL
+
+        -- Functional pillars derived from functional_programs
+        SELECT DISTINCT
+          COALESCE(fp.pillar, 'Unknown') as id,
+          'pillar' as type,
+          'functional' as source,
+          COALESCE(fp.pillar, 'Unknown Pillar') as name,
+          COALESCE(fp.pillar, 'Unknown') as path
+        FROM functional_programs fp
+        LEFT JOIN scorecard_alignments sa ON sa.functional_pillar_id = COALESCE(fp.pillar, 'Unknown')
+        WHERE sa.id IS NULL
+        AND fp.pillar IS NOT NULL
+        AND fp.pillar != ''
+
         ORDER BY path
         LIMIT 50
       `;
