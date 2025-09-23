@@ -18,6 +18,7 @@ interface Alignment {
   alignment_rationale?: string
   functional_name: string
   functional_path: string
+  functional_function?: string
   functional_pillar_id?: string | null
   functional_category_id?: string | null
   functional_goal_id?: string | null

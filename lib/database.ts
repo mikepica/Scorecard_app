@@ -1210,13 +1210,13 @@ export class DatabaseService {
             ELSE NULL
           END as functional_function,
           -- ORD item details
-          CASE 
+          CASE
             WHEN sa.ord_type = 'pillar' THEN sp_ord.name
             WHEN sa.ord_type = 'category' THEN c_ord.name
             WHEN sa.ord_type = 'goal' THEN sg_ord.text
             WHEN sa.ord_type = 'program' THEN sp_ord_prog.text
           END as ord_name,
-          CASE 
+          CASE
             WHEN sa.ord_type = 'pillar' THEN sp_ord.name
             WHEN sa.ord_type = 'category' THEN COALESCE(sp_ord_cat.name, 'Unknown') || ' > ' || c_ord.name
             WHEN sa.ord_type = 'goal' THEN COALESCE(sp_ord_goal.name, 'Unknown') || ' > ' || COALESCE(c_ord_goal.name, 'Unknown') || ' > ' || sg_ord.text
@@ -1643,6 +1643,11 @@ export class DatabaseService {
             WHEN sa.functional_type = 'goal' THEN REPLACE(sa.functional_goal_id, '|', ' > ')
             WHEN sa.functional_type = 'program' THEN COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') || ' > ' || fp.text
           END as functional_path,
+          -- Functional function field (only for programs)
+          CASE
+            WHEN sa.functional_type = 'program' THEN fp.function
+            ELSE NULL
+          END as functional_function,
           -- ORD item details
           CASE
             WHEN sa.ord_type = 'pillar' THEN sp_ord.name
