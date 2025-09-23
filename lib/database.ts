@@ -1565,29 +1565,29 @@ export class DatabaseService {
   // Get alignment count for an item
   static async getAlignmentCount(itemType: string, itemId: string): Promise<number> {
     const client = await getDbConnection();
-    
+
     try {
+      // Check if the itemId appears on either side of an alignment at the correct hierarchy level
+      const columnMap = {
+        'pillar': ['functional_pillar_id', 'ord_pillar_id'],
+        'category': ['functional_category_id', 'ord_category_id'],
+        'goal': ['functional_goal_id', 'ord_goal_id'],
+        'program': ['functional_program_id', 'ord_program_id']
+      };
+
+      const columns = columnMap[itemType as keyof typeof columnMap];
+      if (!columns) {
+        throw new Error(`Invalid itemType: ${itemType}`);
+      }
+
       const result = await client.query(
-        `SELECT COUNT(*) as count FROM scorecard_alignments 
-         WHERE 
-           (functional_type = $1 AND (
-             functional_pillar_id = $2 OR
-             functional_category_id = $2 OR
-             functional_goal_id = $2 OR
-             functional_program_id = $2
-           ))
-           OR
-           (ord_type = $1 AND (
-             ord_pillar_id = $2 OR
-             ord_category_id = $2 OR
-             ord_goal_id = $2 OR
-             ord_program_id = $2
-           ))`,
-        [itemType, itemId]
+        `SELECT COUNT(*) as count FROM scorecard_alignments
+         WHERE ${columns[0]} = $1 OR ${columns[1]} = $1`,
+        [itemId]
       );
-      
+
       return parseInt(result.rows[0].count, 10);
-      
+
     } finally {
       client.release();
     }

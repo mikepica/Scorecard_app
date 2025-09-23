@@ -12,9 +12,11 @@ import { StatusCircle } from "@/components/status-circle"
 import { getPillarColorWithText, getPillarColor } from "@/lib/pillar-utils"
 import { getPillarConfig } from "@/config/pillar-config"
 import { StrategicProgramTooltip } from "@/components/strategic-program-tooltip"
+import { ItemFunctionTooltip } from "@/components/item-function-tooltip"
 import { filterVisibleItems } from "@/lib/quarter-visibility"
 import { AlignmentIndicator } from "@/components/alignment-indicator"
 import { getCurrentQuarter } from "@/lib/quarter-utils"
+import { getFunctionsForPillar, getFunctionsForCategory, getFunctionsForGoal } from "@/lib/function-utils"
 
 // const STATUS_OPTIONS = [
 //   { value: "exceeded", label: "Exceeded" },
@@ -124,49 +126,68 @@ function PillarCard({
   selectionDraft?: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null;
   onSelectionDraftChange?: (s: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null) => void;
 }) {
+  const [hoveredItem, setHoveredItem] = useState<{ type: 'pillar'; name: string; functions: string[] } | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  const handlePillarMouseEnter = (event: React.MouseEvent) => {
+    if (isFunctionalView) {
+      const functions = getFunctionsForPillar(pillar)
+      setHoveredItem({ type: 'pillar', name: pillar.name, functions })
+      setTooltipPosition({ x: event.clientX, y: event.clientY })
+    }
+  }
+
+  const handlePillarMouseLeave = () => {
+    setHoveredItem(null)
+  }
 
   return (
-    <div className="border rounded-md overflow-hidden h-full flex flex-col relative">
-      <div className={`p-3 ${getPillarColorWithText(pillar)}`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {selectionMode && selectionDraft && onSelectionDraftChange && (
-              <Checkbox
-                checked={selectionDraft.pillars.has(pillar.id)}
-                onCheckedChange={(c) => {
-                  const checked = Boolean(c)
-                  const next = {
-                    pillars: new Set(selectionDraft.pillars),
-                    categories: new Set(selectionDraft.categories),
-                    goals: new Set(selectionDraft.goals),
-                    programs: new Set(selectionDraft.programs),
-                  }
-                  if (checked) {
-                    next.pillars.add(pillar.id)
-                    for (const cat of pillar.categories || []) {
-                      next.categories.add(cat.id)
-                      for (const g of cat.goals || []) {
-                        next.goals.add(g.id)
-                        for (const pr of g.programs || []) next.programs.add(pr.id)
+    <>
+      <div className="border rounded-md overflow-hidden h-full flex flex-col relative">
+        <div
+          className={`p-3 ${getPillarColorWithText(pillar)}`}
+          onMouseEnter={handlePillarMouseEnter}
+          onMouseLeave={handlePillarMouseLeave}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {selectionMode && selectionDraft && onSelectionDraftChange && (
+                <Checkbox
+                  checked={selectionDraft.pillars.has(pillar.id)}
+                  onCheckedChange={(c) => {
+                    const checked = Boolean(c)
+                    const next = {
+                      pillars: new Set(selectionDraft.pillars),
+                      categories: new Set(selectionDraft.categories),
+                      goals: new Set(selectionDraft.goals),
+                      programs: new Set(selectionDraft.programs),
+                    }
+                    if (checked) {
+                      next.pillars.add(pillar.id)
+                      for (const cat of pillar.categories || []) {
+                        next.categories.add(cat.id)
+                        for (const g of cat.goals || []) {
+                          next.goals.add(g.id)
+                          for (const pr of g.programs || []) next.programs.add(pr.id)
+                        }
+                      }
+                    } else {
+                      next.pillars.delete(pillar.id)
+                      for (const cat of pillar.categories || []) {
+                        next.categories.delete(cat.id)
+                        for (const g of cat.goals || []) {
+                          next.goals.delete(g.id)
+                          for (const pr of g.programs || []) next.programs.delete(pr.id)
+                        }
                       }
                     }
-                  } else {
-                    next.pillars.delete(pillar.id)
-                    for (const cat of pillar.categories || []) {
-                      next.categories.delete(cat.id)
-                      for (const g of cat.goals || []) {
-                        next.goals.delete(g.id)
-                        for (const pr of g.programs || []) next.programs.delete(pr.id)
-                      }
-                    }
-                  }
-                  onSelectionDraftChange(next)
-                }}
-              />
-            )}
-            <PillarIcon pillar={pillar} />
-            <h2 className="text-xl font-bold">{pillar.name}</h2>
-          </div>
+                    onSelectionDraftChange(next)
+                  }}
+                />
+              )}
+              <PillarIcon pillar={pillar} />
+              <h2 className="text-xl font-bold">{pillar.name}</h2>
+            </div>
           <div className="flex items-center gap-2">
             {onAlignmentClick && (
               <AlignmentIndicator
@@ -198,9 +219,21 @@ function PillarCard({
               />
           ))}
       </div>
-      {/* Bottom line positioned slightly above the bottom */}
-      <div className={`h-1 w-full ${getPillarColor(pillar)} absolute bottom-1`}></div>
-    </div>
+        {/* Bottom line positioned slightly above the bottom */}
+        <div className={`h-1 w-full ${getPillarColor(pillar)} absolute bottom-1`}></div>
+      </div>
+
+      {/* Pillar Function Tooltip */}
+      {hoveredItem && hoveredItem.type === 'pillar' && (
+        <ItemFunctionTooltip
+          itemType="pillar"
+          itemName={hoveredItem.name}
+          functions={hoveredItem.functions}
+          isVisible={true}
+          position={tooltipPosition}
+        />
+      )}
+    </>
   )
 }
 
@@ -233,6 +266,20 @@ function CategorySection({
   selectionDraft?: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null;
   onSelectionDraftChange?: (s: { pillars: Set<string>; categories: Set<string>; goals: Set<string>; programs: Set<string> } | null) => void;
 }) {
+  const [hoveredItem, setHoveredItem] = useState<{ type: 'category'; name: string; functions: string[] } | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
+
+  const handleCategoryMouseEnter = (event: React.MouseEvent) => {
+    if (isFunctionalView) {
+      const functions = getFunctionsForCategory(category)
+      setHoveredItem({ type: 'category', name: category.name, functions })
+      setTooltipPosition({ x: event.clientX, y: event.clientY })
+    }
+  }
+
+  const handleCategoryMouseLeave = () => {
+    setHoveredItem(null)
+  }
 
   // Handler for category name update
   const handleCategoryNameSave = async (newName: string) => {
@@ -252,44 +299,49 @@ function CategorySection({
   }
 
   return (
-    <div className="mb-4 last:mb-0">
-      <div className="flex items-center justify-between mb-2 gap-2">
-        <div className="flex items-center gap-2">
-          {selectionMode && selectionDraft && onSelectionDraftChange && (
-            <Checkbox
-              className="mt-0.5 border-gray-400"
-              checked={selectionDraft.categories.has(category.id)}
-              onCheckedChange={(c) => {
-                const checked = Boolean(c)
-                const next = {
-                  pillars: new Set(selectionDraft.pillars),
-                  categories: new Set(selectionDraft.categories),
-                  goals: new Set(selectionDraft.goals),
-                  programs: new Set(selectionDraft.programs),
-                }
-                if (checked) {
-                  next.categories.add(category.id)
-                  next.pillars.add(pillar.id)
-                  for (const g of category.goals || []) {
-                    next.goals.add(g.id)
-                    for (const pr of g.programs || []) next.programs.add(pr.id)
+    <>
+      <div className="mb-4 last:mb-0">
+        <div
+          className="flex items-center justify-between mb-2 gap-2"
+          onMouseEnter={handleCategoryMouseEnter}
+          onMouseLeave={handleCategoryMouseLeave}
+        >
+          <div className="flex items-center gap-2">
+            {selectionMode && selectionDraft && onSelectionDraftChange && (
+              <Checkbox
+                className="mt-0.5 border-gray-400"
+                checked={selectionDraft.categories.has(category.id)}
+                onCheckedChange={(c) => {
+                  const checked = Boolean(c)
+                  const next = {
+                    pillars: new Set(selectionDraft.pillars),
+                    categories: new Set(selectionDraft.categories),
+                    goals: new Set(selectionDraft.goals),
+                    programs: new Set(selectionDraft.programs),
                   }
-                } else {
-                  next.categories.delete(category.id)
-                  for (const g of category.goals || []) {
-                    next.goals.delete(g.id)
-                    for (const pr of g.programs || []) next.programs.delete(pr.id)
+                  if (checked) {
+                    next.categories.add(category.id)
+                    next.pillars.add(pillar.id)
+                    for (const g of category.goals || []) {
+                      next.goals.add(g.id)
+                      for (const pr of g.programs || []) next.programs.add(pr.id)
+                    }
+                  } else {
+                    next.categories.delete(category.id)
+                    for (const g of category.goals || []) {
+                      next.goals.delete(g.id)
+                      for (const pr of g.programs || []) next.programs.delete(pr.id)
+                    }
+                    const hasAnySelected = (pillar.categories || []).some(c => next.categories.has(c.id))
+                    if (!hasAnySelected) next.pillars.delete(pillar.id)
                   }
-                  const hasAnySelected = (pillar.categories || []).some(c => next.categories.has(c.id))
-                  if (!hasAnySelected) next.pillars.delete(pillar.id)
-                }
-                onSelectionDraftChange(next)
-              }}
-            />
-          )}
-          <EditableField
-            value={category.name}
-            onSave={handleCategoryNameSave}
+                  onSelectionDraftChange(next)
+                }}
+              />
+            )}
+            <EditableField
+              value={category.name}
+              onSave={handleCategoryNameSave}
             className={`text-base font-medium ${getCategoryColor(pillar)}`}
           />
         </div>
@@ -321,7 +373,19 @@ function CategorySection({
           />
         ))}
       </ul>
-    </div>
+      </div>
+
+      {/* Category Function Tooltip */}
+      {hoveredItem && hoveredItem.type === 'category' && (
+        <ItemFunctionTooltip
+          itemType="category"
+          itemName={hoveredItem.name}
+          functions={hoveredItem.functions}
+          isVisible={true}
+          position={tooltipPosition}
+        />
+      )}
+    </>
   )
 }
 
@@ -358,9 +422,22 @@ function GoalItem({
 }) {
   const [expanded, setExpanded] = useState(false)
   const [hoveredProgram, setHoveredProgram] = useState<string | null>(null)
+  const [hoveredGoal, setHoveredGoal] = useState<{ type: 'goal'; name: string; functions: string[] } | null>(null)
   const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 })
   const visiblePrograms = goal.programs ? filterVisibleItems(goal.programs, selectedQuarter) : []
   const hasPrograms = visiblePrograms.length > 0
+
+  const handleGoalMouseEnter = (event: React.MouseEvent) => {
+    if (isFunctionalView) {
+      const functions = getFunctionsForGoal(goal)
+      setHoveredGoal({ type: 'goal', name: goal.text, functions })
+      setTooltipPosition({ x: event.clientX, y: event.clientY })
+    }
+  }
+
+  const handleGoalMouseLeave = () => {
+    setHoveredGoal(null)
+  }
 
   // Get the status for the selected quarter
   const getGoalStatus = (selectedQuarter: string) => {
@@ -505,11 +582,16 @@ function GoalItem({
               {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             </button>
           )}
-          <EditableField
-            value={goal.text}
-            onSave={handleGoalTextSave}
-            className="text-base"
-          />
+          <div
+            onMouseEnter={handleGoalMouseEnter}
+            onMouseLeave={handleGoalMouseLeave}
+          >
+            <EditableField
+              value={goal.text}
+              onSave={handleGoalTextSave}
+              className="text-base"
+            />
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {onAlignmentClick && (
@@ -638,6 +720,17 @@ function GoalItem({
             </li>
           ))}
         </ul>
+      )}
+
+      {/* Goal Function Tooltip */}
+      {hoveredGoal && hoveredGoal.type === 'goal' && (
+        <ItemFunctionTooltip
+          itemType="goal"
+          itemName={hoveredGoal.name}
+          functions={hoveredGoal.functions}
+          isVisible={true}
+          position={tooltipPosition}
+        />
       )}
 
       {/* Strategic Program Tooltip */}

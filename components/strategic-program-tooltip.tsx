@@ -77,6 +77,11 @@ export const StrategicProgramTooltip: React.FC<StrategicProgramTooltipProps> = (
           <span className="text-lime-400 font-medium">Reporting Owner:</span>
           <span className="text-white ml-2">{program.reportingOwners?.join(', ') || "Not specified"}</span>
         </div>
+
+        <div>
+          <span className="text-lime-400 font-medium">Function:</span>
+          <span className="text-white ml-2">{program.functionArea || "Not specified"}</span>
+        </div>
         
         {program.aiContext && (
           <div>

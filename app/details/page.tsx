@@ -1119,6 +1119,7 @@ function DetailsPageContent() {
                             <StatusCircle
                               status={program[statusField as keyof StrategicProgram] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
                               onStatusChange={(newStatus) => handleStatusUpdate(String(program.strategicPillarId), String(program.categoryId), String(program.strategicGoalId), String(program.id), quarterKey, newStatus ?? null)}
+                              isCurrentQuarter={quarter.columnName === currentQuarter.columnName}
                             />
                           </div>
                         </td>

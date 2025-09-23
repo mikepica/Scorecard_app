@@ -441,6 +441,7 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
                     <StatusCircle
                       status={program[statusField as keyof StrategicProgram] as "exceeded" | "on-track" | "delayed" | "missed" | undefined}
                       onStatusChange={(newStatus) => handleStatusUpdate(quarterKey, newStatus ?? null)}
+                      isCurrentQuarter={quarterInfo.columnName === currentQuarter.columnName}
                     />
                   </div>
                   <EditableField
