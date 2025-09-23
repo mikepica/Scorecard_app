@@ -10,6 +10,7 @@ interface Alignment {
   alignment_rationale?: string
   functional_name: string
   functional_path: string
+  functional_function?: string
   ord_name: string
   ord_path: string
   created_at: string
@@ -1188,21 +1189,26 @@ export class DatabaseService {
     
     try {
       const query = `
-        SELECT 
+        SELECT
           sa.*,
           -- Functional item details
-          CASE 
+          CASE
             WHEN sa.functional_type = 'pillar' THEN sp_func.name
             WHEN sa.functional_type = 'category' THEN c_func.name
             WHEN sa.functional_type = 'goal' THEN sg_func.text
             WHEN sa.functional_type = 'program' THEN fp.text
           END as functional_name,
-          CASE 
+          CASE
             WHEN sa.functional_type = 'pillar' THEN sp_func.name
             WHEN sa.functional_type = 'category' THEN COALESCE(sp_func_cat.name, 'Unknown') || ' > ' || c_func.name
             WHEN sa.functional_type = 'goal' THEN COALESCE(sp_func_goal.name, 'Unknown') || ' > ' || COALESCE(c_func_goal.name, 'Unknown') || ' > ' || sg_func.text
             WHEN sa.functional_type = 'program' THEN COALESCE(fp.pillar, 'Unknown') || ' > ' || COALESCE(fp.category, 'Unknown') || ' > ' || COALESCE(fp.strategic_goal, 'Unknown') || ' > ' || fp.text
           END as functional_path,
+          -- Functional function field (only for programs)
+          CASE
+            WHEN sa.functional_type = 'program' THEN fp.function
+            ELSE NULL
+          END as functional_function,
           -- ORD item details
           CASE 
             WHEN sa.ord_type = 'pillar' THEN sp_ord.name

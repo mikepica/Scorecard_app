@@ -181,6 +181,11 @@ export function HierarchicalSelect({
             {!hasChildren && <div className="w-5" />}
             <span className="mr-2 text-xs">{getTypeIcon(item.type)}</span>
             <span className="truncate font-medium">{item.name}</span>
+            {item.functionArea && (
+              <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                {item.functionArea}
+              </span>
+            )}
             {isSelected && <Check size={14} className="ml-auto text-green-600" />}
           </div>
         </div>
@@ -199,8 +204,15 @@ export function HierarchicalSelect({
       {/* Selected item display */}
       {selectedItem && (
         <div className={`mb-2 p-3 rounded-lg border ${colors.selectedBg} ${colors.selectedBorder}`}>
-          <div className={`text-sm font-medium ${colors.selectedText}`}>Selected:</div>
-          <div className="text-sm text-gray-700 mt-1">{selectedItem.path}</div>
+          <div className="flex items-center gap-2 mb-1">
+            <div className={`text-sm font-medium ${colors.selectedText}`}>Selected:</div>
+            {selectedItem.functionArea && (
+              <div className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                {selectedItem.functionArea}
+              </div>
+            )}
+          </div>
+          <div className="text-sm text-gray-700">{selectedItem.path}</div>
         </div>
       )}
 

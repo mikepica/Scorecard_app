@@ -11,6 +11,7 @@ interface Alignment {
   alignment_rationale?: string
   functional_name: string
   functional_path: string
+  functional_function?: string
   ord_name: string
   ord_path: string
   created_at: string
@@ -91,6 +92,11 @@ export function AlignmentCard({
           <div className="flex items-center space-x-2 mb-1">
             <div className="w-2 h-2 rounded-full bg-green-500"></div>
             <div className="text-xs text-green-600 font-medium">FUNCTIONAL</div>
+            {alignment.functional_function && (
+              <div className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                {alignment.functional_function}
+              </div>
+            )}
           </div>
           <div className="font-semibold text-gray-900 leading-tight">
             {alignment.functional_name}

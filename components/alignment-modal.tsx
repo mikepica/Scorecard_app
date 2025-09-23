@@ -12,6 +12,7 @@ interface Alignment {
   alignment_rationale?: string
   functional_name: string
   functional_path: string
+  functional_function?: string
   ord_name: string
   ord_path: string
   created_at: string
