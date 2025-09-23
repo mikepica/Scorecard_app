@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { promises as fs } from 'fs';
 import path from 'path';
+import type { AlignmentContextDetail } from '@/types/alignment';
 
 // to be commented out
 const openai = new OpenAI({
@@ -51,11 +52,66 @@ export async function POST(req: Request) {
     
     if (programContext) {
       const context = JSON.parse(programContext);
-      userMessage += `Strategic program context:\n${programContext}\n\n`;
+      const contextLabel = context.itemType ? `${context.itemType} context` : 'Strategic program context';
+      userMessage += `${contextLabel}:\n${JSON.stringify(context, null, 2)}\n\n`;
 
       // Add specific AI context section if available
       if (context.aiContext && context.aiContext.trim()) {
         userMessage += `AI-specific context and instructions:\n${context.aiContext}\n\n`;
+      }
+
+      // Include alignment details when available
+      if (Array.isArray(context.alignments) && context.alignments.length > 0) {
+        const alignmentSummaries = context.alignments
+          .map((alignmentDetail: AlignmentContextDetail, index: number) => {
+            const summaryLines: string[] = [];
+            const alignmentRecord = alignmentDetail?.alignment;
+            const summaryText = alignmentDetail?.summary;
+            const itemRole = alignmentDetail?.itemRole;
+            const relatedRole = alignmentDetail?.relatedItemRole;
+            const relatedType = alignmentDetail?.relatedItemType;
+            const relatedId = alignmentDetail?.relatedItemId;
+            const relatedName = alignmentDetail?.relatedItemName;
+            const relatedPath = alignmentDetail?.relatedItemPath;
+
+            summaryLines.push(`Alignment ${index + 1}:`);
+
+            if (summaryText) {
+              summaryLines.push(summaryText);
+            }
+
+            const rolesLine = [
+              itemRole ? `Item role: ${itemRole}` : null,
+              relatedRole ? `Related role: ${relatedRole}` : null,
+              relatedType ? `Related type: ${relatedType}` : null,
+              relatedId ? `Related id: ${relatedId}` : null,
+            ]
+              .filter(Boolean)
+              .join(' | ');
+
+            if (rolesLine) {
+              summaryLines.push(rolesLine);
+            }
+
+            if (relatedName) {
+              summaryLines.push(`Related name: ${relatedName}`);
+            }
+
+            if (relatedPath) {
+              summaryLines.push(`Related path: ${relatedPath}`);
+            }
+
+            if (alignmentRecord) {
+              summaryLines.push(
+                `Alignment record:\n${JSON.stringify(alignmentRecord, null, 2)}`,
+              );
+            }
+
+            return summaryLines.join('\n');
+          })
+          .join('\n\n');
+
+        userMessage += `Alignment context for ${context.text || context.itemId || 'selected item'}:\n${alignmentSummaries}\n\n`;
       }
     }
     

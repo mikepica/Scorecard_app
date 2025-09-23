@@ -15,6 +15,8 @@ import { Header } from "@/components/header"
 import { ChatContextProvider, useChatContext } from "@/components/chat-context"
 import { AlignmentModal } from "@/components/alignment-modal"
 import { AlignmentForm } from "@/components/alignment-form"
+import { fetchAlignmentsForSelections } from "@/lib/alignment-context"
+import type { AlignmentContextDetail } from "@/types/alignment"
 
 interface Alignment {
   id: string
@@ -368,6 +370,18 @@ function HomeInner() {
       formData.append('prompt', prompt)
       formData.append('flowType', flowType)
       formData.append('selections', JSON.stringify(selections))
+
+      let flowAlignmentDetails: AlignmentContextDetail[] = []
+      try {
+        flowAlignmentDetails = await fetchAlignmentsForSelections(selections)
+      } catch (alignmentError) {
+        console.error('Failed to load alignments for AI flow request:', alignmentError)
+      }
+
+      if (flowAlignmentDetails.length > 0) {
+        formData.append('alignmentsContext', JSON.stringify(flowAlignmentDetails))
+      }
+
       formData.append('scorecardData', JSON.stringify(data))
       
       // Add files

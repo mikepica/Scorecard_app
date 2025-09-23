@@ -16,6 +16,8 @@ import { AlignmentModal } from "@/components/alignment-modal"
 import { AlignmentForm } from "@/components/alignment-form"
 import { useSearchParams } from "next/navigation"
 import { useMemo } from "react"
+import { fetchAlignmentsForSelections } from "@/lib/alignment-context"
+import type { AlignmentContextDetail } from "@/types/alignment"
 
 interface Alignment {
   id: string
@@ -361,6 +363,18 @@ function FunctionalViewContent() {
       formData.append('prompt', prompt)
       formData.append('flowType', flowType)
       formData.append('selections', JSON.stringify(selections))
+
+      let flowAlignmentDetails: AlignmentContextDetail[] = []
+      try {
+        flowAlignmentDetails = await fetchAlignmentsForSelections(selections)
+      } catch (alignmentError) {
+        console.error('Failed to load alignments for functional AI flow request:', alignmentError)
+      }
+
+      if (flowAlignmentDetails.length > 0) {
+        formData.append('alignmentsContext', JSON.stringify(flowAlignmentDetails))
+      }
+
       formData.append('scorecardData', JSON.stringify(data))
 
       // Add files

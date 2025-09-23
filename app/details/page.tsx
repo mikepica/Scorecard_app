@@ -20,6 +20,8 @@ import BragStatusTable from "@/components/brag-status-table"
 import { ChatContextProvider } from "@/components/chat-context"
 import { GoalViewsDropdown } from "@/components/goal-views-dropdown"
 import { TableViewsDropdown } from "@/components/table-views-dropdown"
+import { fetchAlignmentContext, fetchAlignmentsForSelections } from "@/lib/alignment-context"
+import type { AlignmentContextDetail } from "@/types/alignment"
 import { MenuDropdown } from "@/components/menu-dropdown"
 
 // Special value to represent "All" selection
@@ -680,7 +682,16 @@ function DetailsPageContent() {
       
       // Add program context
       if (currentProgram) {
+        let alignmentDetails: AlignmentContextDetail[] = []
+        try {
+          alignmentDetails = await fetchAlignmentContext('program', currentProgram.id)
+        } catch (alignmentError) {
+          console.error('Failed to load alignments for progress update:', alignmentError)
+        }
+
         const programContext = JSON.stringify({
+          itemType: 'program',
+          itemId: currentProgram.id,
           id: currentProgram.id,
           text: currentProgram.text,
           pillarName: currentProgram.pillarName,
@@ -689,7 +700,8 @@ function DetailsPageContent() {
           q1Objective: currentProgram.q1_2025_objective,
           q2Objective: currentProgram.q2_2025_objective,
           q3Objective: currentProgram.q3_2025_objective,
-          q4Objective: currentProgram.q4_2025_objective
+          q4Objective: currentProgram.q4_2025_objective,
+          alignments: alignmentDetails
         })
         formData.append('programContext', programContext)
       }
@@ -823,6 +835,18 @@ function DetailsPageContent() {
       formData.append('prompt', prompt)
       formData.append('flowType', flowType)
       formData.append('selections', JSON.stringify(selections))
+
+      let flowAlignmentDetails: AlignmentContextDetail[] = []
+      try {
+        flowAlignmentDetails = await fetchAlignmentsForSelections(selections)
+      } catch (alignmentError) {
+        console.error('Failed to load alignments for AI flow request:', alignmentError)
+      }
+
+      if (flowAlignmentDetails.length > 0) {
+        formData.append('alignmentsContext', JSON.stringify(flowAlignmentDetails))
+      }
+
       formData.append('scorecardData', JSON.stringify(data))
       
       // Add files

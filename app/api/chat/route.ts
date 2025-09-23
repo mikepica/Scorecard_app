@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { promises as fs } from 'fs';
 import path from 'path';
+import type { AlignmentContextDetail } from '@/types/alignment';
 
 // to be commented out
 const openai = new OpenAI({
@@ -35,6 +36,7 @@ interface ScorecardData {
     }>;
     [key: string]: unknown;
   }>;
+  alignments?: AlignmentContextDetail[];
 }
 
 // Filter scorecard data based on user selections
@@ -92,6 +94,48 @@ function extractAIContext(data: ScorecardData): string {
     : '';
 }
 
+function buildAlignmentSummary(alignments?: AlignmentContextDetail[]): string {
+  if (!Array.isArray(alignments) || alignments.length === 0) {
+    return '';
+  }
+
+  const sections = alignments.map((detail, index) => {
+    const lines: string[] = [];
+    lines.push(
+      `Alignment ${index + 1}: Item ${detail.itemType} (${detail.itemId}) as ${detail.itemRole.toUpperCase()}`,
+    );
+
+    if (detail.summary) {
+      lines.push(detail.summary);
+    }
+
+    const relatedDescriptor = detail.relatedItemType
+      ? `${detail.relatedItemRole.toUpperCase()} ${detail.relatedItemType} (${detail.relatedItemId ?? 'unknown'})`
+      : 'Related item: unknown';
+    lines.push(relatedDescriptor);
+
+    if (detail.relatedItemName) {
+      lines.push(`Related name: ${detail.relatedItemName}`);
+    }
+
+    if (detail.relatedItemPath) {
+      lines.push(`Related path: ${detail.relatedItemPath}`);
+    }
+
+    lines.push(`Strength: ${detail.alignment.alignment_strength}`);
+
+    if (detail.alignment.alignment_rationale) {
+      lines.push(`Rationale: ${detail.alignment.alignment_rationale}`);
+    }
+
+    lines.push(`Alignment record:\n${JSON.stringify(detail.alignment, null, 2)}`);
+
+    return lines.join('\n');
+  });
+
+  return `\n\nAlignment context:\n${sections.join('\n\n')}`;
+}
+
 export async function POST(req: Request) {
   try {
     const contentType = req.headers.get('content-type');
@@ -144,6 +188,16 @@ export async function POST(req: Request) {
         // AI Flows request
         const selections = formData.get('selections') as string;
         const scorecardData = formData.get('scorecardData') as string;
+        const alignmentsContextRaw = formData.get('alignmentsContext') as string | null;
+        let alignmentsContext: AlignmentContextDetail[] = [];
+
+        if (alignmentsContextRaw) {
+          try {
+            alignmentsContext = JSON.parse(alignmentsContextRaw) as AlignmentContextDetail[];
+          } catch (alignmentParseError) {
+            console.error('Failed to parse alignments context payload:', alignmentParseError);
+          }
+        }
         
         if (scorecardData && selections) {
           const fullData = JSON.parse(scorecardData);
@@ -151,6 +205,10 @@ export async function POST(req: Request) {
           
           // Filter data based on selections
           const filteredData = filterScorecardData(fullData, filterSelections);
+          const contextWithAlignments: ScorecardData = {
+            ...filteredData,
+            alignments: alignmentsContext.length > 0 ? alignmentsContext : undefined,
+          };
           
           userMessage = `Please analyze the selected strategic data for ${flowType.replace('-', ' ')}.\n\n`;
           
@@ -158,13 +216,13 @@ export async function POST(req: Request) {
             userMessage += `User Instructions: ${prompt}\n\n`;
           }
           
-          userMessage += `Selected Data Context: ${JSON.stringify(filteredData, null, 2)}\n\n`;
+          userMessage += `Selected Data Context: ${JSON.stringify(contextWithAlignments, null, 2)}\n\n`;
           
           if (fileContents) {
             userMessage += `Attached Documents:\n${fileContents}\n\n`;
           }
           
-          contextData = filteredData;
+          contextData = contextWithAlignments;
         }
       } else {
         // Reprioritization request
@@ -199,6 +257,7 @@ export async function POST(req: Request) {
     }
 
     const { messages, context } = body;
+    const typedContext = (context ?? { pillars: [] }) as ScorecardData;
 
     // Load appropriate system prompt
     let promptPath;
@@ -216,10 +275,11 @@ export async function POST(req: Request) {
     const systemPrompt = await fs.readFile(promptPath, 'utf-8');
 
     // Extract AI context from selected programs
-    const aiContext = extractAIContext(context);
+    const aiContext = extractAIContext(typedContext);
+    const alignmentSummary = buildAlignmentSummary(typedContext.alignments);
 
     // Limit context size to prevent token overflow
-    const contextString = JSON.stringify(context);
+    const contextString = JSON.stringify(typedContext);
     const maxContextLength = 50000; // Adjust based on needs
     const truncatedContext = contextString.length > maxContextLength
       ? contextString.substring(0, maxContextLength) + '...[truncated]'
@@ -231,7 +291,7 @@ export async function POST(req: Request) {
       messages: [
         {
           role: "system",
-          content: `${systemPrompt}\n\nHere is the context of the scorecard data: ${truncatedContext}${aiContext}`
+          content: `${systemPrompt}\n\nHere is the context of the scorecard data: ${truncatedContext}${aiContext}${alignmentSummary}`
         },
         ...messages
       ],

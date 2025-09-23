@@ -6,6 +6,8 @@ import type { StrategicProgram, ScoreCardData } from '@/types/scorecard'
 import { StatusCircle } from '@/components/status-circle'
 import { EditableField } from '@/components/ui/editable-field'
 import { GenerateUpdateModal } from '@/components/generate-update-modal'
+import { fetchAlignmentContext } from '@/lib/alignment-context'
+import type { AlignmentContextDetail } from '@/types/alignment'
 import { AIContextModal } from '@/components/ai-context-modal'
 import { getCurrentQuarter, getPreviousQuarter, getAvailableQuarters } from '@/lib/quarter-utils'
 import type { QuarterInfo } from '@/lib/quarter-utils'
@@ -496,7 +498,16 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
             onGenerate={async (content, instructions, files) => {
               try {
                 // Build program context including AI context
+                let alignmentDetails: AlignmentContextDetail[] = []
+                try {
+                  alignmentDetails = await fetchAlignmentContext('program', program.id)
+                } catch (alignmentError) {
+                  console.error('Failed to load alignments for sidebar progress update:', alignmentError)
+                }
+
                 const programContext = {
+                  itemType: 'program',
+                  itemId: program.id,
                   text: program.text,
                   pillarName: program.pillarName,
                   categoryName: program.categoryName,
@@ -504,7 +515,8 @@ export const ProgramDetailsSidebar: React.FC<ProgramDetailsSidebarProps> = ({
                   aiContext: program.aiContext,
                   ordLtSponsors: program.ordLtSponsors,
                   sponsorsLeads: program.sponsorsLeads,
-                  reportingOwners: program.reportingOwners
+                  reportingOwners: program.reportingOwners,
+                  alignments: alignmentDetails
                 };
 
                 const formData = new FormData();

@@ -1,4 +1,4 @@
-# AI Context Documentation
+# AI Context Documentation (User Guide)
 
 This document details what context information is provided to the AI in different scenarios within the scorecard application.
 
@@ -59,8 +59,6 @@ The application uses a hierarchical PostgreSQL database structure:
 
 ### 1. AI Chat Thread with Item Selected
 
-**Location**: `/api/chat/route.ts:41-64` (filterScorecardData function)
-
 **Context Provided**:
 - **Filtered Scorecard Data**: Only pillars, categories, goals, and programs matching user selections
   - Selection filters applied to: `selections.pillars[]`, `selections.categories[]`, `selections.goals[]`, `selections.programs[]`
@@ -72,7 +70,6 @@ The application uses a hierarchical PostgreSQL database structure:
   - Appended as: `"\n\nAI Context for Selected Programs:\n${aiContexts.join('\n')}"`
 
 - **Alignment Context**: Detailed scorecard alignments for every selected item (functional or ORD side)
-  - Alignments resolved in `components/ai-chat.tsx` via `lib/alignment-context.ts`, which queries `/api/alignments?itemType=...&itemId=...`
   - For each alignment, the opposite-side item IDs are merged into the filtered hierarchy so the AI sees both sides of the relationship
   - Context payload includes an `alignments` array containing `AlignmentContextDetail` objects (`itemType`, `itemId`, `itemRole`, `relatedItemRole`, `relatedItemType`, `relatedItemId`, `relatedItemName`, `relatedItemPath`, `summary`, plus the nested `alignment` record with strength/rationale metadata)
   - The system prompt appends an "Alignment context" narrative that enumerates every alignment with strength and rationale for quick scanning by the model
@@ -82,8 +79,6 @@ The application uses a hierarchical PostgreSQL database structure:
 - **Context Truncation**: Limited to 50,000 characters to prevent token overflow
 
 ### 2. AI Chat Thread with Nothing Selected (All Data)
-
-**Location**: `/api/chat/route.ts:201-234` (when no filtering applied)
 
 **Context Provided**:
 - **Complete Scorecard Data**: Full unfiltered hierarchy including:
@@ -102,8 +97,6 @@ The application uses a hierarchical PostgreSQL database structure:
 - **Context Truncation**: Same 50,000 character limit
 
 ### 3. Progress Updates Generation
-
-**Location**: `/api/generate-update/route.ts:14-100`
 
 **Context Provided**:
 - **Current Progress Content**: Existing progress update text (if editing)
@@ -125,7 +118,6 @@ The application uses a hierarchical PostgreSQL database structure:
   - Added as separate section: `"AI-specific context and instructions:\n${context.aiContext}"`
 
 - **Alignment Details**: When the targeted program participates in scorecard alignments
-  - UI surfaces alignments via `fetchAlignmentContext('program', programId)` before sending the request
   - The serialized `programContext` includes an `alignments` array (same `AlignmentContextDetail` shape described above)
   - The API expands the user message with numbered alignment summaries, including roles, related items, strength, rationale, and the full JSON alignment record
 
@@ -137,12 +129,10 @@ The application uses a hierarchical PostgreSQL database structure:
 
 ### 4. AI Flows (Goal Comparison / Learnings & Best Practices)
 
-**Location**: Front-end assembly in `app/page.tsx`, `app/details/page.tsx`, and `app/functional/page.tsx`; request handling in `/api/chat/route.ts:112-200`
-
 **Context Provided**:
 - **User Prompt and Flow Type**: Submitted instructions plus `flowType` (e.g., `goal-comparison`, `learnings-best-practices`)
 - **Filtered Scorecard Data**: `scorecardData` is filtered to the selected items before being passed to the model
-- **Alignment Context**: Matching selections trigger `fetchAlignmentsForSelections`, attaching the `alignments` array to the payload and enabling the same alignment summary in the system message as the chat flow
+- **Alignment Context**: Matching selections trigger alignment fetching, attaching the `alignments` array to the payload and enabling the same alignment summary in the system message as the chat flow
 - **Uploaded Documents**: Any supporting files are appended identically to other chat workflows
 - **System Prompt**: Flow-specific prompt loaded from `Prompts/goal-comparison-system-prompt.md` or `Prompts/learnings-best-practices-system-prompt.md`
 
