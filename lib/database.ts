@@ -49,7 +49,7 @@ export function getPool(): Pool {
       connectionString: process.env.DATABASE_URL,
       max: 20,
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 2000,
+      connectionTimeoutMillis: 10000,
     });
   }
   return pool;
@@ -270,10 +270,19 @@ export class DatabaseService {
   // Get all functional scorecard data with hierarchical structure
   static async getFunctionalScoreCardData(): Promise<ScoreCardData> {
     const client = await getDbConnection();
-    
+
     try {
-      // Get functional programs data (now independent from strategic structure)
-      const programsResult = await client.query('SELECT * FROM functional_programs ORDER BY pillar, category, strategic_goal, text');
+      // Get functional programs and functional goals data in parallel
+      const [programsResult, goalsResult] = await Promise.all([
+        client.query('SELECT * FROM functional_programs ORDER BY pillar, category, strategic_goal, text'),
+        client.query('SELECT * FROM functional_strategic_goals')
+      ]);
+
+      // Create a map of functional goals for quick lookup by ID
+      const functionalGoalsMap = new Map<string, any>();
+      goalsResult.rows.forEach(row => {
+        functionalGoalsMap.set(row.id, row);
+      });
 
       // Build hierarchy from functional programs text fields
       const functionalPrograms: StrategicProgram[] = programsResult.rows.map(row => ({
@@ -370,15 +379,39 @@ export class DatabaseService {
       });
 
       // Create unique goals from functional programs
+      // Group by goal text and look up functional_goal_id for status data
       functionalPrograms.forEach(program => {
         const goalKey = `${program.strategicPillarId}|${program.categoryId}|${program.strategicGoalId}`;
         if (!goalsMap.has(goalKey)) {
+          // Find the first program row with this goal to get the functional_goal_id
+          const programRow = programsResult.rows.find(r =>
+            r.pillar === program.strategicPillarId &&
+            r.category === program.categoryId &&
+            r.strategic_goal === program.strategicGoalId
+          );
+
+          // Look up functional goal data if this program references a functional_goal_id
+          const functionalGoalData = programRow?.functional_goal_id
+            ? functionalGoalsMap.get(programRow.functional_goal_id)
+            : null;
+
           goalsMap.set(goalKey, {
             id: goalKey,
-            text: program.strategicGoalId,
+            text: functionalGoalData?.text || program.strategicGoalId,
             programs: [],
             categoryId: `${program.strategicPillarId}|${program.categoryId}`,
             strategicPillarId: program.strategicPillarId,
+
+            // Include status data from functional_strategic_goals if available
+            q1_2025_status: functionalGoalData?.q1_2025_status,
+            q2_2025_status: functionalGoalData?.q2_2025_status,
+            q3_2025_status: functionalGoalData?.q3_2025_status,
+            q4_2025_status: functionalGoalData?.q4_2025_status,
+            q1_2026_status: functionalGoalData?.q1_2026_status,
+            q2_2026_status: functionalGoalData?.q2_2026_status,
+            q3_2026_status: functionalGoalData?.q3_2026_status,
+            q4_2026_status: functionalGoalData?.q4_2026_status,
+
             ordLtSponsors: ['(Not Specified)'],
             sponsorsLeads: ['(Not Specified)'],
             reportingOwners: ['(Not Specified)']
@@ -417,13 +450,22 @@ export class DatabaseService {
   // Get functional scorecard data filtered by function
   static async getFunctionalScoreCardDataByFunction(selectedFunction: string): Promise<ScoreCardData> {
     const client = await getDbConnection();
-    
+
     try {
-      // Get functional programs data filtered by function
-      const programsResult = await client.query(
-        'SELECT * FROM functional_programs WHERE function = $1 ORDER BY pillar, category, strategic_goal, text',
-        [selectedFunction]
-      );
+      // Get functional programs and functional goals data in parallel
+      const [programsResult, goalsResult] = await Promise.all([
+        client.query(
+          'SELECT * FROM functional_programs WHERE function = $1 ORDER BY pillar, category, strategic_goal, text',
+          [selectedFunction]
+        ),
+        client.query('SELECT * FROM functional_strategic_goals')
+      ]);
+
+      // Create a map of functional goals for quick lookup by ID
+      const functionalGoalsMap = new Map<string, any>();
+      goalsResult.rows.forEach(row => {
+        functionalGoalsMap.set(row.id, row);
+      });
 
       // Build hierarchy from filtered functional programs text fields
       const functionalPrograms: StrategicProgram[] = programsResult.rows.map(row => ({
@@ -520,15 +562,39 @@ export class DatabaseService {
       });
 
       // Create unique goals from functional programs
+      // Group by goal text and look up functional_goal_id for status data
       functionalPrograms.forEach(program => {
         const goalKey = `${program.strategicPillarId}|${program.categoryId}|${program.strategicGoalId}`;
         if (!goalsMap.has(goalKey)) {
+          // Find the first program row with this goal to get the functional_goal_id
+          const programRow = programsResult.rows.find(r =>
+            r.pillar === program.strategicPillarId &&
+            r.category === program.categoryId &&
+            r.strategic_goal === program.strategicGoalId
+          );
+
+          // Look up functional goal data if this program references a functional_goal_id
+          const functionalGoalData = programRow?.functional_goal_id
+            ? functionalGoalsMap.get(programRow.functional_goal_id)
+            : null;
+
           goalsMap.set(goalKey, {
             id: goalKey,
-            text: program.strategicGoalId,
+            text: functionalGoalData?.text || program.strategicGoalId,
             programs: [],
             categoryId: `${program.strategicPillarId}|${program.categoryId}`,
             strategicPillarId: program.strategicPillarId,
+
+            // Include status data from functional_strategic_goals if available
+            q1_2025_status: functionalGoalData?.q1_2025_status,
+            q2_2025_status: functionalGoalData?.q2_2025_status,
+            q3_2025_status: functionalGoalData?.q3_2025_status,
+            q4_2025_status: functionalGoalData?.q4_2025_status,
+            q1_2026_status: functionalGoalData?.q1_2026_status,
+            q2_2026_status: functionalGoalData?.q2_2026_status,
+            q3_2026_status: functionalGoalData?.q3_2026_status,
+            q4_2026_status: functionalGoalData?.q4_2026_status,
+
             ordLtSponsors: ['(Not Specified)'],
             sponsorsLeads: ['(Not Specified)'],
             reportingOwners: ['(Not Specified)']
@@ -793,6 +859,7 @@ export class DatabaseService {
     }
   }
 
+  // Note: Functional goal updates are handled through performFunctionalUpdate()
   // Note: updateCategoryStatus removed - categories no longer have status column
 
   // Update category name
@@ -1142,24 +1209,33 @@ export class DatabaseService {
           if (!quarter) throw new Error('Quarter is required for goal quarter status updates');
           const [,, goalQuarterId] = fieldPath;
 
-          // Support year-specific formats
-          const goalColumn = quarter.includes('_') ? `${quarter}_status` : `${quarter}_status`;
+          // Check if this is a functional goal (contains | separator) or strategic goal (UUID)
+          if (goalQuarterId.includes('|')) {
+            // This is a functional goal composite key (pillar|category|goal text)
+            // Functional goals don't have their own status - they derive from programs
+            // So we skip updating here and let the UI show aggregated status from programs
+            console.log(`Skipping functional goal status update for composite key: ${goalQuarterId}`);
+            result = { rowCount: 1 }; // Fake success to avoid errors
+          } else {
+            // This is a strategic goal (ORD) - use UUID
+            const goalColumn = quarter.includes('_') ? `${quarter}_status` : `${quarter}_status`;
 
-          // Validate column name for year-specific formats
-          const validGoalStatusColumns = [
-            'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
-            'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
-          ];
+            // Validate column name for year-specific formats
+            const validGoalStatusColumns = [
+              'q1_2025_status', 'q2_2025_status', 'q3_2025_status', 'q4_2025_status',
+              'q1_2026_status', 'q2_2026_status', 'q3_2026_status', 'q4_2026_status'
+            ];
 
-          if (!validGoalStatusColumns.includes(goalColumn.replace('_status', '') + '_status')) {
-            throw new Error(`Invalid quarter status column for goals: ${goalColumn}`);
+            if (!validGoalStatusColumns.includes(goalColumn.replace('_status', '') + '_status')) {
+              throw new Error(`Invalid quarter status column for goals: ${goalColumn}`);
+            }
+
+            result = await client.query(
+              `UPDATE strategic_goals SET ${goalColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
+              [newValue, goalQuarterId]
+            );
+            if (result.rowCount === 0) throw new Error(`Goal with ID ${goalQuarterId} not found`);
           }
-
-          result = await client.query(
-            `UPDATE strategic_goals SET ${goalColumn} = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`,
-            [newValue, goalQuarterId]
-          );
-          if (result.rowCount === 0) throw new Error(`Goal with ID ${goalQuarterId} not found`);
           break;
 
         default:

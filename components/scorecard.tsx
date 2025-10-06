@@ -602,13 +602,11 @@ function GoalItem({
               className="text-gray-500 hover:text-blue-600"
             />
           )}
-          {!isFunctionalView && (
-            <StatusCircle
-              status={displayStatus}
-              onStatusChange={handleGoalStatusChange}
-              isCurrentQuarter={isCurrentQuarter}
-            />
-          )}
+          <StatusCircle
+            status={displayStatus}
+            onStatusChange={handleGoalStatusChange}
+            isCurrentQuarter={isCurrentQuarter}
+          />
         </div>
       </div>
 
