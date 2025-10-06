@@ -279,7 +279,18 @@ export class DatabaseService {
       ]);
 
       // Create a map of functional goals for quick lookup by ID
-      const functionalGoalsMap = new Map<string, any>();
+      const functionalGoalsMap = new Map<string, {
+        id: string;
+        text: string;
+        q1_2025_status?: string;
+        q2_2025_status?: string;
+        q3_2025_status?: string;
+        q4_2025_status?: string;
+        q1_2026_status?: string;
+        q2_2026_status?: string;
+        q3_2026_status?: string;
+        q4_2026_status?: string;
+      }>();
       goalsResult.rows.forEach(row => {
         functionalGoalsMap.set(row.id, row);
       });
@@ -462,7 +473,18 @@ export class DatabaseService {
       ]);
 
       // Create a map of functional goals for quick lookup by ID
-      const functionalGoalsMap = new Map<string, any>();
+      const functionalGoalsMap = new Map<string, {
+        id: string;
+        text: string;
+        q1_2025_status?: string;
+        q2_2025_status?: string;
+        q3_2025_status?: string;
+        q4_2025_status?: string;
+        q1_2026_status?: string;
+        q2_2026_status?: string;
+        q3_2026_status?: string;
+        q4_2026_status?: string;
+      }>();
       goalsResult.rows.forEach(row => {
         functionalGoalsMap.set(row.id, row);
       });
