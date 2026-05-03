@@ -1,6 +1,10 @@
 // Pillar Configuration
 // This file provides configuration for pillar colors and icons.
 // Simply map your pillar IDs to colors and icons.
+//
+// NOTE: The pillar IDs below (SPill100, SPill101, SPill102) are sample/demo IDs
+// used to illustrate the configuration pattern. Replace with your actual pillar
+// IDs from your database when deploying.
 
 export interface PillarConfig {
   colorHex: string // Hex color code  
